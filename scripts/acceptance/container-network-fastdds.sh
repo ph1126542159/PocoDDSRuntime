@@ -25,6 +25,20 @@ cleanup()
 }
 trap cleanup EXIT
 
+report_failure()
+{
+    local status=$?
+    echo "isolated Fast-DDS acceptance failed with exit code ${status}" >&2
+    for log in "$evidence"/*.log; do
+        if [[ -f "$log" ]]; then
+            echo "===== $(basename "$log") =====" >&2
+            sed -n '1,240p' "$log" >&2
+        fi
+    done
+    exit "$status"
+}
+trap report_failure ERR
+
 mkdir -p "$evidence"
 docker network create --driver bridge --subnet 10.203.1.0/24 "$network" >/dev/null
 
