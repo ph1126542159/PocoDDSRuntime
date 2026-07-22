@@ -91,3 +91,4 @@ Physical two-machine validation is documented in
 [two-host Fast-DDS acceptance](docs/CROSS_HOST_ACCEPTANCE.md).
 See `docs/SINGLE_HOST_ACCEPTANCE.md` for the complete Windows single-machine verification commands,
 including the official OpenTelemetry Collector run.
+The recorded 2026-07-22 baseline is in `docs/ACCEPTANCE_REPORT_2026-07-22.md`.
