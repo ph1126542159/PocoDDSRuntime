@@ -205,6 +205,17 @@ class FastDDSTransport::Impl final : public eprosima::fastdds::dds::DataWriterLi
         return _matchChanged.wait_for(lock, timeout, [&]() { return _matched.load() > 1; });
     }
 
+    bool waitForAcknowledgments(std::chrono::milliseconds timeout) const
+    {
+        const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+        const auto remainder = timeout - seconds;
+        const eprosima::fastdds::dds::Duration_t duration(
+            static_cast<std::int32_t>(seconds.count()),
+            static_cast<std::uint32_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(remainder).count()));
+        return _writer->wait_for_acknowledgments(duration) == eprosima::fastdds::dds::RETCODE_OK;
+    }
+
     void
     on_publication_matched(eprosima::fastdds::dds::DataWriter*,
                            const eprosima::fastdds::dds::PublicationMatchedStatus& status) override
@@ -306,5 +317,10 @@ std::unique_ptr<Subscription> FastDDSTransport::subscribe(const std::string& top
 bool FastDDSTransport::waitForPeer(std::chrono::milliseconds timeout) const
 {
     return _impl->waitForPeer(timeout);
+}
+
+bool FastDDSTransport::waitForAcknowledgments(std::chrono::milliseconds timeout) const
+{
+    return _impl->waitForAcknowledgments(timeout);
 }
 } // namespace PocoDDS::Transport

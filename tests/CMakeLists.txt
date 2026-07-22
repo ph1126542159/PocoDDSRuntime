@@ -1,7 +1,10 @@
 add_executable(PocoDDSCoreTests
     BundleManagerTest.cpp
+    ContractCodecTest.cpp
+    ControlPlaneAgentTest.cpp
     ContractGeneratorTest.cpp
     DependencyResolverTest.cpp
+    DiscoveryAgentTest.cpp
     ComponentRegistryTest.cpp
     ConfigurationTest.cpp
     InMemoryTransportTest.cpp)

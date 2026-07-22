@@ -37,6 +37,7 @@ class FastDDSTransport final : public ITransport
     void publish(const Message& message) override;
     std::unique_ptr<Subscription> subscribe(const std::string& topic, Handler handler) override;
     bool waitForPeer(std::chrono::milliseconds timeout) const;
+    bool waitForAcknowledgments(std::chrono::milliseconds timeout) const;
 
   private:
     std::unique_ptr<Impl> _impl;

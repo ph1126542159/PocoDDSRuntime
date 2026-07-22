@@ -41,6 +41,16 @@ the authority for each business payload carried inside it.
 Automatic discovery does not remove the need for an interface contract. Every business topic must
 have a versioned IDL/schema, QoS profile and ownership definition.
 
+The control plane uses versioned binary contracts for component manifests, configuration
+transactions, lifecycle commands and command results. `DiscoveryAgent` broadcasts leased component
+manifests and removes expired remote entries. `ControlPlaneAgent` applies validated configuration
+transactions immediately, rejects stale revisions without partial changes, executes lifecycle
+handlers and returns correlated results while preserving the incoming trace context.
+
+Acceptance uses an application-level READY handshake before publishing volatile control data. A DDS
+matched count alone is not treated as liveness because stale shared-memory endpoints can remain
+visible briefly after an abruptly terminated process.
+
 ## Desktop child windows
 
 The `QtOpenGLMultiProcess` acceptance demo exercises this boundary. Qt child processes must render

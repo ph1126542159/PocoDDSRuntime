@@ -1,4 +1,7 @@
 add_library(PocoDDSCore
+    Control/ContractCodec.cpp
+    Control/ControlPlaneAgent.cpp
+    Control/DiscoveryAgent.cpp
     Core/BundleManager.cpp
     Core/Configuration.cpp
     Core/ComponentRegistry.cpp

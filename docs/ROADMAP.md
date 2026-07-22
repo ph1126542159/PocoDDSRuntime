@@ -18,8 +18,13 @@ heartbeat timeout restart, controlled termination and transactional configuratio
 heartbeats and admin-driven configuration remain gated on the Fast-DDS and admin-plane phases.
 
 The generic Fast-DDS wire transport now has real two-process SHM-only and UDP-only acceptance on
-Windows, including payload and W3C trace-context verification. Typed control-plane contracts and a
-physical two-host acceptance run are still required.
+Windows, including payload and W3C trace-context verification. A physical two-host acceptance run is
+still required.
+
+Component manifests, discovery leases, configuration transactions, lifecycle commands and correlated
+results are now implemented as versioned control contracts. The SHM and UDP two-process probes verify
+component discovery as well as payload delivery. A READY handshake prevents stale SHM discovery state
+from causing the first volatile control sample to be sent before the live peer is ready.
 
 ## Phase 3 - observability and administration
 
