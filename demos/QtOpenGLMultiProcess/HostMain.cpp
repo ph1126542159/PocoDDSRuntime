@@ -257,13 +257,13 @@ int main(int argc, char* argv[])
                     }
                     else if (count == 2 && restarted && secondRenderSent)
                     {
-                        finishAcceptance("QT_DDS_TRACE_CRASH_RESTART_PASS\nfirst_pid=" +
-                                             std::to_string(firstProcessId.load()) +
-                                             "\nrestarted_pid=" +
-                                             std::to_string(restartedProcessId.load()) +
-                                             "\nnative_embedded=" +
-                                             (nativeSurfaceEmbedded ? "true" : "false") + "\n",
-                                         0);
+                        finishAcceptance(
+                            "QT_DDS_TRACE_CRASH_RESTART_PASS\nfirst_pid=" +
+                                std::to_string(firstProcessId.load()) +
+                                "\nrestarted_pid=" + std::to_string(restartedProcessId.load()) +
+                                "\nnative_embedded=" + (nativeSurfaceEmbedded ? "true" : "false") +
+                                "\n",
+                            0);
                     }
                 },
                 Qt::QueuedConnection);

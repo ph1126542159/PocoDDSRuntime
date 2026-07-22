@@ -85,8 +85,8 @@ TEST(NativeProcessTest, StartsAndTerminatesRealChild)
 TEST(NativeProcessTest, SupervisorRestartsAndRemovesRealChild)
 {
     PocoDDS::Core::ComponentRegistry registry;
-    PocoDDS::Supervisor::Supervisor supervisor(
-        registry, PocoDDS::Supervisor::createNativeProcessLauncher());
+    PocoDDS::Supervisor::Supervisor supervisor(registry,
+                                               PocoDDS::Supervisor::createNativeProcessLauncher());
     supervisor.add({"managed-native-child", PDR_TEST_CHILD_PATH, {}, {}, {}});
     supervisor.start("managed-native-child");
     const auto first = registry.find("managed-native-child");
