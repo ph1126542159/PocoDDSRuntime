@@ -12,8 +12,9 @@ The example keeps those lifecycle and messaging responsibilities below the Qt pr
 
 With tests enabled, `QtOpenGLMultiProcessAcceptance` runs headlessly. It requires a successful render,
 matching parent/child Trace IDs, a changed child PID after fault injection, and a second successful
-render. The visual embedding itself remains a manual platform acceptance gate because an offscreen
-CI platform cannot prove compositor behavior.
+render. On Windows, `QtOpenGLNativeEmbeddingAcceptance` additionally runs with the native platform
+plugin and requires the child surface to be an actual descendant window of the host before the DDS,
+trace, crash and restart checks may pass.
 
 Set `PDR_OTLP_ENDPOINT=http://127.0.0.1:4318` to export both the host and child spans to an
 OpenTelemetry Collector. `config/otel-collector-acceptance.yaml` provides a local validation

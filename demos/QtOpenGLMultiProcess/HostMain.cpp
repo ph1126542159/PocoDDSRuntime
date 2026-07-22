@@ -25,6 +25,11 @@
 #include <utility>
 #include <vector>
 
+#if defined(_WIN32)
+#define NOMINMAX
+#include <Windows.h>
+#endif
+
 namespace
 {
 constexpr const char* SurfaceTopic = "pdr.demo.qt.surface.v1";
@@ -52,12 +57,27 @@ std::string traceId(const std::string& traceParent)
         return {};
     return traceParent.substr(3, 32);
 }
+
+bool isNativeSurfaceEmbedded(WId child, QWidget& host)
+{
+#if defined(_WIN32)
+    const auto childWindow = reinterpret_cast<HWND>(child);
+    const auto hostWindow = reinterpret_cast<HWND>(host.winId());
+    return childWindow != nullptr && hostWindow != nullptr && IsChild(hostWindow, childWindow);
+#else
+    static_cast<void>(child);
+    static_cast<void>(host);
+    return false;
+#endif
+}
 } // namespace
 
 int main(int argc, char* argv[])
 {
     QApplication application(argc, argv);
     const bool acceptance = argc > 1 && std::string(argv[1]) == "--acceptance";
+    const bool requireNativeEmbedding =
+        qEnvironmentVariableIntValue("PDR_REQUIRE_NATIVE_EMBEDDING") == 1;
     const std::string markerPath = acceptance && argc > 2 ? argv[2] : std::string{};
     const auto domainArgument = acceptance ? 3 : 1;
     const auto domain =
@@ -104,6 +124,7 @@ int main(int argc, char* argv[])
     std::atomic<bool> crashSent{false};
     std::atomic<bool> secondRenderSent{false};
     std::atomic<int> successfulResults{0};
+    std::atomic<bool> nativeSurfaceEmbedded{false};
 
     auto finishAcceptance = [&](const std::string& result, int exitCode)
     {
@@ -178,7 +199,17 @@ int main(int argc, char* argv[])
                     {
                         container = QWidget::createWindowContainer(foreignWindow, central);
                         layout->addWidget(container);
-                        status->setText("Child discovered through Fast-DDS and embedded");
+                        container->show();
+                        nativeSurfaceEmbedded = isNativeSurfaceEmbedded(nativeId, window);
+                        status->setText(nativeSurfaceEmbedded
+                                            ? "Child discovered and native surface embedded"
+                                            : "Child discovered; native embedding is unavailable");
+                        if (acceptance && requireNativeEmbedding && !nativeSurfaceEmbedded)
+                        {
+                            finishAcceptance(
+                                "QT_DDS_ACCEPTANCE_FAIL: native surface was not embedded\n", 4);
+                            return;
+                        }
                     }
                     if (acceptance && !firstRenderSent.exchange(true))
                         QMetaObject::invokeMethod(&window, requestRender, Qt::QueuedConnection);
@@ -229,7 +260,9 @@ int main(int argc, char* argv[])
                         finishAcceptance("QT_DDS_TRACE_CRASH_RESTART_PASS\nfirst_pid=" +
                                              std::to_string(firstProcessId.load()) +
                                              "\nrestarted_pid=" +
-                                             std::to_string(restartedProcessId.load()) + "\n",
+                                             std::to_string(restartedProcessId.load()) +
+                                             "\nnative_embedded=" +
+                                             (nativeSurfaceEmbedded ? "true" : "false") + "\n",
                                          0);
                     }
                 },

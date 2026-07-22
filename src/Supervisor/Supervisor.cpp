@@ -53,6 +53,34 @@ void Supervisor::stop(const std::string& id)
     publish(managed, Core::ComponentState::Stopped);
 }
 
+void Supervisor::restart(const std::string& id)
+{
+    std::lock_guard lock(_mutex);
+    auto& managed = _managed.at(id);
+    managed.desiredRunning = true;
+    publish(managed, Core::ComponentState::Stopping);
+    if (managed.process && managed.process->running())
+        managed.process->terminate(std::chrono::seconds(3));
+    managed.process.reset();
+    managed.restarts.clear();
+    launch(managed);
+}
+
+void Supervisor::remove(const std::string& id)
+{
+    std::lock_guard lock(_mutex);
+    const auto found = _managed.find(id);
+    if (found == _managed.end())
+        throw std::out_of_range("process is not registered");
+    auto& managed = found->second;
+    managed.desiredRunning = false;
+    publish(managed, Core::ComponentState::Stopping);
+    if (managed.process && managed.process->running())
+        managed.process->terminate(std::chrono::seconds(3));
+    _managed.erase(found);
+    _registry.remove(id);
+}
+
 void Supervisor::heartbeat(const std::string& id)
 {
     std::lock_guard lock(_mutex);

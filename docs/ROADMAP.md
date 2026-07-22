@@ -60,8 +60,8 @@ and restart. Durable storage, role-based authorization and TLS deployment remain
 ## Phase 4 - application adapters
 
 - Qt/OpenGL multi-process acceptance: discovery, child restart, DDS command/frame exchange, trace
-  continuity and fault injection. Automated headless acceptance is complete; visual native-surface
-  embedding remains a manual platform gate.
+  continuity and fault injection. Automated headless acceptance and Windows native parent/child
+  window relationship verification are complete.
 - Installable CMake SDK with exported core, OSP, CodeGeneration, Fast-DDS, observability and admin
   targets, plus an outside-tree consumer acceptance fixture.
 - Qt host and child-process SDK, with native-surface embedding adapters.

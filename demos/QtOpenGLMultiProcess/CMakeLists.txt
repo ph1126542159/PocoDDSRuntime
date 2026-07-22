@@ -28,4 +28,15 @@ if(PDR_BUILD_TESTS)
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
         ENVIRONMENT_MODIFICATION
             "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+    if(WIN32)
+        add_test(NAME QtOpenGLNativeEmbeddingAcceptance
+            COMMAND pdr-qt-opengl-host --acceptance
+                "${CMAKE_CURRENT_BINARY_DIR}/qt-native-embedding-acceptance.txt" 189)
+        set_tests_properties(QtOpenGLNativeEmbeddingAcceptance PROPERTIES
+            TIMEOUT 45
+            PASS_REGULAR_EXPRESSION "native_embedded=true"
+            ENVIRONMENT "QT_QPA_PLATFORM=windows;PDR_REQUIRE_NATIVE_EMBEDDING=1"
+            ENVIRONMENT_MODIFICATION
+                "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+    endif()
 endif()

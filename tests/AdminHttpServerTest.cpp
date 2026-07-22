@@ -116,7 +116,10 @@ TEST(AdminHttpServerTest, EnforcesAuthenticationAndServesRuntimeData)
     auto trace = request(server.port(), "GET", "/api/v1/traces/trace-one");
     EXPECT_NE(trace.body.find("span-one"), std::string::npos);
     EXPECT_NE(trace.body.find("input"), std::string::npos);
-    EXPECT_NE(request(server.port(), "GET", "/").body.find("PocoDDS Runtime"), std::string::npos);
+    const auto adminPage = request(server.port(), "GET", "/").body;
+    EXPECT_NE(adminPage.find("PocoDDS Runtime"), std::string::npos);
+    EXPECT_NE(adminPage.find("openConfig(c.id)"), std::string::npos);
+    EXPECT_NE(adminPage.find("openLogs(c.id)"), std::string::npos);
 
     server.stop();
 }

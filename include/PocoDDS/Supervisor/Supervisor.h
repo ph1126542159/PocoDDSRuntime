@@ -27,6 +27,8 @@ class Supervisor
     void add(ProcessSpec spec, RestartPolicy policy = {});
     void start(const std::string& id);
     void stop(const std::string& id);
+    void restart(const std::string& id);
+    void remove(const std::string& id);
     void heartbeat(const std::string& id);
     void poll();
 

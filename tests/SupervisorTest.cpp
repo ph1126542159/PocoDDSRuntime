@@ -82,6 +82,28 @@ TEST(NativeProcessTest, StartsAndTerminatesRealChild)
     EXPECT_FALSE(process->running());
 }
 
+TEST(NativeProcessTest, SupervisorRestartsAndRemovesRealChild)
+{
+    PocoDDS::Core::ComponentRegistry registry;
+    PocoDDS::Supervisor::Supervisor supervisor(
+        registry, PocoDDS::Supervisor::createNativeProcessLauncher());
+    supervisor.add({"managed-native-child", PDR_TEST_CHILD_PATH, {}, {}, {}});
+    supervisor.start("managed-native-child");
+    const auto first = registry.find("managed-native-child");
+    ASSERT_TRUE(first.has_value());
+    ASSERT_GT(first->processId, 0);
+
+    supervisor.restart("managed-native-child");
+    const auto restarted = registry.find("managed-native-child");
+    ASSERT_TRUE(restarted.has_value());
+    EXPECT_EQ(restarted->state, PocoDDS::Core::ComponentState::Running);
+    EXPECT_GT(restarted->processId, 0);
+    EXPECT_NE(restarted->processId, first->processId);
+
+    supervisor.remove("managed-native-child");
+    EXPECT_FALSE(registry.find("managed-native-child").has_value());
+}
+
 TEST(SupervisorTest, RestartsAProcessAfterHeartbeatTimeout)
 {
     PocoDDS::Core::ComponentRegistry registry;
