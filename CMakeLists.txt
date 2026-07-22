@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
 project(PocoDDSRuntime VERSION 0.1.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(PDR_BOOTSTRAP_DEPENDENCIES "Build missing dependencies into build/install" ON)
@@ -43,3 +46,21 @@ if(PDR_BUILD_TESTS)
     pdr_require_googletest()
     add_subdirectory(tests)
 endif()
+
+install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(EXPORT PocoDDSRuntimeTargets
+    FILE PocoDDSRuntimeTargets.cmake
+    NAMESPACE PocoDDS::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/PocoDDSRuntime")
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PocoDDSRuntimeConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfig.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/PocoDDSRuntime")
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion)
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/PocoDDSRuntime")

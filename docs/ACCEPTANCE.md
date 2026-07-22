@@ -14,3 +14,4 @@ The framework is complete only when every gate below has executable evidence.
 | Admin plane | Authenticated topology, logs, config, lifecycle and trace APIs plus UI | Real runtime discovers and controls remote process over DDS; durable storage and RBAC pending |
 | Qt/OpenGL demo | Embedded/rendered child, DDS control, trace, crash/restart and cleanup | Automated DDS render, W3C Trace ID continuity, changed PID after crash/restart, second render and cleanup passed; visual compositor embedding remains a manual platform gate |
 | Portability | Windows, Linux and macOS CI plus platform-specific integration evidence | Windows, Linux and macOS core jobs passed; Linux clean dependency bootstrap, full-stack build and Qt acceptance suite passed in GitHub Actions run 29912246747 |
+| Reusable SDK | Installable CMake package is consumed outside the source tree | Installed headers, libraries and six `PocoDDS::` targets configure, link and run from `tests/install-consumer` |

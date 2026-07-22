@@ -26,6 +26,17 @@ cmake -S . -B build -DPDR_ENABLE_FASTDDS=ON -DPDR_ENABLE_OPENTELEMETRY=ON `
 All third-party install artifacts are isolated under `build/install`; host and cross-compiled build
 directories must never share that prefix.
 
+Install the framework SDK and consume it from another project without referring to the source tree:
+
+```powershell
+cmake --install build-fastdds --prefix build/sdk
+cmake -S MyApplication -B MyApplication/build `
+  -DCMAKE_PREFIX_PATH="$PWD/build/sdk;$PWD/build/install"
+```
+
+The installed package exports `PocoDDS::Core`, `PocoDDS::FastDDS`, `PocoDDS::Observability`,
+`PocoDDS::Admin`, `PocoDDS::OSP` and `PocoDDS::CodeGeneration` for `find_package(PocoDDSRuntime)`.
+
 Upstream Poco is detected as a package and otherwise built from the official
 `poco-1.15.3-release` tag by the dependency superbuild. Poco source is not copied into this repository.
 The optional Qt/OpenGL multi-process acceptance demo is enabled with

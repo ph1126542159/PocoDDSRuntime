@@ -57,3 +57,14 @@ jobs:
         run: cmake --build build-full --config Release --parallel 2
       - name: Run full acceptance suite
         run: ctest --test-dir build-full -C Release --output-on-failure
+      - name: Install reusable SDK
+        run: cmake --install build-full --prefix ${{ github.workspace }}/build-sdk
+      - name: Build outside-tree SDK consumer
+        run: >-
+          cmake -S tests/install-consumer -B build-consumer
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build-sdk;${{ github.workspace }}/build-deps/install"
+      - name: Link outside-tree SDK consumer
+        run: cmake --build build-consumer --config Release --parallel 2
+      - name: Run outside-tree SDK consumer
+        run: ./build-consumer/pdr-install-consumer
