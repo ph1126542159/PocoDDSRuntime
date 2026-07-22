@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - name: Configure
+        run: cmake -S . -B build -DPDR_ENABLE_FASTDDS=OFF -DPDR_ENABLE_OPENTELEMETRY=OFF
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Check formatting
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          find include src apps tests -type f \( -name '*.h' -o -name '*.cpp' \) -print0 |
+            xargs -0 clang-format --dry-run --Werror
+

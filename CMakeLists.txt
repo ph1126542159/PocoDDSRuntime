@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.24)
+project(PocoDDSRuntime VERSION 0.1.0 LANGUAGES CXX)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+option(PDR_BOOTSTRAP_DEPENDENCIES "Build missing dependencies into build/install" ON)
+option(PDR_ENABLE_FASTDDS "Build the Fast-DDS transport" OFF)
+option(PDR_ENABLE_OPENTELEMETRY "Build OpenTelemetry integration" OFF)
+option(PDR_BUILD_TESTS "Build GoogleTest tests" ON)
+option(PDR_BUILD_EXAMPLES "Build example processes" ON)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(PDR_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Build-local dependency prefix")
+
+include(PDRWarnings)
+include(PDRDependencies)
+
+add_subdirectory(src)
+if(PDR_BUILD_EXAMPLES)
+    add_subdirectory(apps)
+endif()
+if(PDR_BUILD_TESTS)
+    include(CTest)
+    enable_testing()
+    pdr_require_googletest()
+    add_subdirectory(tests)
+endif()
+
