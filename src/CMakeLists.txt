@@ -1,4 +1,5 @@
 add_library(PocoDDSCore
+    Admin/AdminService.cpp
     Control/ContractCodec.cpp
     Control/ControlPlaneAgent.cpp
     Control/DiscoveryAgent.cpp
@@ -16,6 +17,15 @@ endif()
 target_include_directories(PocoDDSCore PUBLIC "${PROJECT_SOURCE_DIR}/include")
 pdr_set_warnings(PocoDDSCore)
 add_library(PocoDDS::Core ALIAS PocoDDSCore)
+
+if(PDR_ENABLE_ADMIN)
+    pdr_require_poco()
+    add_library(PocoDDSAdmin Admin/AdminHttpServer.cpp)
+    target_include_directories(PocoDDSAdmin PUBLIC "${PROJECT_SOURCE_DIR}/include")
+    target_link_libraries(PocoDDSAdmin PUBLIC PocoDDSCore Poco::Net Poco::JSON)
+    pdr_set_warnings(PocoDDSAdmin)
+    add_library(PocoDDS::Admin ALIAS PocoDDSAdmin)
+endif()
 
 if(PDR_ENABLE_OPENTELEMETRY)
     pdr_require_opentelemetry()

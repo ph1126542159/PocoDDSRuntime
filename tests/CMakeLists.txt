@@ -1,4 +1,5 @@
 add_executable(PocoDDSCoreTests
+    AdminServiceTest.cpp
     BundleManagerTest.cpp
     ContractCodecTest.cpp
     ControlPlaneAgentTest.cpp
@@ -27,6 +28,10 @@ endif()
 if(PDR_ENABLE_OPENTELEMETRY)
     target_sources(PocoDDSCoreTests PRIVATE BusinessTracerTest.cpp)
     target_link_libraries(PocoDDSCoreTests PRIVATE PocoDDS::Observability)
+endif()
+if(PDR_ENABLE_ADMIN)
+    target_sources(PocoDDSCoreTests PRIVATE AdminHttpServerTest.cpp)
+    target_link_libraries(PocoDDSCoreTests PRIVATE PocoDDS::Admin)
 endif()
 target_link_libraries(PocoDDSCoreTests PRIVATE PocoDDS::Core PocoDDS::OSP
     PocoDDS::CodeGeneration GTest::gtest_main)

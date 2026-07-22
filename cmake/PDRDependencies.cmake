@@ -36,7 +36,7 @@ function(pdr_require_opentelemetry)
 endfunction()
 
 function(pdr_require_poco)
-    find_package(Poco 1.15.3 CONFIG QUIET COMPONENTS Foundation Util JSON
+    find_package(Poco 1.15.3 CONFIG QUIET COMPONENTS Foundation Net JSON
         PATHS "${PDR_INSTALL_PREFIX}")
     if(Poco_FOUND)
         return()

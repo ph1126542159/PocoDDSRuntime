@@ -19,7 +19,8 @@ Missing GoogleTest is fetched automatically. For the full native dependency pref
 ```powershell
 cmake -S cmake -B build/dependencies -DPDR_SOURCE_DIR=$PWD
 cmake --build build/dependencies --config Release --parallel 2
-cmake -S . -B build -DPDR_ENABLE_FASTDDS=ON -DPDR_ENABLE_OPENTELEMETRY=ON
+cmake -S . -B build -DPDR_ENABLE_FASTDDS=ON -DPDR_ENABLE_OPENTELEMETRY=ON `
+  -DPDR_ENABLE_ADMIN=ON
 ```
 
 All third-party install artifacts are isolated under `build/install`; host and cross-compiled build
@@ -41,5 +42,21 @@ ctest --test-dir build-fastdds --output-on-failure
 
 The acceptance suite launches independent publisher and subscriber processes twice: once with only
 Fast-DDS shared memory enabled and once with only UDP enabled.
+
+## Local administration
+
+The administration plane binds to `127.0.0.1:9080` by default. API access requires a bearer token
+of at least 16 characters; the HTML shell contains no runtime data and prompts for the token locally.
+
+```powershell
+$env:PDR_ADMIN_TOKEN = "replace-with-a-random-32-byte-token"
+$env:PDR_ADMIN_BIND = "127.0.0.1"
+$env:PDR_ADMIN_PORT = "9080"
+build-fastdds/apps/pdr-runtime.exe
+```
+
+Open `http://127.0.0.1:9080/` to inspect topology and logs, apply live configuration, issue lifecycle
+commands and inspect trace graphs. Binding to a non-loopback interface should only be done behind TLS
+and an authenticated reverse proxy. `PDR_RUN_SECONDS` provides a bounded runtime for CI smoke tests.
 
 See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).

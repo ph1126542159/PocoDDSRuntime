@@ -44,6 +44,12 @@ The official OpenTelemetry C++ SDK is now built by the dependency superbuild. `B
 events. GoogleTest proves parent-child continuity between independent service tracer providers. OTLP
 export, Collector storage and a physical cross-process trace remain acceptance gates.
 
+The loopback administration plane now provides bearer-authenticated topology, configuration,
+lifecycle, log and trace APIs plus an embedded SPA with a trace graph. Real TCP GoogleTests cover
+authorization and every API family; a launched `pdr-runtime` process also passes topology, live config
+and restart smoke checks. Durable storage, role-based authorization, TLS deployment guidance and DDS
+routing to remote owners remain open.
+
 ## Phase 4 - application adapters
 
 - Promote the Qt/OpenGL multi-process demo from native-surface smoke test to a full acceptance test:

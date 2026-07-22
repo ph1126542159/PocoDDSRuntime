@@ -1,5 +1,9 @@
 add_executable(pdr-runtime RuntimeMain.cpp)
 target_link_libraries(pdr-runtime PRIVATE PocoDDS::Core)
+if(PDR_ENABLE_ADMIN)
+    target_link_libraries(pdr-runtime PRIVATE PocoDDS::Admin)
+    target_compile_definitions(pdr-runtime PRIVATE PDR_ENABLE_ADMIN=1)
+endif()
 pdr_set_warnings(pdr-runtime)
 
 if(PDR_ENABLE_FASTDDS)

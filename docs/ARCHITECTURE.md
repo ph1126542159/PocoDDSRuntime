@@ -20,6 +20,12 @@ controlled lifecycle) without inheriting RemotingNG's generated proxy/skeleton/O
 7. **Application adapters** integrate Qt, OpenGL or headless services without leaking those
    dependencies into Core.
 
+The current administration implementation is split into `AdminService`, which owns bounded topology,
+log and trace query/control behavior, and `AdminHttpServer`, which exposes the behavior through Poco
+Net. It binds to loopback by default, rejects short tokens, compares bearer credentials without an
+early exit, limits request bodies and emits anti-framing/content-type headers. The embedded SPA has no
+external assets and all data/control endpoints require authentication.
+
 Upstream Poco is never vendored. CMake first searches the build-local prefix and the system, while
 the dependency superbuild obtains the pinned current Poco release when it is missing. Framework-only
 OSP and contract-generation code lives under `framework/` and remains separate from upstream Poco.

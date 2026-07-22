@@ -15,8 +15,9 @@ set(common -DCMAKE_INSTALL_PREFIX=${prefix} -DCMAKE_PREFIX_PATH=${prefix}
 find_package(Poco 1.15.3 CONFIG QUIET COMPONENTS Foundation Util JSON)
 if(NOT Poco_FOUND)
     ExternalProject_Add(poco
-        GIT_REPOSITORY https://github.com/pocoproject/poco.git
-        GIT_TAG poco-1.15.3-release GIT_SHALLOW TRUE
+        URL https://github.com/pocoproject/poco/archive/refs/tags/poco-1.15.3-release.tar.gz
+        URL_HASH SHA256=4f112fea59e0c65f0fffe30a4957f8d66cf41528c21dd9903e6d7550022c794e
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         CMAKE_ARGS ${common} -DENABLE_TESTS=OFF -DENABLE_SAMPLES=OFF
             -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF
             -DENABLE_DATA_POSTGRESQL=OFF -DENABLE_DATA_MYSQL=OFF
