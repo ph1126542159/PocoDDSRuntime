@@ -26,6 +26,11 @@ Net. It binds to loopback by default, rejects short tokens, compares bearer cred
 early exit, limits request bodies and emits anti-framing/content-type headers. The embedded SPA has no
 external assets and all data/control endpoints require authentication.
 
+Observability uses the official OpenTelemetry SDK for span creation and processing. The optional
+OTLP/HTTP JSON exporter serializes standard `resourceSpans`, `scopeSpans`, Base64 trace/span IDs,
+nanosecond timestamps, attributes, events and status to `/v1/traces`. It targets a local or sidecar
+Collector over HTTP; production TLS, buffering and retry policy belong at the Collector boundary.
+
 Upstream Poco is never vendored. CMake first searches the build-local prefix and the system, while
 the dependency superbuild obtains the pinned current Poco release when it is missing. Framework-only
 OSP and contract-generation code lives under `framework/` and remains separate from upstream Poco.

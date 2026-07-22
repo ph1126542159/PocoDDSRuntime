@@ -18,6 +18,12 @@ struct CompletedSpan
     long long durationNanoseconds = 0;
 };
 
+struct BusinessTracerOptions
+{
+    std::string otlpHttpEndpoint;
+    std::map<std::string, std::string> otlpHeaders;
+};
+
 class BusinessSpan
 {
   public:
@@ -47,6 +53,7 @@ class BusinessTracer
     class Impl;
 
     explicit BusinessTracer(std::string serviceName);
+    BusinessTracer(std::string serviceName, BusinessTracerOptions options);
     ~BusinessTracer();
 
     BusinessSpan start(const std::string& operation,

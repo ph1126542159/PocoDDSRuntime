@@ -11,6 +11,10 @@
 
 #include <utility>
 
+#if defined(PDR_ENABLE_OTLP_HTTP)
+#include "OtlpHttpJsonExporter.h"
+#endif
+
 namespace PocoDDS::Observability
 {
 namespace
@@ -59,13 +63,23 @@ std::string toHex(const otel::trace::SpanId& id)
 class BusinessTracer::Impl
 {
   public:
-    explicit Impl(const std::string& serviceName)
+    Impl(const std::string& serviceName, const BusinessTracerOptions& options)
     {
         auto exporter = std::make_unique<otel::exporter::memory::InMemorySpanExporter>();
         data = exporter->GetData();
-        auto processor = otel::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(exporter));
+        std::vector<std::unique_ptr<otel::sdk::trace::SpanProcessor>> processors;
+        processors.push_back(
+            otel::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(exporter)));
+#if defined(PDR_ENABLE_OTLP_HTTP)
+        if (!options.otlpHttpEndpoint.empty())
+            processors.push_back(otel::sdk::trace::SimpleSpanProcessorFactory::Create(
+                createOtlpHttpJsonExporter(options.otlpHttpEndpoint, options.otlpHeaders)));
+#else
+        if (!options.otlpHttpEndpoint.empty())
+            throw std::invalid_argument("OTLP/HTTP support was not enabled at build time");
+#endif
         auto resource = otel::sdk::resource::Resource::Create({{"service.name", serviceName}});
-        provider = otel::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
+        provider = otel::sdk::trace::TracerProviderFactory::Create(std::move(processors), resource);
         tracer = provider->GetTracer(serviceName, "1.0.0");
     }
 
@@ -125,7 +139,12 @@ void BusinessSpan::finish(const std::string& status,
     _impl->finished = true;
 }
 
-BusinessTracer::BusinessTracer(std::string serviceName) : _impl(std::make_shared<Impl>(serviceName))
+BusinessTracer::BusinessTracer(std::string serviceName) : BusinessTracer(std::move(serviceName), {})
+{
+}
+
+BusinessTracer::BusinessTracer(std::string serviceName, BusinessTracerOptions options)
+    : _impl(std::make_shared<Impl>(serviceName, options))
 {
 }
 

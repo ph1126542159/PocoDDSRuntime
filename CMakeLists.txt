@@ -7,9 +7,14 @@ option(PDR_BOOTSTRAP_DEPENDENCIES "Build missing dependencies into build/install
 option(PDR_ENABLE_FASTDDS "Build the Fast-DDS transport" OFF)
 option(PDR_ENABLE_OPENTELEMETRY "Build OpenTelemetry integration" OFF)
 option(PDR_ENABLE_ADMIN "Build the authenticated Poco HTTP administration plane" OFF)
+option(PDR_ENABLE_OTLP_HTTP "Build the OTLP/HTTP JSON trace exporter" OFF)
 option(PDR_BUILD_TESTS "Build GoogleTest tests" ON)
 option(PDR_BUILD_EXAMPLES "Build example processes" ON)
 option(PDR_BUILD_QT_OPENGL_DEMO "Build the multi-process Qt/OpenGL acceptance demo" OFF)
+
+if(PDR_ENABLE_OTLP_HTTP AND NOT PDR_ENABLE_OPENTELEMETRY)
+    message(FATAL_ERROR "PDR_ENABLE_OTLP_HTTP requires PDR_ENABLE_OPENTELEMETRY")
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

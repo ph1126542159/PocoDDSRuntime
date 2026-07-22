@@ -41,8 +41,10 @@ was released. Directory watching and dependency-ordered batch updates remain ope
 
 The official OpenTelemetry C++ SDK is now built by the dependency superbuild. `BusinessTracer` and
 `BusinessSpan` add W3C propagation, input/output attributes, outcome, duration and correlated log
-events. GoogleTest proves parent-child continuity between independent service tracer providers. OTLP
-export, Collector storage and a physical cross-process trace remain acceptance gates.
+events. GoogleTest proves parent-child continuity between independent service tracer providers. A
+local simulated Collector verifies OTLP/HTTP JSON structure, IDs, resource identity, business fields,
+log events and authentication headers. Durable Collector storage and a physical cross-process trace
+remain acceptance gates.
 
 The loopback administration plane now provides bearer-authenticated topology, configuration,
 lifecycle, log and trace APIs plus an embedded SPA with a trace graph. Real TCP GoogleTests cover

@@ -20,7 +20,7 @@ Missing GoogleTest is fetched automatically. For the full native dependency pref
 cmake -S cmake -B build/dependencies -DPDR_SOURCE_DIR=$PWD
 cmake --build build/dependencies --config Release --parallel 2
 cmake -S . -B build -DPDR_ENABLE_FASTDDS=ON -DPDR_ENABLE_OPENTELEMETRY=ON `
-  -DPDR_ENABLE_ADMIN=ON
+  -DPDR_ENABLE_OTLP_HTTP=ON -DPDR_ENABLE_ADMIN=ON
 ```
 
 All third-party install artifacts are isolated under `build/install`; host and cross-compiled build
@@ -58,5 +58,10 @@ build-fastdds/apps/pdr-runtime.exe
 Open `http://127.0.0.1:9080/` to inspect topology and logs, apply live configuration, issue lifecycle
 commands and inspect trace graphs. Binding to a non-loopback interface should only be done behind TLS
 and an authenticated reverse proxy. `PDR_RUN_SECONDS` provides a bounded runtime for CI smoke tests.
+
+`BusinessTracerOptions::otlpHttpEndpoint` enables OTLP/HTTP JSON export. Passing a Collector base URL
+automatically targets `/v1/traces`; custom headers can be supplied through `otlpHeaders`. The exporter
+targets a local or sidecar Collector over HTTP; use the Collector or a reverse proxy for TLS, retries
+and remote authentication policy.
 
 See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
