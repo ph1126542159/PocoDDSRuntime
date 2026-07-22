@@ -12,5 +12,5 @@ The framework is complete only when every gate below has executable evidence.
 | OpenTelemetry | One business trace crosses processes and correlates spans and logs in OTLP backend | SDK/W3C and OTLP HTTP receiver passed with business fields/logs; durable Collector backend and real-process evidence pending |
 | Bundle loading | Shared library install/resolve/start/stop/unload and atomic replacement | Runtime watcher and admin install/stop/restart/uninstall/reinstall passed with real DLL |
 | Admin plane | Authenticated topology, logs, config, lifecycle and trace APIs plus UI | Real runtime discovers and controls remote process over DDS; durable storage and RBAC pending |
-| Qt/OpenGL demo | Embedded/rendered child, DDS control, trace, crash/restart and cleanup | Partial |
-| Portability | Windows, Linux and macOS CI plus platform-specific integration evidence | Missing |
+| Qt/OpenGL demo | Embedded/rendered child, DDS control, trace, crash/restart and cleanup | Automated DDS render, W3C Trace ID continuity, changed PID after crash/restart, second render and cleanup passed; visual compositor embedding remains a manual platform gate |
+| Portability | Windows, Linux and macOS CI plus platform-specific integration evidence | Three-platform core CI is defined; Linux full-stack dependency/bootstrap and Qt acceptance job is defined, pending its first GitHub run |
