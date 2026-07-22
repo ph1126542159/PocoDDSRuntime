@@ -52,12 +52,15 @@ of at least 16 characters; the HTML shell contains no runtime data and prompts f
 $env:PDR_ADMIN_TOKEN = "replace-with-a-random-32-byte-token"
 $env:PDR_ADMIN_BIND = "127.0.0.1"
 $env:PDR_ADMIN_PORT = "9080"
+$env:PDR_DDS_DOMAIN = "0"
 build-fastdds/apps/pdr-runtime.exe
 ```
 
 Open `http://127.0.0.1:9080/` to inspect topology and logs, apply live configuration, issue lifecycle
 commands and inspect trace graphs. Binding to a non-loopback interface should only be done behind TLS
 and an authenticated reverse proxy. `PDR_RUN_SECONDS` provides a bounded runtime for CI smoke tests.
+When Fast-DDS is enabled, the runtime publishes its manifest, discovers remote components and routes
+targeted configuration/lifecycle requests over DDS with correlated results and revision checks.
 
 `BusinessTracerOptions::otlpHttpEndpoint` enables OTLP/HTTP JSON export. Passing a Collector base URL
 automatically targets `/v1/traces`; custom headers can be supplied through `otlpHeaders`. The exporter

@@ -1,6 +1,13 @@
 #include "PocoDDS/Core/ComponentRegistry.h"
 #include "PocoDDS/Core/Configuration.h"
 
+#if defined(PDR_ENABLE_FASTDDS)
+#include "PocoDDS/Control/ControlPlaneAgent.h"
+#include "PocoDDS/Control/ControlPlaneClient.h"
+#include "PocoDDS/Control/DiscoveryAgent.h"
+#include "PocoDDS/Transport/FastDDSTransport.h"
+#endif
+
 #if defined(PDR_ENABLE_ADMIN)
 #include "PocoDDS/Admin/AdminHttpServer.h"
 #endif
@@ -51,6 +58,25 @@ int main(int argc, char** argv)
                      PocoDDS::Core::ComponentState::Running,
                      {}});
 
+#if defined(PDR_ENABLE_FASTDDS)
+    const auto domainId =
+        static_cast<std::uint32_t>(std::stoul(environment("PDR_DDS_DOMAIN", "0")));
+    PocoDDS::Transport::FastDDSTransport transport(
+        {domainId, "pdr-runtime", PocoDDS::Transport::FastDDSTransportMode::Automatic});
+    PocoDDS::Control::DiscoveryAgent discovery(transport, registry, "pdr-runtime-node");
+    discovery.registerLocal(*registry.find("runtime-1"));
+    PocoDDS::Control::ControlPlaneAgent controlAgent(
+        transport, configuration, "runtime-1",
+        [&](const auto& command)
+        {
+            if (command.action == PocoDDS::Control::LifecycleAction::Stop ||
+                command.action == PocoDDS::Control::LifecycleAction::Uninstall)
+                running = false;
+        });
+    PocoDDS::Control::ControlPlaneClient controlClient(transport, "pdr-runtime-admin");
+    discovery.start();
+#endif
+
 #if defined(PDR_ENABLE_ADMIN)
     const auto token = environment("PDR_ADMIN_TOKEN");
     if (token.empty())
@@ -67,6 +93,31 @@ int main(int argc, char** argv)
             auto component = registry.find(target);
             if (!component)
                 return PocoDDS::Admin::LifecycleResult{false, "component not found"};
+            if (target != "runtime-1")
+            {
+#if defined(PDR_ENABLE_FASTDDS)
+                PocoDDS::Control::LifecycleAction mapped;
+                if (action == "start")
+                    mapped = PocoDDS::Control::LifecycleAction::Start;
+                else if (action == "stop")
+                    mapped = PocoDDS::Control::LifecycleAction::Stop;
+                else if (action == "uninstall")
+                    mapped = PocoDDS::Control::LifecycleAction::Uninstall;
+                else
+                    mapped = PocoDDS::Control::LifecycleAction::Restart;
+                try
+                {
+                    const auto result = controlClient.executeLifecycle(target, mapped);
+                    return PocoDDS::Admin::LifecycleResult{result.success, result.error};
+                }
+                catch (const std::exception& error)
+                {
+                    return PocoDDS::Admin::LifecycleResult{false, error.what()};
+                }
+#else
+                return PocoDDS::Admin::LifecycleResult{false, "Fast-DDS control is not enabled"};
+#endif
+            }
             if (action == "uninstall")
             {
                 registry.remove(target);
@@ -77,6 +128,23 @@ int main(int argc, char** argv)
             registry.upsert(*component);
             return PocoDDS::Admin::LifecycleResult{true, "lifecycle command applied"};
         });
+#if defined(PDR_ENABLE_FASTDDS)
+    admin.routeConfiguration(
+        [&](const auto& target, const auto& changes, auto expectedRevision)
+        {
+            try
+            {
+                const auto result =
+                    controlClient.applyConfiguration(target, changes, expectedRevision);
+                return PocoDDS::Admin::ConfigurationResult{result.success, result.error,
+                                                           result.configurationRevision};
+            }
+            catch (const std::exception& error)
+            {
+                return PocoDDS::Admin::ConfigurationResult{false, error.what(), expectedRevision};
+            }
+        });
+#endif
     admin.appendLog(
         {std::chrono::system_clock::now(), "runtime-1", "info", "runtime started", {}, {}});
     PocoDDS::Admin::AdminHttpServer server(admin, {bindAddress, port, token});

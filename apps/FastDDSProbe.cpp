@@ -1,7 +1,10 @@
 #include "PocoDDS/Control/ContractCodec.h"
+#include "PocoDDS/Control/ControlPlaneAgent.h"
+#include "PocoDDS/Control/ControlPlaneClient.h"
 #include "PocoDDS/Control/DiscoveryAgent.h"
 #include "PocoDDS/Transport/FastDDSTransport.h"
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <fstream>
@@ -15,15 +18,18 @@ namespace
 {
 constexpr const char* Topic = "pdr.acceptance.fastdds";
 constexpr const char* ReadyTopic = "pdr.acceptance.fastdds.ready";
+constexpr const char* ControlReadyTopic = "pdr.acceptance.fastdds.control.ready";
 constexpr const char* TraceParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
 
 PocoDDS::Transport::FastDDSTransportMode parseTransportMode(const std::string& value)
 {
+    if (value == "auto")
+        return PocoDDS::Transport::FastDDSTransportMode::Automatic;
     if (value == "shm")
         return PocoDDS::Transport::FastDDSTransportMode::SharedMemoryOnly;
     if (value == "network")
         return PocoDDS::Transport::FastDDSTransportMode::NetworkOnly;
-    throw std::invalid_argument("transport mode must be shm or network");
+    throw std::invalid_argument("transport mode must be auto, shm or network");
 }
 
 int subscribe(const std::string& markerPath, std::uint32_t domainId,
@@ -146,14 +152,88 @@ int publish(std::uint32_t domainId, PocoDDS::Transport::FastDDSTransportMode mod
     std::cout << "FAST_DDS_PUBLISH_PASS\n";
     return 0;
 }
+
+int controlAgent(std::uint32_t domainId, PocoDDS::Transport::FastDDSTransportMode mode)
+{
+    PocoDDS::Transport::FastDDSTransport transport({domainId, "pdr-control-agent", mode});
+    PocoDDS::Core::Configuration configuration;
+    PocoDDS::Core::ComponentRegistry registry;
+    PocoDDS::Control::DiscoveryAgent discovery(transport, registry, "acceptance-control-agent",
+                                               std::chrono::milliseconds(100),
+                                               std::chrono::seconds(3));
+    discovery.registerLocal({"acceptance.control.worker",
+                             "Acceptance Control Worker",
+                             "localhost",
+                             0,
+                             PocoDDS::Core::ComponentKind::Service,
+                             PocoDDS::Core::ComponentState::Running,
+                             {}});
+    discovery.start();
+    std::atomic_bool restarted{false};
+    PocoDDS::Control::ControlPlaneAgent agent(
+        transport, configuration, "acceptance.control.worker", [&](const auto& command)
+        { restarted = command.action == PocoDDS::Control::LifecycleAction::Restart; });
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    while (std::chrono::steady_clock::now() < deadline)
+    {
+        transport.publish({ControlReadyTopic, "PocoDDS.ControlReady.v1", {}, {}});
+        if (restarted && configuration.get("quality") == "acceptance")
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            std::cout << "FAST_DDS_CONTROL_AGENT_PASS\n";
+            return 0;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    return 7;
+}
+
+int controlClient(const std::string& markerPath, std::uint32_t domainId,
+                  PocoDDS::Transport::FastDDSTransportMode mode)
+{
+    PocoDDS::Transport::FastDDSTransport transport({domainId, "pdr-control-client", mode});
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool ready = false;
+    auto readySubscription = transport.subscribe(ControlReadyTopic,
+                                                 [&](const auto& message)
+                                                 {
+                                                     if (message.type != "PocoDDS.ControlReady.v1")
+                                                         return;
+                                                     {
+                                                         std::lock_guard lock(mutex);
+                                                         ready = true;
+                                                     }
+                                                     changed.notify_all();
+                                                 });
+    std::unique_lock lock(mutex);
+    if (!changed.wait_for(lock, std::chrono::seconds(15), [&] { return ready; }))
+        return 8;
+    lock.unlock();
+
+    PocoDDS::Control::ControlPlaneClient client(transport, "acceptance.admin");
+    const auto configured =
+        client.applyConfiguration("acceptance.control.worker", {{"quality", "acceptance"}}, 0,
+                                  std::chrono::seconds(5), TraceParent);
+    const auto restarted = client.executeLifecycle(
+        "acceptance.control.worker", PocoDDS::Control::LifecycleAction::Restart,
+        std::chrono::seconds(1), std::chrono::seconds(5), TraceParent);
+    if (!configured.success || configured.configurationRevision != 1 || !restarted.success)
+        return 9;
+    std::ofstream marker(markerPath, std::ios::trunc);
+    marker << "FAST_DDS_CONTROL_PASS\n";
+    std::cout << "FAST_DDS_CONTROL_CLIENT_PASS\n";
+    return marker ? 0 : 10;
+}
 } // namespace
 
 int main(int argc, char* argv[])
 {
     if (argc < 4)
     {
-        std::cerr << "usage: pdr-dds-probe <publish|subscribe> <domain-id> "
-                     "<shm|network> [marker-path]\n";
+        std::cerr
+            << "usage: pdr-dds-probe <publish|subscribe|control-agent|control-client> <domain-id> "
+               "<auto|shm|network> [marker-path]\n";
         return 1;
     }
     const auto domainId = static_cast<std::uint32_t>(std::stoul(argv[2]));
@@ -163,5 +243,9 @@ int main(int argc, char* argv[])
         return publish(domainId, transportMode);
     if (mode == "subscribe" && argc == 5)
         return subscribe(argv[4], domainId, transportMode);
+    if (mode == "control-agent")
+        return controlAgent(domainId, transportMode);
+    if (mode == "control-client" && argc == 5)
+        return controlClient(argv[4], domainId, transportMode);
     return 1;
 }

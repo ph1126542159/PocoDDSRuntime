@@ -50,7 +50,9 @@ The loopback administration plane now provides bearer-authenticated topology, co
 lifecycle, log and trace APIs plus an embedded SPA with a trace graph. Real TCP GoogleTests cover
 authorization and every API family; a launched `pdr-runtime` process also passes topology, live config
 and restart smoke checks. Durable storage, role-based authorization, TLS deployment guidance and DDS
-routing to remote owners remain open.
+routing to remote owners is now implemented through correlated `ControlPlaneClient` requests. The
+acceptance suite launches the real runtime and a remote worker and validates HTTP-to-DDS configuration
+and restart. Durable storage, role-based authorization and TLS deployment remain open.
 
 ## Phase 4 - application adapters
 

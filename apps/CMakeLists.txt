@@ -7,6 +7,8 @@ endif()
 pdr_set_warnings(pdr-runtime)
 
 if(PDR_ENABLE_FASTDDS)
+    target_link_libraries(pdr-runtime PRIVATE PocoDDSFastDDS)
+    target_compile_definitions(pdr-runtime PRIVATE PDR_ENABLE_FASTDDS=1)
     add_executable(pdr-dds-probe FastDDSProbe.cpp)
     target_link_libraries(pdr-dds-probe PRIVATE PocoDDSFastDDS)
     pdr_set_warnings(pdr-dds-probe)

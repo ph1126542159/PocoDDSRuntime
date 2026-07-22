@@ -58,6 +58,13 @@ manifests and removes expired remote entries. `ControlPlaneAgent` applies valida
 transactions immediately, rejects stale revisions without partial changes, executes lifecycle
 handlers and returns correlated results while preserving the incoming trace context.
 
+`ControlPlaneClient` is the matching request side. It creates unique correlation IDs, tracks
+concurrent pending commands, enforces response deadlines and ignores unrelated or malformed results.
+The runtime administration service uses it for targeted remote configuration and lifecycle actions;
+local runtime configuration remains an atomic direct path. A process-level acceptance test launches a
+runtime and a remote worker, waits for DDS discovery, then drives configuration and restart through the
+HTTP API and verifies the remote result revision.
+
 Acceptance uses an application-level READY handshake before publishing volatile control data. A DDS
 matched count alone is not treated as liveness because stale shared-memory endpoints can remain
 visible briefly after an abruptly terminated process.

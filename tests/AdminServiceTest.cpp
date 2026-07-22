@@ -21,6 +21,10 @@ TEST(AdminServiceTest, ExposesTopologyAndAppliesConfigurationImmediately)
     ASSERT_EQ(admin.topology().size(), 1U);
     admin.applyConfiguration({{"render.quality", "high"}});
     EXPECT_EQ(admin.configuration().at("render.quality"), "high");
+    EXPECT_EQ(admin.configurationRevision(), 1U);
+    auto conflict = admin.applyConfiguration({}, {{"render.quality", "low"}}, 0);
+    EXPECT_FALSE(conflict.success);
+    EXPECT_EQ(conflict.revision, 1U);
 }
 
 TEST(AdminServiceTest, FiltersLogsAndBuildsTraceData)
@@ -60,4 +64,26 @@ TEST(AdminServiceTest, ValidatesLifecycleCommands)
     EXPECT_TRUE(admin.execute("worker", "restart").success);
     EXPECT_EQ(received, "worker:restart");
     EXPECT_FALSE(admin.execute("worker", "destroy").success);
+}
+
+TEST(AdminServiceTest, RoutesTargetedConfigurationAndReturnsRemoteRevision)
+{
+    PocoDDS::Core::ComponentRegistry registry;
+    PocoDDS::Core::Configuration configuration;
+    AdminService admin(registry, configuration, [](const auto&, const auto&)
+                       { return PocoDDS::Admin::LifecycleResult{true, {}}; });
+    std::string receivedTarget;
+    admin.routeConfiguration(
+        [&](const auto& target, const auto& changes, auto revision)
+        {
+            receivedTarget = target;
+            EXPECT_EQ(changes.at("fps"), "60");
+            EXPECT_EQ(revision, 4U);
+            return PocoDDS::Admin::ConfigurationResult{true, {}, 5};
+        });
+
+    auto result = admin.applyConfiguration("render.worker", {{"fps", "60"}}, 4);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.revision, 5U);
+    EXPECT_EQ(receivedTarget, "render.worker");
 }

@@ -3,6 +3,7 @@ add_executable(PocoDDSCoreTests
     BundleManagerTest.cpp
     ContractCodecTest.cpp
     ControlPlaneAgentTest.cpp
+    ControlPlaneClientTest.cpp
     ContractGeneratorTest.cpp
     DependencyResolverTest.cpp
     DiscoveryAgentTest.cpp
@@ -35,6 +36,12 @@ endif()
 if(PDR_ENABLE_ADMIN)
     target_sources(PocoDDSCoreTests PRIVATE AdminHttpServerTest.cpp)
     target_link_libraries(PocoDDSCoreTests PRIVATE PocoDDS::Admin)
+endif()
+if(PDR_ENABLE_ADMIN AND PDR_ENABLE_FASTDDS)
+    target_sources(PocoDDSCoreTests PRIVATE RuntimeDistributedAdminTest.cpp)
+    target_compile_definitions(PocoDDSCoreTests PRIVATE
+        PDR_RUNTIME_PATH="$<TARGET_FILE:pdr-runtime>")
+    add_dependencies(PocoDDSCoreTests pdr-runtime)
 endif()
 target_link_libraries(PocoDDSCoreTests PRIVATE PocoDDS::Core PocoDDS::OSP
     PocoDDS::CodeGeneration GTest::gtest_main)

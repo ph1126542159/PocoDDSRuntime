@@ -61,6 +61,13 @@ TEST(AdminHttpServerTest, EnforcesAuthenticationAndServesRuntimeData)
                                              lifecycle = id + ":" + action;
                                              return PocoDDS::Admin::LifecycleResult{true, "done"};
                                          });
+    std::string configuredTarget;
+    service.routeConfiguration(
+        [&](const auto& target, const auto&, auto expectedRevision)
+        {
+            configuredTarget = target;
+            return PocoDDS::Admin::ConfigurationResult{true, {}, expectedRevision + 1};
+        });
     service.appendLog({std::chrono::system_clock::now(), "service.one", "info", "ready",
                        "trace-one", "span-one"});
     service.appendTrace({"trace-one",
@@ -90,6 +97,13 @@ TEST(AdminHttpServerTest, EnforcesAuthenticationAndServesRuntimeData)
         request(server.port(), "PUT", "/api/v1/config", R"({"changes":{"quality":"high"}})");
     EXPECT_EQ(updated.status, Poco::Net::HTTPResponse::HTTP_OK);
     EXPECT_EQ(configuration.get("quality"), "high");
+
+    auto remoteUpdated = request(
+        server.port(), "PUT", "/api/v1/config",
+        R"({"targetComponentId":"service.one","expectedRevision":7,"changes":{"quality":"low"}})");
+    EXPECT_EQ(remoteUpdated.status, Poco::Net::HTTPResponse::HTTP_OK);
+    EXPECT_EQ(configuredTarget, "service.one");
+    EXPECT_NE(remoteUpdated.body.find("\"revision\":8"), std::string::npos);
 
     auto controlled = request(server.port(), "POST", "/api/v1/lifecycle",
                               R"({"targetId":"service.one","action":"restart"})");

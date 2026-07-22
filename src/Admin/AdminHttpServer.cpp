@@ -34,7 +34,7 @@ const char AdminPage[] = R"HTML(<!doctype html>
 </style></head><body><header><b>PocoDDS Runtime</b><span class="muted">Local administration</span><div class="tabs"><button data-view="topology" class="active">拓扑</button><button data-view="logs">日志</button><button data-view="config">配置</button><button data-view="traces">业务追踪</button></div></header><main>
 <section id="topology" class="view active"><h2>进程 / 服务 / Bundle / 模块</h2><div id="components" class="grid"></div></section>
 <section id="logs" class="view"><h2>日志</h2><input id="logComponent" placeholder="组件 ID"><button onclick="loadLogs()">查询</button><table><thead><tr><th>时间</th><th>组件</th><th>级别</th><th>消息</th><th>Trace</th></tr></thead><tbody id="logRows"></tbody></table></section>
-<section id="config" class="view"><h2>实时配置</h2><div id="configRows"></div><button onclick="saveConfig()">立即应用</button></section>
+<section id="config" class="view"><h2>实时配置</h2><p><input id="configTarget" placeholder="目标组件 ID；留空表示本地运行时"><input id="configRevision" type="number" min="0" value="0" title="期望配置版本"></p><div id="configRows"></div><button onclick="addConfig()">添加配置项</button> <button onclick="saveConfig()">立即应用</button></section>
 <section id="traces" class="view"><h2>业务流程</h2><select id="traceIds" onchange="loadTrace()"></select><svg id="traceGraph"></svg><pre id="traceDetail">点击节点查看输入、输出、状态、耗时和日志</pre></section>
 </main><script>
 let token=sessionStorage.getItem('pdrToken')||prompt('管理令牌');if(token)sessionStorage.setItem('pdrToken',token);
@@ -44,8 +44,9 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.que
 async function loadTopology(){let d=await api('/api/v1/topology');components.textContent='';d.components.forEach(c=>{let a=document.createElement('article');a.className='card';let b=document.createElement('b');b.textContent=c.name;a.append(b);let p=document.createElement('p');p.className='muted';p.textContent=`${c.id} · ${c.kind} · ${c.host}:${c.processId}`;a.append(p);p=document.createElement('p');p.className=c.state==='running'?'ok':'';p.textContent=c.state;a.append(p);[['restart','重启'],['stop','停止'],['uninstall','卸载']].forEach(([x,t])=>{let q=document.createElement('button');q.textContent=t;q.onclick=()=>life(c.id,x);a.append(q,' ')});components.append(a)})}
 async function life(id,action){await api('/api/v1/lifecycle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetId:id,action})});await loadTopology()}
 async function loadLogs(){let q=logComponent.value?'?component='+encodeURIComponent(logComponent.value):'';let d=await api('/api/v1/logs'+q);logRows.innerHTML=d.logs.map(x=>`<tr><td>${esc(new Date(x.timestamp).toLocaleString())}</td><td>${esc(x.componentId)}</td><td>${esc(x.level)}</td><td>${esc(x.message)}</td><td>${esc(x.traceId)}</td></tr>`).join('')}
-async function loadConfig(){let d=await api('/api/v1/config');configRows.innerHTML=Object.entries(d.values).map(([k,v])=>`<p><label>${esc(k)}<br><input data-key="${esc(k)}" value="${esc(v)}"></label></p>`).join('')||'<p class="muted">暂无配置</p>'}
-async function saveConfig(){let changes={};document.querySelectorAll('#configRows input').forEach(x=>changes[x.dataset.key]=x.value);await api('/api/v1/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({changes})});await loadConfig()}
+async function loadConfig(){let d=await api('/api/v1/config');configRevision.value=d.revision;configRows.innerHTML=Object.entries(d.values).map(([k,v])=>`<p><input class="config-key" value="${esc(k)}" placeholder="键"> <input class="config-value" value="${esc(v)}" placeholder="值"></p>`).join('')||'<p class="muted">暂无本地配置；可添加配置项并指定远程组件</p>'}
+function addConfig(){let p=document.createElement('p');p.innerHTML='<input class="config-key" placeholder="键"> <input class="config-value" placeholder="值">';configRows.append(p)}
+async function saveConfig(){let changes={};document.querySelectorAll('#configRows p').forEach(p=>{let k=p.querySelector('.config-key'),v=p.querySelector('.config-value');if(k&&k.value)changes[k.value]=v.value});let d=await api('/api/v1/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetComponentId:configTarget.value,expectedRevision:Number(configRevision.value),changes})});configRevision.value=d.revision;if(!configTarget.value)await loadConfig()}
 async function loadTraceIds(){let d=await api('/api/v1/traces');traceIds.innerHTML=d.traceIds.map(x=>`<option>${x}</option>`).join('');if(d.traceIds.length)loadTrace()}
 async function loadTrace(){let d=await api('/api/v1/traces/'+encodeURIComponent(traceIds.value)),svg=traceGraph;svg.innerHTML='';d.nodes.forEach((n,i)=>{let y=30+i*90,p=d.nodes.findIndex(x=>x.spanId===n.parentSpanId);if(p>=0)svg.innerHTML+=`<line x1="180" y1="${30+p*90+24}" x2="180" y2="${y}" stroke="#60a5fa"/>`;svg.innerHTML+=`<g data-i="${i}"><rect x="30" y="${y}" width="300" height="52" rx="7" fill="#17223a" stroke="${n.status==='success'?'#4ade80':'#fb7185'}"/><text x="45" y="${y+22}" fill="#e5ecff">${esc(n.operation)}</text><text x="45" y="${y+42}" fill="#91a0bd">${esc(n.componentId)} · ${(n.durationNanoseconds/1e6).toFixed(2)} ms</text></g>`});svg.querySelectorAll('g').forEach(g=>g.onclick=()=>traceDetail.textContent=JSON.stringify(d.nodes[g.dataset.i],null,2))}
 Promise.all([loadTopology(),loadLogs(),loadConfig(),loadTraceIds()]).catch(e=>alert(e.message));setInterval(loadTopology,3000);
@@ -220,7 +221,10 @@ class RequestHandler final : public Poco::Net::HTTPRequestHandler
 
     void configuration(HTTPServerResponse& response)
     {
-        sendJson(response, singleValue("values", stringMap(_service.configuration())));
+        Object value;
+        value.set("values", stringMap(_service.configuration()));
+        value.set("revision", _service.configurationRevision());
+        sendJson(response, value);
     }
 
     void updateConfiguration(HTTPServerRequest& request, HTTPServerResponse& response)
@@ -232,8 +236,18 @@ class RequestHandler final : public Poco::Net::HTTPRequestHandler
         Core::Configuration::Values values;
         for (const auto& item : *changes)
             values[item.first] = item.second.convert<std::string>();
-        _service.applyConfiguration(values);
-        sendJson(response, singleValue("applied", true));
+        const auto target = body->has("targetComponentId")
+                                ? body->getValue<std::string>("targetComponentId")
+                                : std::string{};
+        const auto revision =
+            body->has("expectedRevision") ? body->getValue<std::uint64_t>("expectedRevision") : 0;
+        const auto result = _service.applyConfiguration(target, values, revision);
+        Object responseBody;
+        responseBody.set("applied", result.success);
+        responseBody.set("message", result.message);
+        responseBody.set("revision", result.revision);
+        sendJson(response, responseBody,
+                 result.success ? HTTPServerResponse::HTTP_OK : HTTPServerResponse::HTTP_CONFLICT);
     }
 
     void lifecycle(HTTPServerRequest& request, HTTPServerResponse& response)

@@ -4,6 +4,7 @@
 #include "PocoDDS/Core/Configuration.h"
 
 #include <chrono>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <map>
@@ -44,11 +45,21 @@ struct LifecycleResult
     std::string message;
 };
 
+struct ConfigurationResult
+{
+    bool success{false};
+    std::string message;
+    std::uint64_t revision{0};
+};
+
 class AdminService
 {
   public:
     using LifecycleHandler =
         std::function<LifecycleResult(const std::string& targetId, const std::string& action)>;
+    using ConfigurationHandler = std::function<ConfigurationResult(
+        const std::string& targetId, const Core::Configuration::Values& changes,
+        std::uint64_t expectedRevision)>;
 
     AdminService(Core::ComponentRegistry& registry, Core::Configuration& configuration,
                  LifecycleHandler lifecycleHandler, std::size_t logCapacity = 10000,
@@ -56,7 +67,12 @@ class AdminService
 
     std::vector<Core::Component> topology() const;
     Core::Configuration::Values configuration() const;
+    std::uint64_t configurationRevision() const;
     void applyConfiguration(const Core::Configuration::Values& changes);
+    ConfigurationResult applyConfiguration(const std::string& targetId,
+                                           const Core::Configuration::Values& changes,
+                                           std::uint64_t expectedRevision);
+    void routeConfiguration(ConfigurationHandler handler);
     LifecycleResult execute(const std::string& targetId, const std::string& action);
 
     void appendLog(LogRecord record);
@@ -70,10 +86,13 @@ class AdminService
     Core::ComponentRegistry& _registry;
     Core::Configuration& _configuration;
     LifecycleHandler _lifecycleHandler;
+    ConfigurationHandler _configurationHandler;
     std::size_t _logCapacity;
     std::size_t _traceCapacity;
     mutable std::mutex _mutex;
+    mutable std::mutex _configurationMutex;
     std::deque<LogRecord> _logs;
     std::deque<TraceNode> _traces;
+    std::uint64_t _localConfigurationRevision{0};
 };
 } // namespace PocoDDS::Admin

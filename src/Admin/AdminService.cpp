@@ -28,9 +28,47 @@ Core::Configuration::Values AdminService::configuration() const
     return _configuration.snapshot();
 }
 
+std::uint64_t AdminService::configurationRevision() const
+{
+    std::lock_guard lock(_configurationMutex);
+    return _localConfigurationRevision;
+}
+
 void AdminService::applyConfiguration(const Core::Configuration::Values& changes)
 {
+    std::lock_guard lock(_configurationMutex);
     _configuration.apply(changes);
+    ++_localConfigurationRevision;
+}
+
+ConfigurationResult AdminService::applyConfiguration(const std::string& targetId,
+                                                     const Core::Configuration::Values& changes,
+                                                     std::uint64_t expectedRevision)
+{
+    if (targetId.empty())
+    {
+        std::lock_guard lock(_configurationMutex);
+        if (expectedRevision != _localConfigurationRevision)
+            return {false, "configuration revision conflict", _localConfigurationRevision};
+        _configuration.apply(changes);
+        return {true, {}, ++_localConfigurationRevision};
+    }
+    ConfigurationHandler handler;
+    {
+        std::lock_guard lock(_mutex);
+        handler = _configurationHandler;
+    }
+    if (!handler)
+        return {false, "remote configuration routing is unavailable", expectedRevision};
+    return handler(targetId, changes, expectedRevision);
+}
+
+void AdminService::routeConfiguration(ConfigurationHandler handler)
+{
+    if (!handler)
+        throw std::invalid_argument("configuration handler must not be empty");
+    std::lock_guard lock(_mutex);
+    _configurationHandler = std::move(handler);
 }
 
 LifecycleResult AdminService::execute(const std::string& targetId, const std::string& action)
