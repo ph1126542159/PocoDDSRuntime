@@ -2,6 +2,8 @@
 
 #include "PocoDDS/Control/ContractCodec.h"
 
+#include <stdexcept>
+
 #include <vector>
 
 namespace PocoDDS::Control
