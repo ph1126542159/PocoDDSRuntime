@@ -71,4 +71,10 @@ automatically targets `/v1/traces`; custom headers can be supplied through `otlp
 targets a local or sidecar Collector over HTTP; use the Collector or a reverse proxy for TLS, retries
 and remote authentication policy.
 
+Set `BusinessTracerOptions::onCompleted` to call `AdminService::appendTrace` when the local hidden
+administration page should display the same completed business spans. The adapter transfers inputs,
+outputs, status, duration and correlated span logs without application-specific conversion code.
+
 See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
+Physical two-machine validation is documented in
+[two-host Fast-DDS acceptance](docs/CROSS_HOST_ACCEPTANCE.md).

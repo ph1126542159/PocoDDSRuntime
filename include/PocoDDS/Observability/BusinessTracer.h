@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -11,17 +12,22 @@ namespace PocoDDS::Observability
 struct CompletedSpan
 {
     std::string name;
+    std::string serviceName;
     std::string traceId;
     std::string spanId;
     std::string parentSpanId;
     std::string status;
     long long durationNanoseconds = 0;
+    std::map<std::string, std::string> inputs;
+    std::map<std::string, std::string> outputs;
+    std::vector<std::string> logs;
 };
 
 struct BusinessTracerOptions
 {
     std::string otlpHttpEndpoint;
     std::map<std::string, std::string> otlpHeaders;
+    std::function<void(const CompletedSpan&)> onCompleted;
 };
 
 class BusinessSpan

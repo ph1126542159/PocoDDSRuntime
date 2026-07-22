@@ -1,5 +1,7 @@
 #include "PocoDDS/Admin/AdminService.h"
 
+#include "PocoDDS/Observability/BusinessTracer.h"
+
 #include <algorithm>
 #include <iterator>
 #include <stdexcept>
@@ -109,6 +111,28 @@ void AdminService::appendTrace(TraceNode node)
     _traces.push_back(std::move(node));
     while (_traces.size() > _traceCapacity)
         _traces.pop_front();
+}
+
+void AdminService::appendTrace(const Observability::CompletedSpan& span)
+{
+    TraceNode node;
+    node.traceId = span.traceId;
+    node.spanId = span.spanId;
+    node.parentSpanId = span.parentSpanId;
+    node.operation = span.name;
+    node.componentId = span.serviceName;
+    node.status = span.status;
+    node.durationNanoseconds = span.durationNanoseconds;
+    node.inputs = span.inputs;
+    node.outputs = span.outputs;
+    const auto timestamp = std::chrono::system_clock::now();
+    for (const auto& message : span.logs)
+    {
+        LogRecord record{timestamp, span.serviceName, "info", message, span.traceId, span.spanId};
+        node.logs.push_back(record);
+        appendLog(std::move(record));
+    }
+    appendTrace(std::move(node));
 }
 
 std::vector<TraceNode> AdminService::trace(const std::string& traceId) const

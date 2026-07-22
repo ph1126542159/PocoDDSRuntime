@@ -1,6 +1,11 @@
 #include "PocoDDS/Observability/BusinessTracer.h"
 
+#include "PocoDDS/Admin/AdminService.h"
+
 #include <gtest/gtest.h>
+
+#include <optional>
+#include <utility>
 
 using PocoDDS::Observability::BusinessTracer;
 
@@ -37,4 +42,55 @@ TEST(BusinessTracerTest, EndsAbandonedSpanAsCancelled)
     auto spans = tracer.drain();
     ASSERT_EQ(spans.size(), 1U);
     EXPECT_EQ(spans[0].status, "cancelled");
+}
+
+TEST(BusinessTracerTest, PublishesCompleteBusinessDataWithoutChangingTheOperation)
+{
+    std::optional<PocoDDS::Observability::CompletedSpan> observed;
+    PocoDDS::Observability::BusinessTracerOptions options;
+    options.onCompleted = [&](const auto& span) { observed = span; };
+    PocoDDS::Observability::BusinessTracer tracer("order-service", std::move(options));
+
+    auto span = tracer.start("submit-order", {{"orderId", "A-42"}});
+    span.addLog("inventory reserved");
+    span.finish("success", {{"confirmation", "C-9"}});
+
+    ASSERT_TRUE(observed.has_value());
+    EXPECT_EQ(observed->serviceName, "order-service");
+    EXPECT_EQ(observed->name, "submit-order");
+    EXPECT_EQ(observed->status, "success");
+    EXPECT_EQ(observed->inputs.at("orderId"), "A-42");
+    EXPECT_EQ(observed->outputs.at("confirmation"), "C-9");
+    ASSERT_EQ(observed->logs.size(), 1U);
+    EXPECT_EQ(observed->logs.front(), "inventory reserved");
+    EXPECT_FALSE(observed->traceId.empty());
+    EXPECT_FALSE(observed->spanId.empty());
+    EXPECT_GT(observed->durationNanoseconds, 0);
+}
+
+TEST(BusinessTracerTest, FeedsTheAdministrationTraceAndLogViewsDirectly)
+{
+    PocoDDS::Core::ComponentRegistry registry;
+    PocoDDS::Core::Configuration configuration;
+    PocoDDS::Admin::AdminService admin(registry, configuration, [](const auto&, const auto&)
+                                       { return PocoDDS::Admin::LifecycleResult{true, {}}; });
+    PocoDDS::Observability::BusinessTracerOptions options;
+    options.onCompleted = [&](const auto& completed) { admin.appendTrace(completed); };
+    PocoDDS::Observability::BusinessTracer tracer("billing.worker", std::move(options));
+
+    auto span = tracer.start("charge", {{"invoice", "I-7"}});
+    span.addLog("provider accepted request");
+    span.finish("success", {{"transaction", "T-8"}});
+
+    const auto traceIds = admin.recentTraceIds();
+    ASSERT_EQ(traceIds.size(), 1U);
+    const auto nodes = admin.trace(traceIds.front());
+    ASSERT_EQ(nodes.size(), 1U);
+    EXPECT_EQ(nodes.front().componentId, "billing.worker");
+    EXPECT_EQ(nodes.front().inputs.at("invoice"), "I-7");
+    EXPECT_EQ(nodes.front().outputs.at("transaction"), "T-8");
+    ASSERT_EQ(nodes.front().logs.size(), 1U);
+    const auto logs = admin.logs("billing.worker", traceIds.front());
+    ASSERT_EQ(logs.size(), 1U);
+    EXPECT_EQ(logs.front().message, "provider accepted request");
 }

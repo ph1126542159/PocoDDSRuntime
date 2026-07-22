@@ -9,6 +9,7 @@
 #include <opentelemetry/trace/propagation/http_trace_context.h>
 #include <opentelemetry/trace/provider.h>
 
+#include <chrono>
 #include <utility>
 
 #if defined(PDR_ENABLE_OTLP_HTTP)
@@ -64,6 +65,7 @@ class BusinessTracer::Impl
 {
   public:
     Impl(const std::string& serviceName, const BusinessTracerOptions& options)
+        : serviceName(serviceName), onCompleted(options.onCompleted)
     {
         auto exporter = std::make_unique<otel::exporter::memory::InMemorySpanExporter>();
         data = exporter->GetData();
@@ -86,6 +88,8 @@ class BusinessTracer::Impl
     std::shared_ptr<otel::exporter::memory::InMemorySpanData> data;
     std::shared_ptr<otel::trace::TracerProvider> provider;
     otel::nostd::shared_ptr<otel::trace::Tracer> tracer;
+    std::string serviceName;
+    std::function<void(const CompletedSpan&)> onCompleted;
 };
 
 class BusinessSpan::Impl
@@ -93,6 +97,11 @@ class BusinessSpan::Impl
   public:
     std::shared_ptr<BusinessTracer::Impl> owner;
     otel::nostd::shared_ptr<otel::trace::Span> span;
+    std::string operation;
+    std::string parentSpanId;
+    std::map<std::string, std::string> inputs;
+    std::vector<std::string> logs;
+    std::chrono::steady_clock::time_point started;
     bool finished = false;
 };
 
@@ -121,7 +130,10 @@ std::string BusinessSpan::traceParent() const
 void BusinessSpan::addLog(const std::string& message)
 {
     if (_impl && !_impl->finished)
+    {
+        _impl->logs.push_back(message);
         _impl->span->AddEvent("log", {{"log.message", message}});
+    }
 }
 
 void BusinessSpan::finish(const std::string& status,
@@ -137,6 +149,31 @@ void BusinessSpan::finish(const std::string& status,
                            status);
     _impl->span->End();
     _impl->finished = true;
+    if (_impl->owner->onCompleted)
+    {
+        CompletedSpan completed;
+        const auto context = _impl->span->GetContext();
+        completed.name = _impl->operation;
+        completed.serviceName = _impl->owner->serviceName;
+        completed.traceId = toHex(context.trace_id());
+        completed.spanId = toHex(context.span_id());
+        completed.parentSpanId = _impl->parentSpanId;
+        completed.status = status;
+        completed.durationNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                            std::chrono::steady_clock::now() - _impl->started)
+                                            .count();
+        completed.inputs = _impl->inputs;
+        completed.outputs = outputs;
+        completed.logs = _impl->logs;
+        try
+        {
+            _impl->owner->onCompleted(completed);
+        }
+        catch (...)
+        {
+            // Observability consumers must never alter the business operation result.
+        }
+    }
 }
 
 BusinessTracer::BusinessTracer(std::string serviceName) : BusinessTracer(std::move(serviceName), {})
@@ -168,6 +205,11 @@ BusinessSpan BusinessTracer::start(const std::string& operation,
     auto impl = std::make_unique<BusinessSpan::Impl>();
     impl->owner = _impl;
     impl->span = std::move(span);
+    impl->operation = operation;
+    impl->inputs = inputs;
+    impl->started = std::chrono::steady_clock::now();
+    if (parentTraceParent.size() >= 52)
+        impl->parentSpanId = parentTraceParent.substr(36, 16);
     return BusinessSpan(std::move(impl));
 }
 

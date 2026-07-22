@@ -13,6 +13,11 @@
 #include <string>
 #include <vector>
 
+namespace PocoDDS::Observability
+{
+struct CompletedSpan;
+}
+
 namespace PocoDDS::Admin
 {
 struct LogRecord
@@ -79,6 +84,7 @@ class AdminService
     std::vector<LogRecord> logs(const std::optional<std::string>& componentId = {},
                                 const std::optional<std::string>& traceId = {}) const;
     void appendTrace(TraceNode node);
+    void appendTrace(const Observability::CompletedSpan& span);
     std::vector<TraceNode> trace(const std::string& traceId) const;
     std::vector<std::string> recentTraceIds() const;
 
