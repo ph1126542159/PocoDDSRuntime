@@ -28,8 +28,10 @@ from causing the first volatile control sample to be sent before the live peer i
 
 The bundle runtime now loads native shared libraries through a versioned C ABI, runs the complete
 lifecycle, validates a replacement before switching, rolls back a failed replacement start and unloads
-the old library. The Windows test deletes the temporary DLL after uninstall to prove the module handle
-was released. Directory watching and dependency-ordered batch updates remain open.
+the old library. The Windows loader uses a same-directory shadow copy so a running deployment DLL can
+be overwritten. A runtime-process acceptance test verifies directory install, admin stop/restart,
+uninstall suppression and file-change reinstall. Dependency-ordered multi-bundle batch updates remain
+open.
 
 ## Phase 3 - observability and administration
 

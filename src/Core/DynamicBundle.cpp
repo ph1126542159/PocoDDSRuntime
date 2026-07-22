@@ -1,8 +1,10 @@
 #include "PocoDDS/Core/DynamicBundle.h"
 #include "PocoDDS/Core/BundleLibrary.h"
 
+#include <atomic>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 
 #if defined(_WIN32)
 #include <Windows.h>
@@ -14,6 +16,18 @@ namespace PocoDDS::Core
 {
 namespace
 {
+std::atomic_uint64_t shadowSequence{0};
+
+std::filesystem::path createShadowCopy(const std::filesystem::path& source)
+{
+    const auto absolute = std::filesystem::absolute(source);
+    const auto shadow =
+        absolute.parent_path() /
+        (".pdr-shadow-" + std::to_string(++shadowSequence) + "-" + absolute.filename().string());
+    std::filesystem::copy_file(absolute, shadow, std::filesystem::copy_options::overwrite_existing);
+    return shadow;
+}
+
 #if defined(_WIN32)
 using LibraryHandle = HMODULE;
 
@@ -50,11 +64,17 @@ template <typename Function> Function requireSymbol(LibraryHandle handle, const 
 class DynamicBundle::Impl
 {
   public:
-    explicit Impl(std::filesystem::path path) : libraryPath(std::move(path))
+    explicit Impl(std::filesystem::path path)
+        : libraryPath(std::filesystem::absolute(std::move(path)))
     {
-        handle = openLibrary(libraryPath);
+        shadowPath = createShadowCopy(libraryPath);
+        handle = openLibrary(shadowPath);
         if (!handle)
+        {
+            std::error_code ignored;
+            std::filesystem::remove(shadowPath, ignored);
             throw std::runtime_error("cannot load bundle library: " + libraryPath.string());
+        }
         try
         {
             const auto abiVersion =
@@ -75,6 +95,8 @@ class DynamicBundle::Impl
             if (bundle && destroy)
                 destroy(bundle);
             closeLibrary(handle);
+            std::error_code ignored;
+            std::filesystem::remove(shadowPath, ignored);
             throw;
         }
     }
@@ -85,9 +107,12 @@ class DynamicBundle::Impl
             destroy(bundle);
         if (handle)
             closeLibrary(handle);
+        std::error_code ignored;
+        std::filesystem::remove(shadowPath, ignored);
     }
 
     std::filesystem::path libraryPath;
+    std::filesystem::path shadowPath;
     LibraryHandle handle{};
     DestroyBundleFunction destroy{};
     Bundle* bundle{};

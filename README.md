@@ -53,6 +53,7 @@ $env:PDR_ADMIN_TOKEN = "replace-with-a-random-32-byte-token"
 $env:PDR_ADMIN_BIND = "127.0.0.1"
 $env:PDR_ADMIN_PORT = "9080"
 $env:PDR_DDS_DOMAIN = "0"
+$env:PDR_BUNDLE_DIR = "C:\path\to\bundles"
 build-fastdds/apps/pdr-runtime.exe
 ```
 
@@ -61,6 +62,9 @@ commands and inspect trace graphs. Binding to a non-loopback interface should on
 and an authenticated reverse proxy. `PDR_RUN_SECONDS` provides a bounded runtime for CI smoke tests.
 When Fast-DDS is enabled, the runtime publishes its manifest, discovers remote components and routes
 targeted configuration/lifecycle requests over DDS with correlated results and revision checks.
+When `PDR_BUNDLE_DIR` is set, the runtime watches native bundle libraries, shadow-loads them so the
+source file remains replaceable on Windows, and applies install/replace/remove through the complete
+bundle lifecycle. An explicitly uninstalled artifact remains suppressed until its file changes.
 
 `BusinessTracerOptions::otlpHttpEndpoint` enables OTLP/HTTP JSON export. Passing a Collector base URL
 automatically targets `/v1/traces`; custom headers can be supplied through `otlpHeaders`. The exporter

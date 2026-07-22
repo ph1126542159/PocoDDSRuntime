@@ -16,6 +16,8 @@ class BundleManager
     explicit BundleManager(ComponentRegistry& registry) : _context(registry) {}
     void install(std::unique_ptr<Bundle> bundle);
     std::string installLibrary(const std::filesystem::path& libraryPath);
+    std::string upsertLibrary(const std::filesystem::path& libraryPath,
+                              bool startAfterInstall = true);
     void replaceLibrary(const std::string& name, const std::filesystem::path& libraryPath);
     void start(const std::string& name);
     void stop(const std::string& name);
@@ -31,5 +33,6 @@ class BundleManager
     BundleContext _context;
     std::mutex _mutex;
     std::unordered_map<std::string, Entry> _bundles;
+    void publish(const std::string& name, ComponentState state);
 };
 } // namespace PocoDDS::Core

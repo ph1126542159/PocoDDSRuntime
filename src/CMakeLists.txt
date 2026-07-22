@@ -5,6 +5,7 @@ add_library(PocoDDSCore
     Control/ControlPlaneAgent.cpp
     Control/DiscoveryAgent.cpp
     Core/BundleManager.cpp
+    Core/BundleDirectoryWatcher.cpp
     Core/Configuration.cpp
     Core/ComponentRegistry.cpp
     Core/DynamicBundle.cpp

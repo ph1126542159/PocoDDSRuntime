@@ -21,9 +21,13 @@ TEST(BundleManagerTest, RunsCompleteLifecycle)
     PocoDDS::Core::ComponentRegistry registry;
     PocoDDS::Core::BundleManager manager(registry);
     manager.install(std::make_unique<TestBundle>());
+    ASSERT_TRUE(registry.find("test.bundle"));
+    EXPECT_EQ(registry.find("test.bundle")->state, PocoDDS::Core::ComponentState::Stopped);
     EXPECT_NO_THROW(manager.start("test.bundle"));
+    EXPECT_EQ(registry.find("test.bundle")->state, PocoDDS::Core::ComponentState::Running);
     EXPECT_NO_THROW(manager.stop("test.bundle"));
     EXPECT_NO_THROW(manager.uninstall("test.bundle"));
+    EXPECT_FALSE(registry.find("test.bundle"));
 }
 
 TEST(BundleManagerTest, LoadsStartsReplacesAndUnloadsSharedLibrary)

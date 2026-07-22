@@ -1,3 +1,5 @@
+#include "PocoDDS/Core/BundleDirectoryWatcher.h"
+#include "PocoDDS/Core/BundleManager.h"
 #include "PocoDDS/Core/ComponentRegistry.h"
 #include "PocoDDS/Core/Configuration.h"
 
@@ -17,6 +19,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <thread>
 
@@ -50,6 +53,7 @@ int main(int argc, char** argv)
 {
     PocoDDS::Core::ComponentRegistry registry;
     PocoDDS::Core::Configuration configuration;
+    PocoDDS::Core::BundleManager bundleManager(registry);
     registry.upsert({"runtime-1",
                      "pdr-runtime",
                      "localhost",
@@ -77,6 +81,32 @@ int main(int argc, char** argv)
     discovery.start();
 #endif
 
+    std::unique_ptr<PocoDDS::Core::BundleDirectoryWatcher> bundleWatcher;
+    const auto bundleDirectory = environment("PDR_BUNDLE_DIR");
+    if (!bundleDirectory.empty())
+    {
+        bundleWatcher =
+            std::make_unique<PocoDDS::Core::BundleDirectoryWatcher>(bundleManager, bundleDirectory);
+        bundleWatcher->observe(
+            [&](const PocoDDS::Core::BundleFileEvent& event)
+            {
+#if defined(PDR_ENABLE_FASTDDS)
+                if (event.kind == PocoDDS::Core::BundleFileEventKind::Removed)
+                    discovery.unregisterLocal(event.bundleName);
+                else if (event.kind != PocoDDS::Core::BundleFileEventKind::Failed)
+                {
+                    const auto component = registry.find(event.bundleName);
+                    if (component)
+                        discovery.registerLocal(*component);
+                }
+#endif
+                if (event.kind == PocoDDS::Core::BundleFileEventKind::Failed)
+                    std::cerr << "Bundle update failed: " << event.path << ": " << event.error
+                              << '\n';
+            });
+        bundleWatcher->start();
+    }
+
 #if defined(PDR_ENABLE_ADMIN)
     const auto token = environment("PDR_ADMIN_TOKEN");
     if (token.empty())
@@ -95,6 +125,38 @@ int main(int argc, char** argv)
                 return PocoDDS::Admin::LifecycleResult{false, "component not found"};
             if (target != "runtime-1")
             {
+                if (component->kind == PocoDDS::Core::ComponentKind::Bundle)
+                {
+                    try
+                    {
+                        if (action == "start")
+                            bundleManager.start(target);
+                        else if (action == "stop")
+                            bundleManager.stop(target);
+                        else if (action == "restart")
+                        {
+                            bundleManager.stop(target);
+                            bundleManager.start(target);
+                        }
+                        else
+                        {
+                            bundleManager.uninstall(target);
+                            if (bundleWatcher)
+                                bundleWatcher->suppress(target);
+                        }
+#if defined(PDR_ENABLE_FASTDDS)
+                        if (action == "uninstall")
+                            discovery.unregisterLocal(target);
+                        else if (const auto updated = registry.find(target))
+                            discovery.registerLocal(*updated);
+#endif
+                        return PocoDDS::Admin::LifecycleResult{true, "bundle lifecycle applied"};
+                    }
+                    catch (const std::exception& error)
+                    {
+                        return PocoDDS::Admin::LifecycleResult{false, error.what()};
+                    }
+                }
 #if defined(PDR_ENABLE_FASTDDS)
                 PocoDDS::Control::LifecycleAction mapped;
                 if (action == "start")

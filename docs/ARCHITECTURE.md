@@ -65,6 +65,12 @@ local runtime configuration remains an atomic direct path. A process-level accep
 runtime and a remote worker, waits for DDS discovery, then drives configuration and restart through the
 HTTP API and verifies the remote result revision.
 
+Native bundles are loaded from same-directory shadow copies. This keeps the deployment artifact
+replaceable on Windows while preserving normal adjacent dependency lookup. `BundleDirectoryWatcher`
+detects additions, content/timestamp changes and removals, but always delegates to `BundleManager` so
+validation, stop/start ordering, rollback and registry state transitions remain intact. An admin
+uninstall suppresses the unchanged artifact; modifying it explicitly re-enables installation.
+
 Acceptance uses an application-level READY handshake before publishing volatile control data. A DDS
 matched count alone is not treated as liveness because stale shared-memory endpoints can remain
 visible briefly after an abruptly terminated process.
