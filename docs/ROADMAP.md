@@ -26,6 +26,11 @@ results are now implemented as versioned control contracts. The SHM and UDP two-
 component discovery as well as payload delivery. A READY handshake prevents stale SHM discovery state
 from causing the first volatile control sample to be sent before the live peer is ready.
 
+The bundle runtime now loads native shared libraries through a versioned C ABI, runs the complete
+lifecycle, validates a replacement before switching, rolls back a failed replacement start and unloads
+the old library. The Windows test deletes the temporary DLL after uninstall to prove the module handle
+was released. Directory watching and dependency-ordered batch updates remain open.
+
 ## Phase 3 - observability and administration
 
 - OpenTelemetry SDK wrapper, W3C propagation, OTLP export and trace/log correlation.

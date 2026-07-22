@@ -5,6 +5,7 @@ add_library(PocoDDSCore
     Core/BundleManager.cpp
     Core/Configuration.cpp
     Core/ComponentRegistry.cpp
+    Core/DynamicBundle.cpp
     Supervisor/Supervisor.cpp
     Transport/InMemoryTransport.cpp)
 if(WIN32)

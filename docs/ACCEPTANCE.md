@@ -10,7 +10,7 @@ The framework is complete only when every gate below has executable evidence.
 | Fast-DDS | Two processes discover and exchange typed data using SHM on one host | Windows passed, 22-test suite plus 10x transport repeat |
 | Cross-host DDS | Two hosts exchange with non-SHM transport and retain trace context | Network-only loopback passed; two-host evidence pending |
 | OpenTelemetry | One business trace crosses processes and correlates spans and logs in OTLP backend | SDK/W3C parent-child and business fields passed; OTLP backend and real-process evidence pending |
-| Bundle loading | Shared library install/resolve/start/stop/unload and atomic replacement | Missing |
+| Bundle loading | Shared library install/resolve/start/stop/unload and atomic replacement | ABI/load/start/replace/unload passed with real DLL; dependency-aware file watcher pending |
 | Admin plane | Authenticated topology, logs, config, lifecycle and trace APIs plus UI | Missing |
 | Qt/OpenGL demo | Embedded/rendered child, DDS control, trace, crash/restart and cleanup | Partial |
 | Portability | Windows, Linux and macOS CI plus platform-specific integration evidence | Missing |

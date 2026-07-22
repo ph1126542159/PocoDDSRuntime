@@ -3,6 +3,7 @@
 #include "PocoDDS/Core/Bundle.h"
 #include "PocoDDS/Core/BundleContext.h"
 
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -14,6 +15,8 @@ class BundleManager
   public:
     explicit BundleManager(ComponentRegistry& registry) : _context(registry) {}
     void install(std::unique_ptr<Bundle> bundle);
+    std::string installLibrary(const std::filesystem::path& libraryPath);
+    void replaceLibrary(const std::string& name, const std::filesystem::path& libraryPath);
     void start(const std::string& name);
     void stop(const std::string& name);
     void uninstall(const std::string& name);

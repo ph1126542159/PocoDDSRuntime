@@ -11,9 +11,13 @@ add_executable(PocoDDSCoreTests
 target_sources(PocoDDSCoreTests PRIVATE SupervisorTest.cpp)
 add_executable(pdr-test-child TestChild.cpp)
 pdr_set_warnings(pdr-test-child)
+add_library(pdr-test-bundle SHARED TestDynamicBundle.cpp)
+target_include_directories(pdr-test-bundle PRIVATE "${PROJECT_SOURCE_DIR}/include")
+pdr_set_warnings(pdr-test-bundle)
 target_compile_definitions(PocoDDSCoreTests PRIVATE
-    PDR_TEST_CHILD_PATH="$<TARGET_FILE:pdr-test-child>")
-add_dependencies(PocoDDSCoreTests pdr-test-child)
+    PDR_TEST_CHILD_PATH="$<TARGET_FILE:pdr-test-child>"
+    PDR_TEST_BUNDLE_PATH="$<TARGET_FILE:pdr-test-bundle>")
+add_dependencies(PocoDDSCoreTests pdr-test-child pdr-test-bundle)
 if(PDR_ENABLE_FASTDDS)
     target_sources(PocoDDSCoreTests PRIVATE FastDDSMultiProcessTest.cpp)
     target_compile_definitions(PocoDDSCoreTests PRIVATE
