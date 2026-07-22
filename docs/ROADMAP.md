@@ -34,6 +34,11 @@ from causing the first volatile control sample to be sent before the live peer i
 - Use an external observability backend (OpenTelemetry Collector plus Tempo/Jaeger and Loki) for
   durable storage; the framework UI queries it instead of inventing a trace database.
 
+The official OpenTelemetry C++ SDK is now built by the dependency superbuild. `BusinessTracer` and
+`BusinessSpan` add W3C propagation, input/output attributes, outcome, duration and correlated log
+events. GoogleTest proves parent-child continuity between independent service tracer providers. OTLP
+export, Collector storage and a physical cross-process trace remain acceptance gates.
+
 ## Phase 4 - application adapters
 
 - Promote the Qt/OpenGL multi-process demo from native-surface smoke test to a full acceptance test:

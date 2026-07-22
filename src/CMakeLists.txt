@@ -16,6 +16,18 @@ target_include_directories(PocoDDSCore PUBLIC "${PROJECT_SOURCE_DIR}/include")
 pdr_set_warnings(PocoDDSCore)
 add_library(PocoDDS::Core ALIAS PocoDDSCore)
 
+if(PDR_ENABLE_OPENTELEMETRY)
+    pdr_require_opentelemetry()
+    add_library(PocoDDSObservability Observability/BusinessTracer.cpp)
+    target_include_directories(PocoDDSObservability PUBLIC "${PROJECT_SOURCE_DIR}/include")
+    target_link_libraries(PocoDDSObservability PUBLIC
+        opentelemetry-cpp::trace
+        opentelemetry-cpp::resources
+        opentelemetry-cpp::in_memory_span_exporter)
+    pdr_set_warnings(PocoDDSObservability)
+    add_library(PocoDDS::Observability ALIAS PocoDDSObservability)
+endif()
+
 if(PDR_ENABLE_FASTDDS)
     pdr_require_fastdds()
     add_library(PocoDDSFastDDS Transport/FastDDSTransport.cpp)

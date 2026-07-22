@@ -43,8 +43,11 @@ ExternalProject_Add(fastdds
 ExternalProject_Add(opentelemetry
     GIT_REPOSITORY https://github.com/open-telemetry/opentelemetry-cpp.git
     GIT_TAG v1.28.0 GIT_SHALLOW TRUE
+    GIT_SUBMODULES ""
     CMAKE_ARGS ${common} -DBUILD_TESTING=OFF -DWITH_OTLP_GRPC=OFF
-        -DWITH_OTLP_HTTP=ON -DWITH_EXAMPLES=OFF)
+        -DWITH_OTLP_HTTP=OFF -DWITH_OTLP_FILE=OFF -DWITH_EXAMPLES=OFF
+        -DWITH_ELASTICSEARCH=OFF -DWITH_ZIPKIN=OFF -DWITH_ETW=OFF
+        -DWITH_CONFIGURATION=OFF -DBUILD_W3CTRACECONTEXT_TEST=OFF)
 ExternalProject_Add(googletest_install
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG v1.17.0 GIT_SHALLOW TRUE
