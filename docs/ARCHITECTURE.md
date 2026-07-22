@@ -20,6 +20,10 @@ controlled lifecycle) without inheriting RemotingNG's generated proxy/skeleton/O
 7. **Application adapters** integrate Qt, OpenGL or headless services without leaking those
    dependencies into Core.
 
+Upstream Poco is never vendored. CMake first searches the build-local prefix and the system, while
+the dependency superbuild obtains the pinned current Poco release when it is missing. Framework-only
+OSP and contract-generation code lives under `framework/` and remains separate from upstream Poco.
+
 ## Discovery and data path
 
 Fast-DDS participant discovery identifies processes and endpoints. A retained component-manifest
@@ -33,8 +37,8 @@ have a versioned IDL/schema, QoS profile and ownership definition.
 
 ## Desktop child windows
 
-Qt child processes must render into a platform-supported embedding surface or use streamed/offscreen
+The `QtOpenGLMultiProcess` acceptance demo exercises this boundary. Qt child processes must render
+into a platform-supported embedding surface or use streamed/offscreen
 rendering. Native window re-parenting is platform-specific and not a cross-platform framework
 contract. The reusable contract is process lifecycle + surface handle negotiation + input/resize
 events; each OS/graphics backend supplies its own adapter.
-

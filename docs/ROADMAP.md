@@ -23,7 +23,8 @@
 
 ## Phase 4 - application adapters
 
+- Promote the Qt/OpenGL multi-process demo from native-surface smoke test to a full acceptance test:
+  discovery, child restart, DDS command/frame exchange, trace continuity and fault injection.
 - Qt host and child-process SDK, with Windows/Linux/macOS embedding adapters.
 - OpenGL offscreen/shared-texture option for robust cross-process 3D composition.
 - Headless service templates, packaging, fault injection and multi-host acceptance tests.
-

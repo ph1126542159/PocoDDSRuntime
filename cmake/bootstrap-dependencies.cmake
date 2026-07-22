@@ -11,6 +11,19 @@ set(prefix "${PDR_BINARY_DIR}/install")
 set(common -DCMAKE_INSTALL_PREFIX=${prefix} -DCMAKE_PREFIX_PATH=${prefix}
     -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON)
 
+find_package(Poco 1.15.3 CONFIG QUIET COMPONENTS Foundation Util JSON)
+if(NOT Poco_FOUND)
+    ExternalProject_Add(poco
+        GIT_REPOSITORY https://github.com/pocoproject/poco.git
+        GIT_TAG poco-1.15.3-release GIT_SHALLOW TRUE
+        CMAKE_ARGS ${common} -DENABLE_TESTS=OFF -DENABLE_SAMPLES=OFF
+            -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF
+            -DENABLE_DATA_POSTGRESQL=OFF -DENABLE_DATA_MYSQL=OFF
+            -DENABLE_MONGODB=OFF -DENABLE_REDIS=OFF)
+else()
+    message(STATUS "Using existing Poco ${Poco_VERSION}")
+endif()
+
 ExternalProject_Add(foonathan_memory
     GIT_REPOSITORY https://github.com/eProsima/foonathan_memory_vendor.git
     GIT_TAG v1.4.1 GIT_SHALLOW TRUE

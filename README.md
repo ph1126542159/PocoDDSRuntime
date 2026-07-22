@@ -25,4 +25,9 @@ cmake -S . -B build -DPDR_ENABLE_FASTDDS=ON -DPDR_ENABLE_OPENTELEMETRY=ON
 All third-party install artifacts are isolated under `build/install`; host and cross-compiled build
 directories must never share that prefix.
 
+Upstream Poco is detected as a package and otherwise built from the official
+`poco-1.15.3-release` tag by the dependency superbuild. Poco source is not copied into this repository.
+The optional Qt/OpenGL multi-process acceptance demo is enabled with
+`-DPDR_BUILD_QT_OPENGL_DEMO=ON`.
+
 See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).

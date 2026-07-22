@@ -35,3 +35,13 @@ function(pdr_require_opentelemetry)
         "OpenTelemetry was requested but is not installed. Run cmake/bootstrap-dependencies.cmake.")
 endfunction()
 
+function(pdr_require_poco)
+    find_package(Poco 1.15.3 CONFIG QUIET COMPONENTS Foundation Util JSON
+        PATHS "${PDR_INSTALL_PREFIX}")
+    if(Poco_FOUND)
+        return()
+    endif()
+    message(FATAL_ERROR
+        "Poco 1.15.3 was requested but is not installed. Run the dependency superbuild in cmake/. "
+        "The project never vendors the upstream Poco source tree.")
+endfunction()
