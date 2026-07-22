@@ -58,8 +58,13 @@ jobs:
       - name: Run full acceptance suite
         run: ctest --test-dir build-full -C Release --output-on-failure
       - name: Verify Fast-DDS across isolated network stacks
-        run: bash scripts/acceptance/container-network-fastdds.sh
-          build-full/apps/pdr-dds-probe build-deps/install
+        shell: bash
+        run: |
+          if ! bash scripts/acceptance/container-network-fastdds.sh \
+              build-full/apps/pdr-dds-probe build-deps/install; then
+            find build-network-evidence-* -maxdepth 1 -type f -print -exec sed -n '1,240p' {} \;
+            exit 1
+          fi
       - name: Install reusable SDK
         run: cmake --install build-full --prefix ${{ github.workspace }}/build-sdk
       - name: Build outside-tree SDK consumer
