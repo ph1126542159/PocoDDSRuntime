@@ -1,8 +1,8 @@
 # Two-host Fast-DDS acceptance
 
-CI also runs `scripts/acceptance/network-namespace-fastdds.sh`, which proves network-only discovery,
-payload/trace propagation and control across two isolated Linux network stacks. The procedure below
-is deliberately stricter and remains the required physical two-machine acceptance.
+CI also runs `scripts/acceptance/container-network-fastdds.sh`, which proves network-only discovery,
+payload/trace propagation and control across two isolated Linux container network stacks. The
+procedure below is deliberately stricter and remains the required physical two-machine acceptance.
 
 This gate proves that communication is not accidentally using shared memory or loopback. Both hosts
 must be on a multicast-capable network, use the same probe binary build and DDS domain, and allow UDP
