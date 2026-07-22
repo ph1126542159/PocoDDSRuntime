@@ -15,6 +15,12 @@ matching parent/child Trace IDs, a changed child PID after fault injection, and 
 render. The visual embedding itself remains a manual platform acceptance gate because an offscreen
 CI platform cannot prove compositor behavior.
 
+Set `PDR_OTLP_ENDPOINT=http://127.0.0.1:4318` to export both the host and child spans to an
+OpenTelemetry Collector. `config/otel-collector-acceptance.yaml` provides a local validation
+pipeline with the standard OTLP/HTTP receiver and detailed debug exporter.
+The file exporter writes to the path in `PDR_OTEL_EVIDENCE`, allowing an acceptance runner to verify
+the two service names, operations and parent/child identifiers without scraping console text.
+
 ```powershell
 ctest --test-dir build-qt -C Release --output-on-failure `
   -R QtOpenGLMultiProcessAcceptance

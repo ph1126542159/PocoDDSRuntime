@@ -1,6 +1,5 @@
 #include "OtlpHttpJsonExporter.h"
 
-#include <Poco/Base64Encoder.h>
 #include <Poco/JSON/Array.h>
 #include <Poco/JSON/Object.h>
 #include <Poco/Net/HTTPClientSession.h>
@@ -28,15 +27,11 @@ namespace otel = opentelemetry;
 using Poco::JSON::Array;
 using Poco::JSON::Object;
 
-template <typename Id> std::string base64Id(const Id& id)
+template <typename Id> std::string hexId(const Id& id)
 {
-    std::ostringstream output;
-    Poco::Base64Encoder encoder(output);
-    encoder.rdbuf()->setLineLength(0);
-    const auto bytes = id.Id();
-    encoder.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-    encoder.close();
-    return output.str();
+    char value[Id::kSize * 2];
+    id.ToLowerBase16({value, sizeof(value)});
+    return {value, sizeof(value)};
 }
 
 class AnyValueVisitor
@@ -93,10 +88,10 @@ std::string unixNanos(otel::common::SystemTimestamp timestamp)
 Object serializeSpan(const otel::sdk::trace::SpanData& span)
 {
     Object result;
-    result.set("traceId", base64Id(span.GetTraceId()));
-    result.set("spanId", base64Id(span.GetSpanId()));
+    result.set("traceId", hexId(span.GetTraceId()));
+    result.set("spanId", hexId(span.GetSpanId()));
     if (span.GetParentSpanId().IsValid())
-        result.set("parentSpanId", base64Id(span.GetParentSpanId()));
+        result.set("parentSpanId", hexId(span.GetParentSpanId()));
     result.set("name", std::string(span.GetName()));
     result.set("kind", static_cast<int>(span.GetSpanKind()) + 1);
     result.set("startTimeUnixNano", unixNanos(span.GetStartTime()));

@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -83,7 +84,9 @@ int main(int argc, char* argv[])
                              PocoDDS::Core::ComponentState::Running,
                              {}});
     discovery.start();
-    PocoDDS::Observability::BusinessTracer tracer("qt.render.surface");
+    PocoDDS::Observability::BusinessTracerOptions tracerOptions;
+    tracerOptions.otlpHttpEndpoint = qEnvironmentVariable("PDR_OTLP_ENDPOINT").toStdString();
+    PocoDDS::Observability::BusinessTracer tracer("qt.render.surface", std::move(tracerOptions));
 
     RenderSurface surface;
     surface.setWindowTitle("PocoDDS OpenGL child");

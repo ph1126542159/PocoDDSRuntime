@@ -102,8 +102,8 @@ TEST(OtlpHttpExporterTest, SendsCollectorCompatibleJsonWithBusinessDataAndLogs)
     auto exportedSpan = scopeSpans->getObject(0)->getArray("spans")->getObject(0);
     EXPECT_EQ(exportedSpan->getValue<std::string>("name"), "fulfil-order");
     EXPECT_EQ(exportedSpan->getObject("status")->getValue<std::string>("message"), "success");
-    EXPECT_EQ(exportedSpan->getValue<std::string>("traceId").size(), 24U);
-    EXPECT_EQ(exportedSpan->getValue<std::string>("spanId").size(), 12U);
+    EXPECT_EQ(exportedSpan->getValue<std::string>("traceId").size(), 32U);
+    EXPECT_EQ(exportedSpan->getValue<std::string>("spanId").size(), 16U);
     EXPECT_NE(body.find("service.name"), std::string::npos);
     EXPECT_NE(body.find("business.input.orderId"), std::string::npos);
     EXPECT_NE(body.find("business.output.shipmentId"), std::string::npos);

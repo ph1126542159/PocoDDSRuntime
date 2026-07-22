@@ -22,6 +22,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -73,7 +74,9 @@ int main(int argc, char* argv[])
                    {5, std::chrono::minutes(1)});
     PocoDDS::Transport::FastDDSTransport transport(
         {domain, "qt-opengl-host", PocoDDS::Transport::FastDDSTransportMode::Automatic});
-    PocoDDS::Observability::BusinessTracer tracer("qt.opengl.host");
+    PocoDDS::Observability::BusinessTracerOptions tracerOptions;
+    tracerOptions.otlpHttpEndpoint = qEnvironmentVariable("PDR_OTLP_ENDPOINT").toStdString();
+    PocoDDS::Observability::BusinessTracer tracer("qt.opengl.host", std::move(tracerOptions));
 
     QMainWindow window;
     auto* central = new QWidget(&window);
