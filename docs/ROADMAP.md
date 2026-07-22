@@ -13,6 +13,10 @@
 - Supervisor with crash loop protection, dependency ordering and graceful shutdown.
 - Dynamic library bundle loader with ABI/API version checks.
 
+Implemented core evidence currently includes native Windows/POSIX launchers, bounded crash restart,
+heartbeat timeout restart, controlled termination and transactional configuration rollback. Distributed
+heartbeats and admin-driven configuration remain gated on the Fast-DDS and admin-plane phases.
+
 ## Phase 3 - observability and administration
 
 - OpenTelemetry SDK wrapper, W3C propagation, OTLP export and trace/log correlation.
