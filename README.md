@@ -89,3 +89,5 @@ outputs, status, duration and correlated span logs without application-specific 
 See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
 Physical two-machine validation is documented in
 [two-host Fast-DDS acceptance](docs/CROSS_HOST_ACCEPTANCE.md).
+See `docs/SINGLE_HOST_ACCEPTANCE.md` for the complete Windows single-machine verification commands,
+including the official OpenTelemetry Collector run.
