@@ -17,6 +17,10 @@ Implemented core evidence currently includes native Windows/POSIX launchers, bou
 heartbeat timeout restart, controlled termination and transactional configuration rollback. Distributed
 heartbeats and admin-driven configuration remain gated on the Fast-DDS and admin-plane phases.
 
+The generic Fast-DDS wire transport now has real two-process SHM-only and UDP-only acceptance on
+Windows, including payload and W3C trace-context verification. Typed control-plane contracts and a
+physical two-host acceptance run are still required.
+
 ## Phase 3 - observability and administration
 
 - OpenTelemetry SDK wrapper, W3C propagation, OTLP export and trace/log correlation.

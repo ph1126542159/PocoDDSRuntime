@@ -9,7 +9,8 @@ if(NOT DEFINED PDR_BINARY_DIR)
 endif()
 set(prefix "${PDR_BINARY_DIR}/install")
 set(common -DCMAKE_INSTALL_PREFIX=${prefix} -DCMAKE_PREFIX_PATH=${prefix}
-    -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON)
+    -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON)
 
 find_package(Poco 1.15.3 CONFIG QUIET COMPONENTS Foundation Util JSON)
 if(NOT Poco_FOUND)
@@ -36,7 +37,9 @@ ExternalProject_Add(fastdds
     GIT_REPOSITORY https://github.com/eProsima/Fast-DDS.git
     GIT_TAG v3.6.2 GIT_SHALLOW TRUE
     DEPENDS foonathan_memory fastcdr
-    CMAKE_ARGS ${common} -DCOMPILE_EXAMPLES=OFF -DBUILD_TESTING=OFF)
+    CMAKE_ARGS ${common} -DCOMPILE_EXAMPLES=OFF -DBUILD_TESTING=OFF
+        -DTHIRDPARTY=ON -DTHIRDPARTY_Asio=ON -DTHIRDPARTY_TinyXML2=ON
+        -DTHIRDPARTY_UPDATE=OFF)
 ExternalProject_Add(opentelemetry
     GIT_REPOSITORY https://github.com/open-telemetry/opentelemetry-cpp.git
     GIT_TAG v1.28.0 GIT_SHALLOW TRUE

@@ -30,4 +30,16 @@ Upstream Poco is detected as a package and otherwise built from the official
 The optional Qt/OpenGL multi-process acceptance demo is enabled with
 `-DPDR_BUILD_QT_OPENGL_DEMO=ON`.
 
+To build and verify the real Fast-DDS adapter after the dependency superbuild:
+
+```powershell
+cmake -S . -B build-fastdds -DCMAKE_BUILD_TYPE=Release `
+  -DPDR_INSTALL_PREFIX="$PWD/build-deps/install" -DPDR_ENABLE_FASTDDS=ON
+cmake --build build-fastdds --parallel 2
+ctest --test-dir build-fastdds --output-on-failure
+```
+
+The acceptance suite launches independent publisher and subscriber processes twice: once with only
+Fast-DDS shared memory enabled and once with only UDP enabled.
+
 See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).

@@ -32,6 +32,12 @@ descriptors enable shared memory and UDP; same-host endpoints prefer shared memo
 participants use UDP. Security, stable domain IDs, topic ACLs and schema compatibility are mandatory
 for production deployments.
 
+`FastDDSTransport` uses a versioned `PocoDDS.Wire.v1` envelope and exposes three explicit modes:
+automatic SHM+UDP, SHM-only and network-only UDP. Acceptance runs SHM-only and network-only in two
+independent processes, so a passing SHM test cannot silently fall back to loopback UDP. Logical topic,
+payload type and W3C trace context are serialized in the envelope. Production IDL contracts remain
+the authority for each business payload carried inside it.
+
 Automatic discovery does not remove the need for an interface contract. Every business topic must
 have a versioned IDL/schema, QoS profile and ownership definition.
 
