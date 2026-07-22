@@ -40,6 +40,7 @@ report_failure()
 trap report_failure ERR
 
 mkdir -p "$evidence"
+docker pull ubuntu:24.04 >/dev/null
 docker network create --driver bridge --subnet 10.203.1.0/24 "$network" >/dev/null
 
 run_probe()
@@ -47,9 +48,10 @@ run_probe()
     local name=$1
     local address=$2
     shift 2
-    docker run --rm --name "$name" --hostname "$name" --network "$network" --ip "$address" \
+    timeout 35s docker run --rm --name "$name" --hostname "$name" --network "$network" \
+        --ip "$address" \
         --volume "$workspace:/workspace" --workdir /workspace \
-        --env LD_LIBRARY_PATH="$runtime_path" ubuntu:24.04 timeout 30s "$probe" "$@"
+        --env LD_LIBRARY_PATH="$runtime_path" ubuntu:24.04 "$probe" "$@"
 }
 
 run_probe "$subscriber" 10.203.1.2 subscriber 167 network \
