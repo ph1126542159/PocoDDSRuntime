@@ -43,6 +43,11 @@ mkdir -p "$evidence"
 docker pull ubuntu:24.04 >/dev/null
 docker network create --driver bridge --subnet 10.203.1.0/24 "$network" >/dev/null
 
+docker run --rm --volume "$workspace:/workspace" --workdir /workspace \
+    --env LD_LIBRARY_PATH="$runtime_path" ubuntu:24.04 \
+    /bin/bash -c 'set -eux; test -x "$1"; /lib64/ld-linux-x86-64.so.2 --list "$1"' \
+    bash "$probe"
+
 run_probe()
 {
     local name=$1
