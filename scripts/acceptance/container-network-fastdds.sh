@@ -59,11 +59,11 @@ run_probe()
         --env LD_LIBRARY_PATH="$runtime_path" ubuntu:24.04 "$probe" "$@"
 }
 
-run_probe "$subscriber" 10.203.1.2 subscriber 167 network \
+run_probe "$subscriber" 10.203.1.2 subscribe 167 network \
     "/workspace/build-network-evidence-${suffix}/subscriber.marker" \
     >"$evidence/subscriber.log" 2>&1 &
 subscriber_pid=$!
-run_probe "$publisher" 10.203.1.3 publisher 167 network >"$evidence/publisher.log" 2>&1
+run_probe "$publisher" 10.203.1.3 publish 167 network >"$evidence/publisher.log" 2>&1
 wait "$subscriber_pid"
 grep -Fxq FAST_DDS_TWO_PROCESS_PASS "$evidence/subscriber.marker"
 grep -Fq FAST_DDS_DISCOVERY_PASS "$evidence/subscriber.log"

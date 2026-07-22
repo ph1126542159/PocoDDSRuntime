@@ -23,7 +23,12 @@ $log = "$prefix.log.txt"
 $report = "$prefix.json"
 Remove-Item -LiteralPath $marker -ErrorAction SilentlyContinue
 
-$arguments = @($Role, $Domain.ToString(), 'network')
+$probeRole = switch ($Role) {
+    'subscriber' { 'subscribe' }
+    'publisher' { 'publish' }
+    default { $Role }
+}
+$arguments = @($probeRole, $Domain.ToString(), 'network')
 if ($Role -eq 'subscriber' -or $Role -eq 'control-client') {
     $arguments += $marker
 }
