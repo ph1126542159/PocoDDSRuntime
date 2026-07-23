@@ -1,0 +1,1 @@
+{"id":"pdr.webui.tracing","title":"业务追踪","description":"OpenTelemetry 业务流程、参数、状态、耗时与关联日志","icon":"activity","order":200,"hidden":false,"entry":"index.html"}

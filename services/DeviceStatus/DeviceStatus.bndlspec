@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Device Status Service</name>
+    <symbolicName>pdr.service.deviceStatus</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>IoT::DeviceStatus::BundleActivator</class>
+      <library>pdr.service.deviceStatus</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>220</runLevel>
+    <requiredBundles>
+      <bundle>
+        <symbolicName>osp.core</symbolicName>
+        <version>[1.0.0, 2.0.0)</version>
+      </bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+</bundlespec>

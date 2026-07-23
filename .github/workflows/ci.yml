@@ -15,16 +15,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: lukka/get-cmake@latest
       - name: Configure
-        run: cmake -S . -B build -DPDR_ENABLE_FASTDDS=OFF -DPDR_ENABLE_OPENTELEMETRY=OFF
+        run: cmake -S . -B build/core -DPDR_ENABLE_FASTDDS=OFF -DPDR_ENABLE_OPENTELEMETRY=OFF
       - name: Build
-        run: cmake --build build --config Release --parallel 2
+        run: cmake --build build/core --config Release --parallel 2
       - name: Test
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: ctest --test-dir build/core -C Release --output-on-failure
       - name: Check formatting
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          find include src apps tests framework demos -type f \( -name '*.h' -o -name '*.cpp' \) -print0 |
+          find include services server tests platform demos -type f \( -name '*.h' -o -name '*.cpp' \) -print0 |
             xargs -0 clang-format --dry-run --Werror
 
   linux-full-stack:
@@ -39,40 +39,40 @@ jobs:
       - uses: actions/cache@v4
         id: native-dependencies
         with:
-          path: build-deps/install
-          key: native-dependencies-${{ runner.os }}-${{ hashFiles('cmake/bootstrap-dependencies.cmake') }}
+          path: build/dependencies/install
+          key: native-dependencies-${{ runner.os }}-${{ hashFiles('cmake/*.cmake') }}
       - name: Bootstrap native dependencies
         if: steps.native-dependencies.outputs.cache-hit != 'true'
         run: |
-          cmake -S cmake -B build-deps -DPDR_SOURCE_DIR=${{ github.workspace }} -DPDR_BINARY_DIR=${{ github.workspace }}/build-deps
-          cmake --build build-deps --config Release --parallel 2
+          cmake -S cmake -B build/dependencies
+          cmake --build build/dependencies --config Release --parallel 2
       - name: Configure full stack
         run: >-
-          cmake -S . -B build-full -DCMAKE_BUILD_TYPE=Release
-          -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build-deps/install
+          cmake -S . -B build/full -DCMAKE_BUILD_TYPE=Release
+          -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/dependencies/install
           -DPDR_ENABLE_FASTDDS=ON -DPDR_ENABLE_OPENTELEMETRY=ON
           -DPDR_ENABLE_OTLP_HTTP=ON -DPDR_ENABLE_ADMIN=ON
           -DPDR_BUILD_QT_OPENGL_DEMO=ON
       - name: Build full stack
-        run: cmake --build build-full --config Release --parallel 2
+        run: cmake --build build/full --config Release --parallel 2
       - name: Run full acceptance suite
-        run: ctest --test-dir build-full -C Release --output-on-failure
+        run: ctest --test-dir build/full -C Release --output-on-failure
       - name: Verify Fast-DDS across isolated network stacks
         shell: bash
         run: |
           if ! bash scripts/acceptance/container-network-fastdds.sh \
-              build-full/apps/pdr-dds-probe build-deps/install; then
-            find build-network-evidence-* -maxdepth 1 -type f -print -exec sed -n '1,240p' {} \;
+              build/full/server/pdr-dds-probe build/dependencies/install; then
+            find build/network-evidence-* -maxdepth 1 -type f -print -exec sed -n '1,240p' {} \;
             exit 1
           fi
       - name: Install reusable SDK
-        run: cmake --install build-full --prefix ${{ github.workspace }}/build-sdk
+        run: cmake --install build/full --prefix ${{ github.workspace }}/build/sdk
       - name: Build outside-tree SDK consumer
         run: >-
-          cmake -S tests/install-consumer -B build-consumer
+          cmake -S tests/install-consumer -B build/consumer
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build-sdk;${{ github.workspace }}/build-deps/install"
+          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/sdk;${{ github.workspace }}/build/dependencies/install"
       - name: Link outside-tree SDK consumer
-        run: cmake --build build-consumer --config Release --parallel 2
+        run: cmake --build build/consumer --config Release --parallel 2
       - name: Run outside-tree SDK consumer
-        run: ./build-consumer/pdr-install-consumer
+        run: ./build/consumer/pdr-install-consumer

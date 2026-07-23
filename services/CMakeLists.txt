@@ -1,0 +1,6 @@
+add_subdirectory(DeviceGateway)
+add_subdirectory(UnitsOfMeasure)
+add_subdirectory(NetworkEnvironment)
+add_subdirectory(DeviceStatus)
+add_subdirectory(WebEvent)
+add_subdirectory(MobileConnection)

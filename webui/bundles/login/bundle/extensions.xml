@@ -1,0 +1,7 @@
+<extensions>
+  <extension point="osp.web.server.directory"
+             path="/login"
+             resource="webui"
+             allowSpecialization="owner"
+             hidden="true"/>
+</extensions>

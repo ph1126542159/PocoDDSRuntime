@@ -1,0 +1,29 @@
+#pragma once
+
+#include "PocoDDS/Protocols/Serial/SerialChannel.h"
+#include "PocoDDS/Protocols/XBee/XBeeFrame.h"
+
+#include <memory>
+#include <string>
+
+namespace PocoDDS::Protocols::XBee
+{
+class XBeePort final : public PocoDDS::Protocols::Protocol
+{
+public:
+    explicit XBeePort(std::shared_ptr<PocoDDS::Protocols::Serial::SerialChannel> serial,
+                      bool escapedApiMode = false);
+
+    std::string name() const override;
+    void open() override;
+    void close() noexcept override;
+    bool isOpen() const noexcept override;
+
+    void send(const XBeeFrame& frame);
+    bool receive(XBeeFrame& frame, Poco::Timespan timeout);
+
+private:
+    std::shared_ptr<PocoDDS::Protocols::Serial::SerialChannel> _serial;
+    bool _escapedApiMode;
+};
+} // namespace PocoDDS::Protocols::XBee

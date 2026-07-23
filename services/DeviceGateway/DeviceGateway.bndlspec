@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Fast DDS Device Gateway</name>
+    <symbolicName>pdr.device.gateway</symbolicName>
+    <version>0.1.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::Services::DeviceGatewayActivator</class>
+      <library>pdr.device.gateway</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>100</runLevel>
+    <requiredBundles>
+      <bundle>
+        <symbolicName>osp.core</symbolicName>
+        <version>[1.0.0, 2.0.0)</version>
+      </bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+</bundlespec>

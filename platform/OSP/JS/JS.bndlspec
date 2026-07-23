@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>OSP JavaScript Integration</name>
+    <symbolicName>com.appinf.osp.js</symbolicName>
+    <version>1.0.0</version>
+    <vendor>Applied Informatics</vendor>
+    <copyright>(c) 2013-2022, Applied Informatics Software Engineering GmbH</copyright>
+    <activator>
+      <class>Poco::OSP::JS::JSBundleActivator</class>
+      <library>com.appinf.osp.js</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>600</runLevel>
+  </manifest>
+  <files>
+  	bundle/*
+  </files>
+  <code>
+    ${bin}/*.dll
+    ${bin}/*.pdb
+    ../../${bin}/PocoJSCore${64}.dll
+    ../../${bin}/PocoJSCore${64}d.dll
+    ../../${bin}/PocoJSCore${64}d.pdb
+    ../../${bin}/PocoJSNet${64}.dll
+    ../../${bin}/PocoJSNet${64}d.dll
+    ../../${bin}/PocoJSNet${64}d.pdb
+    ../../${bin}/PocoJSData${64}.dll
+    ../../${bin}/PocoJSData${64}d.dll
+    ../../${bin}/PocoJSData${64}d.pdb
+    ../../${bin}/PocoOSPJS${64}.dll
+    ../../${bin}/PocoOSPJS${64}d.dll
+    ../../${bin}/PocoOSPJS${64}d.pdb
+    bin/${osName}/${osArch}/*.so
+    bin/${osName}/${osArch}/*.dylib
+    ../../lib/${osName}/${osArch}/libPocoJSCore.so.*
+    ../../lib/${osName}/${osArch}/libPocoJSCored.so.*
+    ../../lib/${osName}/${osArch}/libPocoJSCore.*.dylib
+    ../../lib/${osName}/${osArch}/libPocoJSCored.*.dylib
+    ../../lib/${osName}/${osArch}/libPocoOSPJS.so.*
+    ../../lib/${osName}/${osArch}/libPocoOSPJSd.so.*
+    ../../lib/${osName}/${osArch}/libPocoOSPJS.*.dylib
+    ../../lib/${osName}/${osArch}/libPocoOSPJSd.*.dylib
+    ../../lib/${osName}/${osArch}/libv8.so
+    ../../lib/${osName}/${osArch}/libv8_libbase.so
+    ../../lib/${osName}/${osArch}/libv8_libplatform.so
+    ../../lib/${osName}/${osArch}/libv8.dylib
+    ../../lib/${osName}/${osArch}/libv8_libbase.dylib
+    ../../lib/${osName}/${osArch}/libv8_libplatform.dylib
+  </code>
+</bundlespec>

@@ -1,5 +1,6 @@
-/build*/
+/build/
 /.vs/
 /.vscode/
 *.user
 *.log
+/webui/node_modules/

@@ -1,94 +1,234 @@
 # PocoDDSRuntime
 
-A cross-platform C++17 runtime inspired by macchina.io OSP lifecycle concepts, designed for
-multi-process applications and backend services using Fast-DDS and OpenTelemetry.
+PocoDDSRuntime is a C++17 OSP service container derived from the macchina.io
+composition model. OSP owns local Bundle lifecycle and service registration;
+Fast DDS replaces the former RemotingNG cross-process proxy/skeleton layer.
 
-This repository is an independent clean architecture; it does not copy macchina.io web assets or
-RemotingNG-generated code.
+The project deliberately does not contain RemotingNG-generated `RemoteObject`,
+`Skeleton`, `ServerHelper` or `EventDispatcher` code.
 
-## Build
+## Directory layout
+
+- `platform/` — migrated platform/runtime infrastructure:
+  - `DDS`, `observability`, `CodeGeneration`, `Geo`, `OSP`, `Serial` and
+    `WebTunnel`;
+  - `protocols/` for BtLE, CAN, Modbus, MQTT, ROS Bridge, Serial, UDP,
+    WebTunnel and XBee;
+  - `devices/` for common device interfaces plus CAN, GNSS, Linux, Modbus,
+    Serial, Simulation and XBeeSensor implementations.
+- `services/` — independently packaged OSP Bundles: `DeviceGateway`,
+  `UnitsOfMeasure`, `NetworkEnvironment`, `DeviceStatus`, `WebEvent` and
+  `MobileConnection`.
+- `launcher/` — external watchdog/service wrapper that starts and relaunches
+  `pdr-runtime`; it is intentionally separate from the OSP server process.
+- `server/` — `MacchinaServer.cpp`, the single process entry point.
+- `webui/` — embedded runtime administration UI and REST API for processes,
+  services, modules, Bundles, configuration, logs and lifecycle operations.
+- `cmake/` — third-party discovery, download/build/install superbuild and
+  compatibility patches.
+- `scripts/` — Linux host and PetaLinux SDK build entry points.
+- `config/` — runtime configuration.
+- `build/` — all generated dependency, native, cross and install trees.
+
+## Communication boundary
+
+Fast DDS replaces RemotingNG only for communication between processes or
+machines. It does not replace physical/device protocols such as CAN, Modbus,
+MQTT, serial, XBee or Bluetooth.
+
+The device gateway uses:
+
+- `pdr.device.state`
+- `pdr.device.request`
+- `pdr.device.response`
+
+Migrated services use:
+
+| Service | Request | Response | Event |
+| --- | --- | --- | --- |
+| UnitsOfMeasure | `pdr.units.request` | `pdr.units.response` | — |
+| NetworkEnvironment | `pdr.network.request` | `pdr.network.response` | `pdr.network.environment` |
+| DeviceStatus | `pdr.status.request` | `pdr.status.response` | `pdr.device.status` |
+| WebEvent | `pdr.web.request` | `pdr.web.response` | `pdr.web.event` |
+| MobileConnection | `pdr.mobile.request` | `pdr.mobile.response` | `pdr.mobile.state` |
+
+OSP remains responsible for local Bundle startup, shutdown, reload and service
+registry ownership.
+
+## OpenTelemetry business tracing
+
+Business tracing is optional (`-DPDR_ENABLE_OBSERVABILITY=ON`). Applications use
+`BusinessTracer::startBusiness()` and `BusinessSpan::startStep()` to record the
+business flow, sanitized input/output fields, success or failure, duration and
+step logs. W3C trace context is carried in the Fast DDS Envelope, and completed
+or running span snapshots are aggregated over `pdr.observability.span`.
+
+The administration WebUI contains a **业务追踪** page that renders each trace as
+a clickable flow graph. See [docs/BUSINESS_TRACING.md](docs/BUSINESS_TRACING.md)
+for the API, cross-process propagation and data-safety rules.
+
+## Third-party dependencies
+
+Third-party sources are not copied into the repository. The superbuild pins and
+installs:
+
+- Poco 1.15.3
+- Fast DDS 3.6.2 and its Fast-CDR/foonathan dependencies
+- Eclipse Paho MQTT C 1.3.15
+
+OpenTelemetry business tracing and GoogleTest remain optional:
 
 ```powershell
-cmake -S . -B build
+cmake -S cmake -B build/dependencies `
+  -DPDR_BUILD_GOOGLETEST=ON
+```
+
+Offline or restricted-network builds can provide:
+
+- `PDR_POCO_ARCHIVE`
+- `PDR_FASTDDS_SOURCE_DIR`
+- `PDR_FASTCDR_SOURCE_DIR`
+- `PDR_FOONATHAN_MEMORY_SOURCE_DIR`
+- `PDR_PAHO_MQTT_SOURCE_DIR`
+
+Dependencies and PocoDDSRuntime are installed into one prefix per target
+architecture. On a normal Windows build that single prefix is `build/install`.
+
+## Windows build
+
+With Visual Studio 2022:
+
+```powershell
+cmake -S cmake -B build/dependencies -G "Visual Studio 17 2022" -A x64 `
+  -DPDR_DEPENDENCY_INSTALL_PREFIX="$PWD/build/install"
+cmake --build build/dependencies --config Release --parallel 2
+
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release --parallel 2
 ctest --test-dir build -C Release --output-on-failure
+cmake --install build --config Release
 ```
 
-Missing GoogleTest is fetched automatically. For the full native dependency prefix:
+Start the build-tree runtime:
 
 ```powershell
-cmake -S cmake -B build/dependencies -DPDR_SOURCE_DIR=$PWD
-cmake --build build/dependencies --config Release --parallel 2
-cmake -S . -B build -DPDR_ENABLE_FASTDDS=ON -DPDR_ENABLE_OPENTELEMETRY=ON `
-  -DPDR_ENABLE_OTLP_HTTP=ON -DPDR_ENABLE_ADMIN=ON
+Set-Location build/bin
+./pdr-runtime.exe
 ```
 
-All third-party install artifacts are isolated under `build/install`; host and cross-compiled build
-directories must never share that prefix.
+Other long-running executables are placed below the shared subprocess root:
 
-Install the framework SDK and consume it from another project without referring to the source tree:
-
-```powershell
-cmake --install build-fastdds --prefix build/sdk
-cmake -S MyApplication -B MyApplication/build `
-  -DCMAKE_PREFIX_PATH="$PWD/build/sdk;$PWD/build/install"
+```text
+build/bin/
+├─ pdr-runtime.exe
+├─ pdr-runtime.properties
+├─ pdr-subprocesses.properties
+├─ logs/
+├─ bundles/
+└─ processes/
+   └─ pdr-launcher/
+      ├─ pdr-launcher.exe
+      ├─ pdr-launcher.properties
+      ├─ logs/
+      └─ bundles/
 ```
 
-The installed package exports `PocoDDS::Core`, `PocoDDS::FastDDS`, `PocoDDS::Observability`,
-`PocoDDS::Admin`, `PocoDDS::OSP` and `PocoDDS::CodeGeneration` for `find_package(PocoDDSRuntime)`.
+`PDRBundleManagement.dll` monitors the owning process's `bundles/` directory.
+After a changed directory snapshot remains stable across two scans, it performs
+the complete OSP lifecycle: stop, unload, repository reload, dependency
+resolution and start. This handles added, atomically replaced and deleted
+Bundle packages without loading partially copied files.
 
-Upstream Poco is detected as a package and otherwise built from the official
-`poco-1.15.3-release` tag by the dependency superbuild. Poco source is not copied into this repository.
-The optional Qt/OpenGL multi-process acceptance demo is enabled with
-`-DPDR_BUILD_QT_OPENGL_DEMO=ON`.
+`pdr-runtime` reads `pdr-subprocesses.properties` after its own initialization
+and starts enabled subprocess entries in ascending numeric order. Executable
+paths and optional working directories are relative to `build/bin/`. On startup
+failure, already-started children are stopped. Normal shutdown stops children in
+reverse order.
 
-To build and verify the real Fast-DDS adapter after the dependency superbuild:
-
-```powershell
-cmake -S . -B build-fastdds -DCMAKE_BUILD_TYPE=Release `
-  -DPDR_INSTALL_PREFIX="$PWD/build-deps/install" -DPDR_ENABLE_FASTDDS=ON
-cmake --build build-fastdds --parallel 2
-ctest --test-dir build-fastdds --output-on-failure
+```properties
+subprocess.count = 1
+subprocess.0.enabled = true
+subprocess.0.name = worker
+subprocess.0.path = processes/worker/worker.exe
+subprocess.0.workingDirectory = processes/worker
+subprocess.0.argument.count = 1
+subprocess.0.argument.0 = --config=worker.properties
 ```
 
-The acceptance suite launches independent publisher and subscriber processes twice: once with only
-Fast-DDS shared memory enabled and once with only UDP enabled.
+`pdr-launcher` remains available below `processes/`, but it is not enabled in
+the default child-process configuration because its watchdog role is to launch
+another command; configuring it to launch `pdr-runtime` from `pdr-runtime`
+would create a parent/child cycle.
 
-## Local administration
+Poco uses `/option=value` syntax on Windows and `--option=value` on Unix.
 
-The administration plane binds to `127.0.0.1:9080` by default. API access requires a bearer token
-of at least 16 characters; the HTML shell contains no runtime data and prompts for the token locally.
+## Linux host build
 
-```powershell
-$env:PDR_ADMIN_TOKEN = "replace-with-a-random-32-byte-token"
-$env:PDR_ADMIN_BIND = "127.0.0.1"
-$env:PDR_ADMIN_PORT = "9080"
-$env:PDR_DDS_DOMAIN = "0"
-$env:PDR_BUNDLE_DIR = "C:\path\to\bundles"
-build-fastdds/apps/pdr-runtime.exe
+```bash
+./scripts/bootstrap-cmake.sh
+./scripts/build-host.sh
+cd build/host-install/bin
+./pdr-runtime --config-file=../etc/pdr-runtime.properties
 ```
 
-Open `http://127.0.0.1:9080/` to inspect topology and logs, apply live configuration, issue lifecycle
-commands and inspect trace graphs. Binding to a non-loopback interface should only be done behind TLS
-and an authenticated reverse proxy. `PDR_RUN_SECONDS` provides a bounded runtime for CI smoke tests.
-When Fast-DDS is enabled, the runtime publishes its manifest, discovers remote components and routes
-targeted configuration/lifecycle requests over DDS with correlated results and revision checks.
-When `PDR_BUNDLE_DIR` is set, the runtime watches native bundle libraries, shadow-loads them so the
-source file remains replaceable on Windows, and applies install/replace/remove through the complete
-bundle lifecycle. An explicitly uninstalled artifact remains suppressed until its file changes.
+The script keeps separate build trees but installs both dependencies and the
+runtime into the single `build/host-install` prefix.
 
-`BusinessTracerOptions::otlpHttpEndpoint` enables OTLP/HTTP JSON export. Passing a Collector base URL
-automatically targets `/v1/traces`; custom headers can be supplied through `otlpHeaders`. The exporter
-targets a local or sidecar Collector over HTTP; use the Collector or a reverse proxy for TLS, retries
-and remote authentication policy.
+## PetaLinux SDK build
 
-Set `BusinessTracerOptions::onCompleted` to call `AdminService::appendTrace` when the local hidden
-administration page should display the same completed business spans. The adapter transfers inputs,
-outputs, status, duration and correlated span logs without application-specific conversion code.
+The default SDK environment is
+`/data/petalinux/bin/petalinux-sdk-env.sh`. Override it with
+`PDR_PETALINUX_SDK_ENV`. The Bundle creator is executed through qemu-aarch64;
+override its location with `MYIOT_QEMU_ARM`.
 
-See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
-Physical two-machine validation is documented in
-[two-host Fast-DDS acceptance](docs/CROSS_HOST_ACCEPTANCE.md).
-See `docs/SINGLE_HOST_ACCEPTANCE.md` for the complete Windows single-machine verification commands,
-including the official OpenTelemetry Collector run.
-The recorded 2026-07-22 baseline is in `docs/ACCEPTANCE_REPORT_2026-07-22.md`.
+```bash
+./scripts/bootstrap-cmake.sh
+./scripts/build-petalinux.sh
+```
+
+Target dependencies and runtime artifacts are both installed under the single
+`build/petalinux-install` prefix. It never reuses the host prefix.
+
+## Runtime devices
+
+The portable default configuration enables only `simulation-1`. Physical
+backends are opt-in in `config/pdr-runtime.properties`:
+
+- `pdr.modbus.*`
+- `pdr.serial.*`
+- `pdr.gnss.*`
+- `pdr.gpio.*`
+- `pdr.led.*`
+- `pdr.xbee.*`
+- `pdr.can.*`
+
+The installed process layout is:
+
+```text
+bin/
+├─ pdr-runtime
+├─ pdr-runtime.properties
+├─ pdr-subprocesses.properties
+├─ bundles/
+│  ├─ osp.core_1.7.0.bndl
+│  ├─ poco.net_1.11.6.bndl
+│  ├─ pdr.device.gateway_0.1.0.bndl
+│  ├─ pdr.service.units_1.0.0.bndl
+│  ├─ pdr.service.network_1.0.0.bndl
+│  ├─ pdr.service.deviceStatus_1.0.0.bndl
+│  ├─ pdr.service.webEvent_1.0.0.bndl
+│  └─ pdr.service.mobile_1.0.0.bndl
+└─ processes/
+   └─ pdr-launcher/
+      ├─ pdr-launcher
+      └─ pdr-launcher.properties
+include/Poco/
+include/fastdds/
+include/fastcdr/
+lib/PocoFoundation...
+lib/fastdds...
+lib/cmake/Poco/
+lib/cmake/fastdds/
+include/
+lib/
+```

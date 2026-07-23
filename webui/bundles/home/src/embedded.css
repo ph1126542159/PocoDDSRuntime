@@ -1,0 +1,14 @@
+/* The portal shell owns global navigation and the module title bar. */
+.app-shell > aside,
+.app-shell > .mobile-overlay,
+.topbar {
+  display: none;
+}
+
+.app-shell > main {
+  margin-left: 0;
+}
+
+.content {
+  padding-top: 24px;
+}

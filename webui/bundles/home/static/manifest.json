@@ -1,0 +1,9 @@
+{
+  "id": "pdr.webui.home",
+  "title": "运行主页",
+  "description": "运行时资源、日志、配置与生命周期管理",
+  "icon": "dashboard",
+  "order": 100,
+  "hidden": false,
+  "entry": "index.html"
+}

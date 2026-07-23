@@ -1,0 +1,18 @@
+{
+    "buildType": {
+        "default": "release",
+        "description": "PocoDDSRuntime supports Release dependencies on Windows.",
+        "choices": {
+            "debug": {
+                "short": "Debug",
+                "long": "Debug build with Release-compatible dependency ABI",
+                "buildType": "Debug"
+            },
+            "release": {
+                "short": "Release",
+                "long": "Release build",
+                "buildType": "Release"
+            }
+        }
+    }
+}

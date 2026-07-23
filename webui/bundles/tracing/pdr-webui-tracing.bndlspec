@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Business Tracing</name>
+    <symbolicName>pdr.webui.tracing</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <lazyStart>false</lazyStart>
+    <runLevel>460-webui</runLevel>
+    <dependency>
+      <symbolicName>osp.web</symbolicName>
+      <version>[1.1.0,2.0.0)</version>
+    </dependency>
+  </manifest>
+  <code></code>
+  <files>bundle/*</files>
+</bundlespec>

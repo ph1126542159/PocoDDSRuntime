@@ -1,0 +1,28 @@
+function(pdr_add_webui_bundle target bundle_spec)
+    get_filename_component(spec "${bundle_spec}" ABSOLUTE
+        BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    file(GLOB_RECURSE resources CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/bundle/*")
+    set(stamp "${CMAKE_CURRENT_BINARY_DIR}/${target}.bndl.stamp")
+    add_custom_command(
+        OUTPUT "${stamp}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${PDR_BUNDLE_OUTPUT_DIRECTORY}"
+        COMMAND ${MYIOT_OSP_BUNDLE_CREATOR_COMMAND}
+            "${MYIOT_BUNDLE_OPT_PREFIX}output-dir=${PDR_BUNDLE_OUTPUT_DIRECTORY}"
+            "${MYIOT_BUNDLE_OPT_PREFIX}osname=${MYIOT_OSP_BUNDLE_OSNAME}"
+            "${MYIOT_BUNDLE_OPT_PREFIX}osarch=${MYIOT_OSP_BUNDLE_OSARCH}"
+            "${spec}"
+        COMMAND ${CMAKE_COMMAND} -E touch "${stamp}"
+        DEPENDS OSPBundleCreator "${spec}" ${resources}
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM)
+    add_custom_target(${target}_Package ALL DEPENDS "${stamp}")
+endfunction()
+
+file(GLOB web_bundle_cmake_files CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/*/CMakeLists.txt")
+foreach(web_bundle_cmake IN LISTS web_bundle_cmake_files)
+    get_filename_component(web_bundle_dir "${web_bundle_cmake}" DIRECTORY)
+    get_filename_component(web_bundle_name "${web_bundle_dir}" NAME)
+    add_subdirectory("${web_bundle_name}")
+endforeach()

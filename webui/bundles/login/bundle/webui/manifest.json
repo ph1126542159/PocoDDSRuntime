@@ -1,0 +1,9 @@
+{
+  "id": "pdr.webui.login",
+  "title": "入口登录",
+  "description": "PocoDDS Runtime 管理入口",
+  "icon": "login",
+  "order": 0,
+  "hidden": true,
+  "entry": "index.html"
+}
