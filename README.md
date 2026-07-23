@@ -19,8 +19,9 @@ The project deliberately does not contain RemotingNG-generated `RemoteObject`,
 - `services/` — independently packaged OSP Bundles: `DeviceGateway`,
   `UnitsOfMeasure`, `NetworkEnvironment`, `DeviceStatus`, `WebEvent` and
   `MobileConnection`.
-- `launcher/` — external watchdog/service wrapper that starts and relaunches
-  `pdr-runtime`; it is intentionally separate from the OSP server process.
+- `SubSystem/` — subprocess implementations. It currently contains the
+  `launcher/` watchdog/service wrapper that starts and relaunches `pdr-runtime`;
+  the launcher is intentionally separate from the OSP server process.
 - `server/` — `MacchinaServer.cpp`, the single process entry point.
 - `webui/` — embedded runtime administration UI and REST API for processes,
   services, modules, Bundles, configuration, logs and lifecycle operations.

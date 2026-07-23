@@ -102,6 +102,7 @@ public:
 		bool corsEnable = true;
 		std::string defaultDomain;
 		std::string corsAllowedOrigin;
+		std::string rootRedirect;
 		if (pPrefsSvcRef)
 		{
 			Poco::AutoPtr<PreferencesService> pPrefsSvc = pPrefsSvcRef->castedInstance<PreferencesService>();
@@ -131,6 +132,7 @@ public:
 			authMethods = WebServerDispatcher::parseAuthMethods(pPrefsSvc->configuration()->getString("osp.web.authMethods"s, ""s));
 			corsEnable = pPrefsSvc->configuration()->getBool("osp.web.cors.enable"s, true);
 			corsAllowedOrigin = pPrefsSvc->configuration()->getString("osp.web.cors.allowedOrigin"s, ""s);
+			rootRedirect = pPrefsSvc->configuration()->getString("osp.web.rootRedirect"s, ""s);
 		}
 
 		Poco::StringTokenizer tok(compressedMediaTypesString, ",", Poco::StringTokenizer::TOK_TRIM | Poco::StringTokenizer::TOK_IGNORE_EMPTY);
@@ -162,6 +164,7 @@ public:
 		config.authServiceName = authServiceName;
 		config.tokenValidatorName = tokenValidatorName;
 		config.corsAllowedOrigin = corsAllowedOrigin;
+		config.rootRedirect = rootRedirect;
 		if (compressResponse) config.options |= WebServerDispatcher::CONF_OPT_COMPRESS_RESPONSES;
 		config.compressedMediaTypes = compressedMediaTypes;
 		config.customResponseHeaders = customResponseHeaders;

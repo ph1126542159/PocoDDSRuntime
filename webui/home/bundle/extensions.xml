@@ -1,6 +1,6 @@
 <extensions>
   <extension point="osp.web.server.directory"
-             path="/"
+             path="/home"
              resource="webui"
              allowSpecialization="owner"
              hidden="true"/>

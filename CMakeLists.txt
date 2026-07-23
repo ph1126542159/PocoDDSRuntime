@@ -177,7 +177,7 @@ set(CMAKE_FOLDER "Services")
 add_subdirectory(services)
 
 set(CMAKE_FOLDER "Applications")
-add_subdirectory(launcher)
+add_subdirectory(SubSystem)
 add_subdirectory(webui)
 add_subdirectory(server)
 

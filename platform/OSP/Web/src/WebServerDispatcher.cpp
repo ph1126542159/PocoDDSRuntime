@@ -78,6 +78,7 @@ WebServerDispatcher::WebServerDispatcher(const Config& config):
 	_tokenValidatorName(config.tokenValidatorName),
 	_corsEnabled((config.options & CONF_OPT_ENABLE_CORS) != 0),
 	_corsAllowedOrigin(config.corsAllowedOrigin),
+	_rootRedirect(config.rootRedirect),
 	_compressResponses((config.options & CONF_OPT_COMPRESS_RESPONSES) != 0),
 	_cacheResources((config.options & CONF_OPT_CACHE_RESOURCES) != 0),
 	_addAuthHeader((config.options & CONF_OPT_ADD_AUTH_HEADER) != 0),
@@ -371,7 +372,11 @@ void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, P
 	{
 		try
 		{
-			sendNotFound(request, request.getURI());
+			URI uri(request.getURI());
+			if (uri.getPath() == "/" && !_rootRedirect.empty())
+				sendFound(request, _rootRedirect);
+			else
+				sendNotFound(request, request.getURI());
 		}
 		catch (Poco::Exception& exc)
 		{

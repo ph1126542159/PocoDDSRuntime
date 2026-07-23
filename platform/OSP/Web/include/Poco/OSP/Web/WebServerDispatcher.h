@@ -218,6 +218,7 @@ public:
 		int options;
 		int authMethods;
 		std::string corsAllowedOrigin;
+		std::string rootRedirect;
 	};
 
 	using PathMap = std::map<std::string, VirtualPath>;
@@ -417,6 +418,7 @@ private:
 	std::string _tokenValidatorName;
 	bool _corsEnabled;
 	std::string _corsAllowedOrigin;
+	std::string _rootRedirect;
 	bool _compressResponses;
 	bool _cacheResources;
 	bool _addAuthHeader;
