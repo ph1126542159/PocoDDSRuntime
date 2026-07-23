@@ -118,6 +118,7 @@ add_subdirectory(SecureWebServer)
 add_subdirectory(SimpleAuth)
 add_subdirectory(BundleAdmin)
 add_subdirectory(WebEvent)
+add_subdirectory(SystemMonitoring)
 add_subdirectory(StripBundle)
 add_subdirectory(Unit)
 

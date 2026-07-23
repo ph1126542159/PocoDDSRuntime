@@ -59,6 +59,12 @@ Configuration::Ptr PreferencesService::configuration()
 	return _pConfig;
 }
 
+void PreferencesService::setConfiguration(const std::string& key, const std::string& value)
+{
+	Poco::FastMutex::ScopedLock lock(_mutex);
+	_pConfig->setProperty(key, value);
+}
+
 
 const std::type_info& PreferencesService::type() const
 {

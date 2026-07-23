@@ -26,6 +26,7 @@
 namespace Poco {
 namespace OSP {
 
+class PreferencesService;
 
 class OSP_API Configuration: public Poco::Util::AbstractConfiguration
 	/// A simple wrapper class for Poco::Util::AbstractConfiguration,
@@ -46,6 +47,8 @@ protected:
 	~Configuration();
 
 private:
+	friend class PreferencesService;
+	void setProperty(const std::string& key, const std::string& value);
 	Configuration();
 
 	AbstractConfiguration* _pConfig;

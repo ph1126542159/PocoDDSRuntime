@@ -30,6 +30,7 @@
 #include "Poco/StreamCopier.h"
 #include "Poco/Exception.h"
 #include "Poco/NumberFormatter.h"
+#include "Poco/NumberParser.h"
 #include "Poco/Format.h"
 #include "Poco/ScopedLock.h"
 #include "Poco/File.h"
@@ -41,9 +42,20 @@
 #include "Poco/StringTokenizer.h"
 #include "Poco/String.h"
 #include "Poco/Message.h"
+#include "Poco/Environment.h"
+#include "Poco/Process.h"
+#include "Poco/UnicodeConverter.h"
 #include <memory>
 #include <limits>
+#include <fstream>
+#include <deque>
 #include <sstream>
+#include <cctype>
+
+#if defined(POCO_OS_FAMILY_WINDOWS)
+#include <Windows.h>
+#include <TlHelp32.h>
+#endif
 
 
 using namespace std::string_literals;
@@ -288,6 +300,213 @@ void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, P
 
 		URI uri(request.getURI());
 		std::string path(uri.getPath());
+		if (path == "/api/v1/process-logs" && request.getMethod() == "GET")
+		{
+			std::string processId;
+			std::string processName;
+			int limit = 300;
+			for (const auto& parameter : uri.getQueryParameters())
+			{
+				if (parameter.first == "id") processId = parameter.second;
+				else if (parameter.first == "name") processName = parameter.second;
+				else if (parameter.first == "limit")
+				{
+					try { limit = Poco::NumberParser::parse(parameter.second); }
+					catch (...) {}
+				}
+			}
+			limit = std::max(20, std::min(limit, 1000));
+
+			std::string logName = "pdr-runtime";
+			if (!processId.empty() &&
+				processId != Poco::NumberFormatter::format(Poco::Process::id()))
+			{
+				logName.clear();
+				for (const char character : processName)
+				{
+					const unsigned char value = static_cast<unsigned char>(character);
+					if (std::isalnum(value) || character == '.' || character == '_' ||
+						character == '-')
+						logName += character;
+				}
+				const std::string suffix = ".exe";
+				if (logName.size() > suffix.size() &&
+					Poco::icompare(logName.substr(logName.size() - suffix.size()), suffix) == 0)
+					logName.resize(logName.size() - suffix.size());
+			}
+
+			std::deque<std::string> lines;
+			if (!logName.empty())
+			{
+				const Poco::Path logPath =
+					Poco::Path("logs").append(logName + ".log").makeAbsolute();
+				std::ifstream input(logPath.toString());
+				std::string line;
+				while (std::getline(input, line))
+				{
+					lines.push_back(line);
+					if (lines.size() > static_cast<std::size_t>(limit))
+						lines.pop_front();
+				}
+			}
+
+			std::ostringstream json;
+			json << "{\"processId\":\"" << jsonize(processId) << "\",\"lines\":[";
+			for (std::size_t index = 0; index < lines.size(); ++index)
+			{
+				if (index) json << ',';
+				json << '"' << jsonize(lines[index]) << '"';
+			}
+			json << "]}";
+			const std::string body = json.str();
+			response.setContentType("application/json");
+			response.setStatusAndReason(HTTPResponse::HTTP_OK);
+			response.setContentLength(static_cast<int>(body.size()));
+			response.sendBuffer(body.data(), body.size());
+			return;
+		}
+		if (path == "/api/v1/topology" && request.getMethod() == "GET")
+		{
+			std::vector<Bundle::Ptr> bundles;
+			_pContext->listBundles(bundles);
+			std::vector<ServiceRef::Ptr> services = _pContext->registry().find("name");
+
+			double cpuPercent = 0.0;
+			double memoryPercent = 0.0;
+			Poco::UInt64 memoryUsedMB = 0;
+			Poco::UInt64 memoryTotalMB = 0;
+			double diskPercent = 0.0;
+			Poco::UInt64 diskUsedGB = 0;
+			Poco::UInt64 diskTotalGB = 0;
+
+#if defined(POCO_OS_FAMILY_WINDOWS)
+			static Poco::FastMutex sampleMutex;
+			static ULONGLONG previousIdle = 0;
+			static ULONGLONG previousKernel = 0;
+			static ULONGLONG previousUser = 0;
+			{
+				FastMutex::ScopedLock sampleLock(sampleMutex);
+				FILETIME idleTime;
+				FILETIME kernelTime;
+				FILETIME userTime;
+				if (GetSystemTimes(&idleTime, &kernelTime, &userTime))
+				{
+					const auto asUInt64 = [](const FILETIME& value) {
+						return (static_cast<ULONGLONG>(value.dwHighDateTime) << 32) |
+							value.dwLowDateTime;
+					};
+					const ULONGLONG idle = asUInt64(idleTime);
+					const ULONGLONG kernel = asUInt64(kernelTime);
+					const ULONGLONG user = asUInt64(userTime);
+					const ULONGLONG totalDelta =
+						(kernel - previousKernel) + (user - previousUser);
+					const ULONGLONG idleDelta = idle - previousIdle;
+					if (previousKernel != 0 && totalDelta != 0)
+						cpuPercent = 100.0 * static_cast<double>(totalDelta - idleDelta) /
+							static_cast<double>(totalDelta);
+					previousIdle = idle;
+					previousKernel = kernel;
+					previousUser = user;
+				}
+			}
+
+			MEMORYSTATUSEX memoryStatus{};
+			memoryStatus.dwLength = sizeof(memoryStatus);
+			if (GlobalMemoryStatusEx(&memoryStatus))
+			{
+				memoryPercent = static_cast<double>(memoryStatus.dwMemoryLoad);
+				memoryTotalMB = memoryStatus.ullTotalPhys / (1024ULL * 1024ULL);
+				memoryUsedMB =
+					(memoryStatus.ullTotalPhys - memoryStatus.ullAvailPhys) /
+					(1024ULL * 1024ULL);
+			}
+
+			ULARGE_INTEGER freeBytes;
+			ULARGE_INTEGER totalBytes;
+			if (GetDiskFreeSpaceExW(nullptr, &freeBytes, &totalBytes, nullptr) &&
+				totalBytes.QuadPart != 0)
+			{
+				const ULONGLONG usedBytes = totalBytes.QuadPart - freeBytes.QuadPart;
+				diskPercent = 100.0 * static_cast<double>(usedBytes) /
+					static_cast<double>(totalBytes.QuadPart);
+				diskTotalGB = totalBytes.QuadPart / (1024ULL * 1024ULL * 1024ULL);
+				diskUsedGB = usedBytes / (1024ULL * 1024ULL * 1024ULL);
+			}
+#endif
+
+			std::ostringstream json;
+			json << "{\"host\":\"" << jsonize(Poco::Environment::nodeName())
+				<< "\",\"mainProcess\":{\"kind\":\"process\",\"id\":\""
+				<< Poco::Process::id() << "\",\"pid\":" << Poco::Process::id()
+				<< ",\"name\":\"pdr-runtime\",\"role\":\"main\",\"state\":\"running\"},";
+			json << "\"resources\":{\"cpuPercent\":" << cpuPercent
+				<< ",\"cpuCores\":" << Poco::Environment::processorCount()
+				<< ",\"memoryPercent\":" << memoryPercent
+				<< ",\"memoryUsedMb\":" << memoryUsedMB
+				<< ",\"memoryTotalMb\":" << memoryTotalMB
+				<< ",\"diskPercent\":" << diskPercent
+				<< ",\"diskUsedGb\":" << diskUsedGB
+				<< ",\"diskTotalGb\":" << diskTotalGB << "},";
+
+			json << "\"processes\":[";
+#if defined(POCO_OS_FAMILY_WINDOWS)
+			bool firstProcess = true;
+			HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+			if (snapshot != INVALID_HANDLE_VALUE)
+			{
+				PROCESSENTRY32W entry{};
+				entry.dwSize = sizeof(entry);
+				if (Process32FirstW(snapshot, &entry))
+				{
+					do
+					{
+						if (entry.th32ParentProcessID ==
+							static_cast<DWORD>(Poco::Process::id()))
+						{
+							if (_wcsicmp(entry.szExeFile, L"conhost.exe") == 0)
+								continue;
+							if (!firstProcess) json << ',';
+							firstProcess = false;
+							std::string name;
+							Poco::UnicodeConverter::toUTF8(entry.szExeFile, name);
+							json << "{\"kind\":\"process\",\"id\":\"" << entry.th32ProcessID
+								<< "\",\"pid\":" << entry.th32ProcessID << ",\"name\":\""
+								<< jsonize(name) << "\",\"state\":\"running\"}";
+						}
+					}
+					while (Process32NextW(snapshot, &entry));
+				}
+				CloseHandle(snapshot);
+			}
+#endif
+			json << "],\"services\":[";
+			for (std::size_t index = 0; index < services.size(); ++index)
+			{
+				if (index) json << ',';
+				json << "{\"kind\":\"service\",\"id\":\""
+					<< jsonize(services[index]->name()) << "\",\"name\":\""
+					<< jsonize(services[index]->name()) << "\",\"state\":\"active\"}";
+			}
+			json << "],\"modules\":[],\"bundles\":[";
+			for (std::size_t index = 0; index < bundles.size(); ++index)
+			{
+				if (index) json << ',';
+				const auto& bundle = bundles[index];
+				json << "{\"kind\":\"bundle\",\"id\":\"" << jsonize(bundle->symbolicName())
+					<< "\",\"name\":\"" << jsonize(bundle->name()) << "\",\"version\":\""
+					<< jsonize(bundle->version().toString()) << "\",\"state\":\""
+					<< (bundle->state() == Bundle::BUNDLE_ACTIVE ? "active" : "resolved")
+					<< "\"}";
+			}
+			json << "]}";
+
+			const std::string body = json.str();
+			response.setContentType("application/json");
+			response.setStatusAndReason(HTTPResponse::HTTP_OK);
+			response.setContentLength(static_cast<int>(body.size()));
+			response.sendBuffer(body.data(), body.size());
+			return;
+		}
 		if (cleanPath(path))
 		{
 			Poco::ScopedLockWithUnlock<Poco::FastMutex> lock(_mutex);

@@ -58,6 +58,9 @@ public:
 	Configuration::Ptr configuration();
 		/// Returns the global application configuration.
 
+	void setConfiguration(const std::string& key, const std::string& value);
+		/// Updates one global application configuration value at runtime.
+
 	static const std::string SERVICE_NAME;
 
 	// Service

@@ -14,3 +14,31 @@
 | XBeeSensor | XBee IO Sample |
 
 具体后端只有在对应 `pdr.*.enabled=true` 时由设备网关启用；默认可移植配置只启用仿真设备。
+
+## 统一实现流程
+
+每个设备实现 `start/stop/snapshot/execute/setSnapshotHandler`。设备后端负责线程和物理协议；`DeviceBridge` 负责 DDS；`DeviceGateway` 负责配置和 OSP 注册。三层不能混在一起，否则设备无法独立测试。
+
+```text
+pdr-runtime.properties
+→ DeviceGateway
+→ Device 实现
+→ Protocol/OS 驱动
+→ 物理设备
+
+DeviceSnapshot
+→ DeviceBridge
+→ pdr.device.state
+```
+
+配置项集中在 `config/pdr-runtime.properties`。当前结构每种物理后端最多创建一个实例；多设备场景需要把配置扩展为 `pdr.<type>.count` 和编号项。
+
+## 测试
+
+```powershell
+ctest --test-dir build -C Release `
+  -R "device|gnss|can-signal|linux-sysfs|xbee-sensor" `
+  --output-on-failure
+```
+
+测试成功证明设备模型和模拟输入路径；真实总线和物理量必须单独闭环。

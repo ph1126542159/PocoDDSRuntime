@@ -21,6 +21,7 @@
 #include "Poco/OSP/OSPSubsystem.h"
 #include "Poco/OSP/ServiceRegistry.h"
 #include "Poco/ThreadPool.h"
+#include "Poco/Timestamp.h"
 #include "Poco/Util/HelpFormatter.h"
 #include "Poco/Util/LoggingConfigurator.h"
 #include "Poco/Util/Option.h"
@@ -36,10 +37,15 @@
 #endif
 
 #include <algorithm>
+#include <atomic>
+#include <condition_variable>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <memory>
 #include <string>
+#include <thread>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -196,6 +202,19 @@ class MacchinaServer final : public Poco::Util::ServerApplication
                                      std::string(exception.what()));
                 }
             });
+        _traceRuntime->preparePublisher("pdr.process.heartbeat.request");
+        _traceRuntime->subscribe(
+            "pdr.process.heartbeat.response", [this](const PocoDDS::FastDDS::Envelope& envelope) {
+                {
+                    std::lock_guard<std::mutex> lock(_heartbeatMutex);
+                    _heartbeatResponses.insert(envelope.correlationId);
+                }
+                _heartbeatCondition.notify_all();
+            });
+        PocoDDS::Observability::BusinessTracerOptions heartbeatOptions;
+        heartbeatOptions.bundleName = "pdr.runtime";
+        _heartbeatTracer = std::make_unique<PocoDDS::Observability::BusinessTracer>(
+            "pdr-runtime-heartbeat", std::move(heartbeatOptions));
 #endif
         ServerApplication::initialize(self);
         if (_showHelp)
@@ -286,8 +305,18 @@ class MacchinaServer final : public Poco::Util::ServerApplication
         const std::size_t startedSubprocesses =
             _subprocessManager->startFromConfiguration(subprocessConfiguration, processRoot);
         logger().information("Started %z configured subprocess(es).", startedSubprocesses);
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        _heartbeatStopping = false;
+        _heartbeatThread = std::thread([this] { heartbeatLoop(); });
+#endif
 
         waitForTerminationRequest();
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        _heartbeatStopping = true;
+        _heartbeatCondition.notify_all();
+        if (_heartbeatThread.joinable())
+            _heartbeatThread.join();
+#endif
         if (_subprocessManager)
             _subprocessManager->stopAll();
         if (_bundleManager)
@@ -300,6 +329,74 @@ class MacchinaServer final : public Poco::Util::ServerApplication
     }
 
   private:
+#if defined(PDR_ENABLE_OBSERVABILITY)
+    void heartbeatLoop()
+    {
+        std::uint64_t sequence = 0;
+        while (!_heartbeatStopping)
+        {
+            const std::string correlation = "heartbeat-" +
+                std::to_string(Poco::Timestamp().epochMicroseconds()) + "-" +
+                std::to_string(++sequence);
+            auto business = _heartbeatTracer->startBusiness(
+                "主子进程Fast-DDS心跳",
+                {{"protocol", "Fast-DDS"}, {"interval", "5000ms"},
+                 {"target", "all-subprocesses"}},
+                correlation);
+            {
+                auto step = business.startStep(
+                    "主进程广播心跳",
+                    {{"topic", "pdr.process.heartbeat.request"},
+                     {"correlationId", correlation},
+                     {"sequence", std::to_string(sequence)}});
+                PocoDDS::FastDDS::Envelope request;
+                request.sequence = sequence;
+                request.timestampMicroseconds = Poco::Timestamp().epochMicroseconds();
+                request.kind = "process.heartbeat.request";
+                request.operation = "broadcast";
+                request.correlationId = correlation;
+                request.traceParent = business.traceParent();
+                request.businessName = "主子进程Fast-DDS心跳";
+                request.businessInstanceId = correlation;
+                request.payload = "{\"command\":\"heartbeat\"}";
+                _traceRuntime->publish("pdr.process.heartbeat.request", request);
+                step.success({{"published", "true"}, {"ddsStatus", "OK"}});
+            }
+
+            bool answered = false;
+            {
+                std::unique_lock<std::mutex> lock(_heartbeatMutex);
+                answered = _heartbeatCondition.wait_for(
+                    lock, std::chrono::seconds(3), [&] {
+                        return _heartbeatStopping ||
+                            _heartbeatResponses.erase(correlation) > 0;
+                    });
+            }
+            auto confirmation = business.startStep(
+                "主进程确认应答",
+                {{"topic", "pdr.process.heartbeat.response"},
+                 {"correlationId", correlation},
+                 {"timeout", "3000ms"}});
+            if (answered && !_heartbeatStopping)
+            {
+                confirmation.success({{"response", "received"}, {"link", "connected"}});
+                business.success({{"link", "connected"}, {"result", "success"}});
+            }
+            else if (!_heartbeatStopping)
+            {
+                confirmation.failure("heartbeat_timeout", "子进程在3秒内未应答",
+                                     {{"link", "timeout"}});
+                business.failure("heartbeat_timeout", "Fast-DDS心跳链路未走通",
+                                 {{"link", "timeout"}});
+            }
+
+            std::unique_lock<std::mutex> lock(_heartbeatMutex);
+            _heartbeatCondition.wait_for(
+                lock, std::chrono::seconds(5), [&] { return _heartbeatStopping.load(); });
+        }
+    }
+#endif
+
     void handleHelp(const std::string&, const std::string&)
     {
         _showHelp = true;
@@ -331,6 +428,12 @@ class MacchinaServer final : public Poco::Util::ServerApplication
     std::vector<std::string> _configurationFiles;
 #if defined(PDR_ENABLE_OBSERVABILITY)
     std::unique_ptr<PocoDDS::FastDDS::Runtime> _traceRuntime;
+    std::unique_ptr<PocoDDS::Observability::BusinessTracer> _heartbeatTracer;
+    std::thread _heartbeatThread;
+    std::atomic<bool> _heartbeatStopping{true};
+    std::mutex _heartbeatMutex;
+    std::condition_variable _heartbeatCondition;
+    std::unordered_set<std::string> _heartbeatResponses;
 #endif
 };
 } // namespace

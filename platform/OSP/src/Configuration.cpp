@@ -63,5 +63,10 @@ void Configuration::removeRaw(const std::string& key)
 	throw Poco::InvalidAccessException("Cannot change configuration properties");
 }
 
+void Configuration::setProperty(const std::string& key, const std::string& value)
+{
+	_pConfig->setString(key, value);
+}
+
 
 } } // namespace Poco::OSP

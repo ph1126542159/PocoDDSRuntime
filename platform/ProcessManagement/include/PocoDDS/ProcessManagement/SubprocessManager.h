@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #if defined(_WIN32)
 #if defined(PDR_PROCESS_MANAGEMENT_EXPORTS)
@@ -26,6 +27,15 @@ struct SubprocessManagerOptions
     std::int64_t shutdownTimeoutMilliseconds{5000};
 };
 
+struct SubprocessInfo
+{
+    std::string name;
+    std::string location{"local"};
+    std::string state{"stopped"};
+    unsigned long processId{0};
+    bool manageable{true};
+};
+
 class PDR_PROCESS_MANAGEMENT_API SubprocessManager final
 {
   public:
@@ -39,8 +49,14 @@ class PDR_PROCESS_MANAGEMENT_API SubprocessManager final
     std::size_t startFromConfiguration(const std::string& configurationPath,
                                        const std::string& processRootDirectory);
     void stopAll();
+    bool start(const std::string& name);
+    bool stop(const std::string& name);
+    bool restart(const std::string& name);
+    std::vector<SubprocessInfo> processes() const;
 
     std::size_t runningCount() const;
+
+    static SubprocessManager* active() noexcept;
 
   private:
     class Impl;

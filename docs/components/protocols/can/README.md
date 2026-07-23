@@ -9,3 +9,34 @@
 先在 Linux 配置并启用 `can0`，然后创建 `SocketCanEndpoint`。设备层通常通过 `CanSignalSensor` 使用本组件，并在 `pdr-runtime.properties` 中设置 `pdr.can.*`。
 
 Windows 构建可编译公共逻辑，但 SocketCAN 实际收发必须在 Linux 目标验证。
+
+## 实现细节
+
+`CanFrame` 保存帧 ID、DLC 和最多 8 字节数据。`SocketCanEndpoint` 打开 PF_CAN RAW socket 并绑定接口。`SignalCodec` 的换算为：
+
+```text
+engineeringValue = decodedRaw × factor + offset
+```
+
+## C++ 用法
+
+```cpp
+using namespace PocoDDS::Protocols::CAN;
+SocketCanEndpoint can("can0");
+can.open();
+CanFrame frame = can.receive(Poco::Timespan(1, 0));
+double value = SignalCodec::decodeScaled(
+    frame, 0, 16, BitOrder::littleEndian, false, 0.1, -40.0);
+can.close();
+```
+
+## Linux 配置
+
+```bash
+sudo ip link set can0 down
+sudo ip link set can0 type can bitrate 500000
+sudo ip link set can0 up
+candump can0
+```
+
+协议库不读取 properties；`pdr.can.*` 由 DeviceGateway 转换为 `CanSignalSensor::Options`。必须用已知帧验证 frame ID、大小端、符号位和缩放。

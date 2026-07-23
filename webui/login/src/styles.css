@@ -2,3 +2,9 @@
 
 /* Keep operational text readable on desktop displays. */
 body{font-size:16px}.brand{font-size:16px}.intro-copy small{font-size:12px}.intro-copy p{font-size:16px}.secure b{font-size:14px}.secure small{font-size:12px}.form-title p{font-size:14px}label{font-size:14px}label div{height:48px}input{font-size:15px}form>button{height:48px;font-size:15px}.error{font-size:14px}.hint{font-size:12px}
+
+/* Match the larger operational type scale used by the console. */
+body{font-size:18px}.brand{font-size:19px}.intro-copy small{font-size:14px}.intro-copy h1{font-size:54px}.intro-copy p{font-size:18px}.secure b{font-size:16px}.secure small{font-size:14px}.form-title h2{font-size:30px}.form-title p{font-size:17px}label{font-size:16px}label div{height:52px}input{font-size:17px}form>button{height:52px;font-size:17px}.error{font-size:16px}.hint{font-size:14px}
+
+/* 2x operator display scale and full-viewport layout. */
+body{font-size:36px}main{width:100vw;min-height:100vh}.intro{padding:60px 6vw}.brand{font-size:38px}.brand span{width:68px;height:68px}.intro-copy small{font-size:28px}.intro-copy h1{font-size:108px}.intro-copy p{font-size:36px;max-width:720px}.secure b{font-size:32px}.secure small{font-size:28px}.form-side{padding:60px}.form-side form{width:min(680px,100%)}.form-title>span{width:70px;height:70px}.form-title h2{font-size:60px}.form-title p{font-size:34px}label{font-size:32px;margin-bottom:28px}label div{height:86px;padding:0 22px}input{font-size:34px}form>button{height:86px;font-size:34px}.error{font-size:32px}.hint{font-size:28px}@media(max-width:900px){main{grid-template-columns:1fr}.intro-copy h1{font-size:70px}}

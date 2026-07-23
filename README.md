@@ -117,6 +117,19 @@ Set-Location build/bin
 ./pdr-runtime.exe
 ```
 
+### Web 登录信息
+
+启动后访问 <http://127.0.0.1:9080/>，程序会跳转到登录页面。
+
+| 登录项 | 当前值 |
+| --- | --- |
+| 用户名 | `admin` |
+| 密码 | `admin` |
+
+该默认凭据仅用于绑定在 `127.0.0.1` 的本地管理页面。当前
+`osp.web.authServiceName` 为空且 `auth.simple.enable = false`，因此它不是远程部署
+所需的服务端安全边界；开放到其他网卡前必须接入服务端认证并更换凭据。
+
 Other long-running executables are placed below the shared subprocess root:
 
 ```text

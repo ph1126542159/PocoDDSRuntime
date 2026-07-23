@@ -13,3 +13,117 @@
 业务 Bundle 提供 `BundleActivator`，在 `start()` 中注册服务并在 `stop()` 中注销服务。通过 `.bndlspec` 声明名称、版本、依赖和打包内容，构建后将 `.bndl` 放入运行进程的 `bundles/`。
 
 不要绕过 OSP 直接加载动态库；否则依赖解析、停止和卸载阶段不会完整执行。
+
+## Bundle 结构和配置
+
+`.bndl` 包含 manifest（symbolicName、version、activator、runLevel、依赖）、按系统架构打包的 DLL/SO、资源文件和可选 `extensions.xml`。Activator 的 `start()` 注册服务和监听器，`stop()` 必须逐项撤销。
+
+```properties
+osp.bundleRepository = ${application.dir}bundles/
+osp.codeCache = ${application.dir}codeCache
+osp.data = ${application.dir}data
+osp.web.server.host = 127.0.0.1
+osp.web.server.port = 9080
+osp.web.server.securePort = 0
+osp.web.rootRedirect = /login/
+osp.web.authServiceName =
+auth.simple.enable = false
+```
+
+WebServer 还支持 `maxQueued`、`maxThreads`、`keepAlive`、`keepAliveTime` 和 `maxKeepAlive`。
+
+## 新 Bundle 实现步骤
+
+1. 实现 `Poco::OSP::BundleActivator`。
+2. 在 `.bndlspec` 填写唯一 symbolicName、版本、activator、runLevel 和 requiredBundles。
+3. 用 `myiot_add_osp_bundle()` 增加 CMake 目标。
+4. 构建并检查 `.bndl` 内容。
+5. 放入 `bundles/`，确认依赖解析和 active 状态。
+
+runLevel 决定启动顺序，停止顺序相反；依赖版本不满足时不能强制跳过解析。
+
+## Web 安全与性能配置
+
+以下键由 `platform/OSP/Web` 和 `WebServer` 实际读取，但默认模板只显式设置其中一部分：
+
+| 配置项 | 代码默认值 | 说明 |
+| --- | --- | --- |
+| `osp.web.server.maxQueued` | `100` | 等待处理的最大连接数 |
+| `osp.web.server.maxThreads` | `8` | HTTP 工作线程数 |
+| `osp.web.server.keepAlive` | `true` | HTTP Keep-Alive |
+| `osp.web.server.keepAliveTime` | `10` | Keep-Alive 超时 |
+| `osp.web.server.maxKeepAlive` | `10` | 每连接最大请求数 |
+| `osp.web.cacheResources` | `false` | 是否缓存 Bundle 静态资源 |
+| `osp.web.compressResponses` | `false` | 是否压缩响应 |
+| `osp.web.compressedMediaTypes` | 空 | 可压缩 MIME，逗号分隔 |
+| `osp.web.authServiceName` | 空 | OSP AuthService 名称 |
+| `osp.web.tokenValidatorName` | 空 | TokenValidator 服务名称 |
+| `osp.web.authMethods` | 空 | 允许的认证方法 |
+| `osp.web.addAuthHeader` | `true` | 添加认证相关响应头 |
+| `osp.web.addSignature` | `true` | 添加服务器签名 |
+| `osp.web.logFullRequest` | `false` | 是否记录完整请求；生产慎用 |
+| `osp.web.cors.enable` | `true` | CORS 处理开关 |
+| `osp.web.cors.allowedOrigin` | 空 | 允许的 Origin |
+| `osp.web.csrfProtectionEnabled` | `true` | CSRF 防护 |
+| `osp.web.contentTypeOptions` | `nosniff` | X-Content-Type-Options |
+| `osp.web.frameOptions` | 空 | X-Frame-Options |
+| `osp.web.hsts.enable` | `false` | HSTS；仅 HTTPS 部署启用 |
+| `osp.web.hsts.maxAge` | `21772800` | HSTS max-age |
+| `osp.web.hsts.includeSubdomains` | `true` | HSTS includeSubDomains |
+| `osp.web.xssProtection.enable` | `false` | 旧式 X-XSS-Protection |
+| `osp.web.xssProtection.mode` | `block` | XSS header mode |
+
+会话配置：
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `osp.web.sessionManager.cookiePersistence` | `persistent` | `persistent` 或 `transient` |
+| `osp.web.sessionManager.cookieSecure` | `false` | HTTPS 部署应设为 true |
+| `osp.web.sessionManager.cookieSameSite` | 空 | `none`、`lax`、`strict` |
+| `osp.web.sessionManager.csrfCookie` | `XSRF-TOKEN` | CSRF Cookie 名 |
+| `osp.web.sessionManager.verifyAddress` | `true` | 校验会话来源地址 |
+| `osp.web.sessionManager.defaultDomain` | 空 | Cookie 默认域 |
+| `osp.web.sessionManager.sessionStore` | 空 | 会话存储服务 |
+
+## SimpleAuth
+
+```properties
+auth.simple.enable = true
+osp.web.authServiceName = osp.auth
+auth.simple.salt = <随机盐>
+auth.simple.admin.name = admin
+auth.simple.admin.passwordHash = <MD5(salt + password) 的十六进制>
+auth.simple.user.name = operator
+auth.simple.user.passwordHash = <MD5(salt + password) 的十六进制>
+auth.simple.user.permissions = view,status
+```
+
+当前实现按 `MD5(salt + password)` 验证。这属于兼容性实现，不适合直接暴露到不可信网络；外网部署应接入更强的认证服务、TLS 和限流。
+
+## 代理与 WebEvent
+
+```properties
+http.proxy.host =
+http.proxy.port = 80
+http.proxy.username =
+http.proxy.password =
+http.proxy.nonProxyHosts =
+
+osp.web.event.workers = 4
+osp.web.event.maxWebSockets = 0
+```
+
+`maxWebSockets=0` 表示使用实现默认/不设显式上限，生产环境应结合资源限制评估。
+
+## 其他 OSP 运行项
+
+| 配置项 | 说明 |
+| --- | --- |
+| `osp.language` | OSP 资源/本地化语言 |
+| `osp.sharedCodeCache` | 共享代码缓存位置 |
+| `osp.autoUpdateCodeCache` | Bundle 变化时是否更新代码缓存 |
+| `osp.web.server.secureHost` | HTTPS Server 绑定地址 |
+| `osp.js.moduleSearchPaths` | JavaScript OSP 模块搜索路径 |
+| `osp.js.v8.flags` | V8 启动 flags |
+
+当前根 CMake 没有加入 `platform/OSP/JS`，所以两个 `osp.js.*` 键仅在后续启用 JS Bundle 时生效；不要在当前部署中把它们当作已启用功能。

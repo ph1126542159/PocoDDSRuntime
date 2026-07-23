@@ -17,3 +17,74 @@
 ## 验证
 
 构建后运行 `pdr-fastdds-device-smoke` 和 `pdr-service-integration-smoke`。
+
+## 数据模型
+
+`Envelope` 是所有 Topic 共用的数据载体，核心字段包括关联 ID、操作名、JSON/文本载荷和 W3C trace context。`EnvelopeTopicDataType` 实现 Fast DDS 序列化，使不同服务不需要各自生成 IDL 类型。
+
+请求/响应约定：
+
+```text
+客户端发布 request Envelope
+        │ correlationId 保持不变
+        ▼
+ServiceEndpoint 工作线程调用 Handler
+        │
+        ├─ 成功：发布 response Envelope
+        └─ 异常：发布带错误信息的 response Envelope
+```
+
+## Runtime 用法
+
+```cpp
+#include <PocoDDS/DDS/Runtime.h>
+
+PocoDDS::FastDDS::Runtime runtime(0, "example-client");
+runtime.start();
+runtime.subscribe("demo.response", [](const auto& envelope) {
+    // 根据 correlationId 匹配请求
+});
+runtime.preparePublisher("demo.request");
+runtime.publish("demo.request", requestEnvelope);
+runtime.stop();
+```
+
+`start()` 后才能发布或订阅；析构前应调用 `stop()`。同一 `Runtime` 可管理多个 Topic，Writer/Reader 会按需创建。
+
+## ServiceEndpoint 用法
+
+```cpp
+PocoDDS::FastDDS::ServiceEndpoint endpoint(
+    domainId,
+    "demo-service",
+    "demo.request",
+    "demo.response",
+    "demo.event");
+
+endpoint.start([](const PocoDDS::FastDDS::Envelope& request) {
+    PocoDDS::FastDDS::Envelope response;
+    response.payload = handle(request.operation, request.payload);
+    return response;
+});
+
+endpoint.publishEvent("changed", R"({"value":42})");
+```
+
+停止 Bundle 时先 `endpoint.stop()`，再注销 OSP 服务，防止 DDS 工作线程访问已销毁对象。
+
+## 配置与网络
+
+```properties
+pdr.fastdds.domainId = 0
+```
+
+运行时、所有服务 Bundle 和外部客户端必须使用相同 Domain ID。仓库没有暴露 XML QoS 文件配置项；需要自定义发现、传输或 QoS 时，应在 `Runtime.cpp` 中增加明确配置入口，不能假设环境变量已生效。
+
+## 验证命令
+
+```powershell
+ctest --test-dir build -C Release -R "fastdds|service-integration" `
+  --output-on-failure
+```
+
+Smoke Test 证明本机进程间 Topic 路径；跨机器验收还需检查组播/单播发现、防火墙和实际网卡。
