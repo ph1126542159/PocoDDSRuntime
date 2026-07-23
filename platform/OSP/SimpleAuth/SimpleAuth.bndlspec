@@ -19,7 +19,5 @@
     bin/${osName}/${osArch}/*.so,
     bin/${osName}/${osArch}/*.dylib
   </code>
-  <files>
-    bundle/*
-  </files>
+  <files></files>
 </bundlespec>
