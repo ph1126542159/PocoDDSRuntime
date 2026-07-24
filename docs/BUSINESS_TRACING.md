@@ -95,6 +95,10 @@ webui.bearerToken =
 observability.otlpHttpEndpoint =
 # Collector 示例：
 # observability.otlpHttpEndpoint = http://127.0.0.1:4318/v1/traces
+
+# 本地业务历史记录。默认按 UTC 小时分库，并保留最近 10 天。
+observability.history.path = ${application.dir}data/business-traces/
+observability.history.retentionDays = 10
 ```
 
 WebUI 地址为 `http://127.0.0.1:9080/`。非回环地址必须配置至少 16 字符的
@@ -103,7 +107,13 @@ Bearer Token。
 ## API
 
 - `GET /api/v1/business-traces`：最近业务实例和整体状态；
-- `GET /api/v1/business-traces/{traceId}`：完整流程节点、参数和日志。
+- `GET /api/v1/business-traces/{traceId}`：完整流程节点、参数和日志；
+- `GET /api/v1/business-trace-history`：查询持久化历史记录，支持 `from`、
+  `to`、`name`、`status`、`limit` 和 `offset` 参数。
 
-内存存储用于实时页面和开发验收；长期留存、检索、采样、重试和告警应由
-OpenTelemetry Collector 及其后端承担。
+实时页面最多显示最近 1000 条业务记录。历史记录使用 Poco Data SQLite
+持久化：`business-traces-catalog.sqlite` 是总索引库，
+`business-traces-YYYYMMDD-HH.sqlite` 是 UTC 小时分库。运行时启动以及持续写入时
+都会清理超过 `observability.history.retentionDays` 的小时库；默认只保留最近
+10 天。更长期的留存、采样、重试和告警仍应由 OpenTelemetry Collector 及其后端
+承担。

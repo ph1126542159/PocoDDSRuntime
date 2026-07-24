@@ -1079,9 +1079,11 @@ public:
         {
             Poco::JSON::Array::Ptr records = new Poco::JSON::Array;
             for (const auto& summary :
-                 PocoDDS::Observability::globalTraceStore().recent(100))
+                 PocoDDS::Observability::globalTraceStore().recent(1000))
             {
-                if (summary.businessName != "主子进程Fast-DDS心跳") continue;
+                if (summary.businessName != "主子进程Fast-DDS心跳" &&
+                    summary.businessName != "Qt3D多窗口协同业务")
+                    continue;
                 Poco::JSON::Object::Ptr record = new Poco::JSON::Object;
                 record->set("traceId", summary.traceId);
                 record->set("businessName", summary.businessName);
@@ -1126,6 +1128,161 @@ public:
         response.setContentType("application/json; charset=utf-8");
         response.set("Cache-Control", "no-store");
         root.stringify(response.send());
+    }
+};
+
+class BusinessTracesHandler final : public Poco::Net::HTTPRequestHandler
+{
+public:
+    void handleRequest(Poco::Net::HTTPServerRequest& request,
+                       Poco::Net::HTTPServerResponse& response) override
+    {
+        const std::string prefix = "/api/v1/business-traces/";
+        const std::string path = Poco::URI(request.getURI()).getPath();
+        Poco::JSON::Object root;
+        if (path == "/api/v1/business-traces" ||
+            path == "/api/v1/business-traces/")
+        {
+            Poco::JSON::Array::Ptr traces = new Poco::JSON::Array;
+            for (const auto& summary :
+                 PocoDDS::Observability::globalTraceStore().recent(1000))
+            {
+                Poco::JSON::Object::Ptr item = new Poco::JSON::Object;
+                item->set("traceId", summary.traceId);
+                item->set("businessName", summary.businessName);
+                item->set("businessInstanceId", summary.businessInstanceId);
+                item->set("status", summary.status);
+                item->set("startedUnixMicroseconds", summary.startedUnixMicroseconds);
+                item->set("durationNanoseconds", summary.durationNanoseconds);
+                item->set("stepCount", summary.stepCount);
+                item->set("failedOperation", summary.failedOperation);
+                traces->add(item);
+            }
+            root.set("traces", traces);
+        }
+        else if (path.rfind(prefix, 0) == 0)
+        {
+            std::string traceId;
+            Poco::URI::decode(path.substr(prefix.size()), traceId);
+            Poco::JSON::Array::Ptr nodes = new Poco::JSON::Array;
+            for (const auto& span :
+                 PocoDDS::Observability::globalTraceStore().trace(traceId))
+            {
+                Poco::JSON::Object::Ptr node = new Poco::JSON::Object;
+                node->set("businessName", span.businessName);
+                node->set("businessInstanceId", span.businessInstanceId);
+                node->set("operation", span.operation);
+                node->set("serviceName", span.serviceName);
+                node->set("bundleName", span.bundleName);
+                node->set("hostName", span.hostName);
+                node->set("processId", span.processId);
+                node->set("traceId", span.traceId);
+                node->set("spanId", span.spanId);
+                node->set("parentSpanId", span.parentSpanId);
+                node->set("status", span.status);
+                node->set("errorCode", span.errorCode);
+                node->set("errorMessage", span.errorMessage);
+                node->set("startedUnixMicroseconds", span.startedUnixMicroseconds);
+                node->set("endedUnixMicroseconds", span.endedUnixMicroseconds);
+                node->set("durationNanoseconds", span.durationNanoseconds);
+                node->set("inputs", traceFields(span.inputs));
+                node->set("outputs", traceFields(span.outputs));
+                Poco::JSON::Array::Ptr logs = new Poco::JSON::Array;
+                for (const auto& log : span.logs)
+                {
+                    Poco::JSON::Object::Ptr value = new Poco::JSON::Object;
+                    value->set("timestampUnixMicroseconds",
+                               log.timestampUnixMicroseconds);
+                    value->set("level", log.level);
+                    value->set("message", log.message);
+                    value->set("fields", traceFields(log.fields));
+                    logs->add(value);
+                }
+                node->set("logs", logs);
+                nodes->add(node);
+            }
+            root.set("nodes", nodes);
+        }
+        else
+        {
+            return sendJsonError(response, Poco::Net::HTTPResponse::HTTP_NOT_FOUND,
+                                 "未找到业务追踪。");
+        }
+        response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
+        response.setContentType("application/json; charset=utf-8");
+        response.set("Cache-Control", "no-store");
+        root.stringify(response.send());
+    }
+};
+
+class BusinessTraceHistoryHandler final : public Poco::Net::HTTPRequestHandler
+{
+public:
+    void handleRequest(Poco::Net::HTTPServerRequest& request,
+                       Poco::Net::HTTPServerResponse& response) override
+    {
+        try
+        {
+            PocoDDS::Observability::TraceHistoryQuery query;
+            for (const auto& parameter : Poco::URI(request.getURI()).getQueryParameters())
+            {
+                if (parameter.first == "from" && !parameter.second.empty())
+                    query.fromUnixMicroseconds =
+                        Poco::NumberParser::parse64(parameter.second);
+                else if (parameter.first == "to" && !parameter.second.empty())
+                    query.toUnixMicroseconds =
+                        Poco::NumberParser::parse64(parameter.second);
+                else if (parameter.first == "name")
+                    query.businessName = parameter.second;
+                else if (parameter.first == "status")
+                    query.status = parameter.second;
+                else if (parameter.first == "limit" && !parameter.second.empty())
+                    query.limit = static_cast<std::size_t>(
+                        std::max(1, Poco::NumberParser::parse(parameter.second)));
+                else if (parameter.first == "offset" && !parameter.second.empty())
+                    query.offset = static_cast<std::size_t>(
+                        std::max(0, Poco::NumberParser::parse(parameter.second)));
+            }
+            Poco::JSON::Array::Ptr records = new Poco::JSON::Array;
+            const auto append = [](void* context, const char* traceId,
+                                   const char* businessName,
+                                   const char* businessInstanceId,
+                                   const char* status,
+                                   long long startedUnixMicroseconds,
+                                   long long durationNanoseconds,
+                                   std::size_t stepCount,
+                                   const char* failedOperation) {
+                auto* values = static_cast<Poco::JSON::Array*>(context);
+                Poco::JSON::Object::Ptr item = new Poco::JSON::Object;
+                item->set("traceId", traceId);
+                item->set("businessName", businessName);
+                item->set("businessInstanceId", businessInstanceId);
+                item->set("status", status);
+                item->set("startedUnixMicroseconds", startedUnixMicroseconds);
+                item->set("durationNanoseconds", durationNanoseconds);
+                item->set("stepCount", stepCount);
+                item->set("failedOperation", failedOperation);
+                values->add(item);
+            };
+            const bool hasMore = PocoDDS::Observability::pdrQueryTraceHistory(
+                query.fromUnixMicroseconds, query.toUnixMicroseconds,
+                query.businessName.c_str(), query.status.c_str(), query.limit,
+                query.offset, append, records.get());
+            Poco::JSON::Object root;
+            root.set("records", records);
+            root.set("hasMore", hasMore);
+            root.set("limit", query.limit);
+            root.set("offset", query.offset);
+            response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
+            response.setContentType("application/json; charset=utf-8");
+            response.set("Cache-Control", "no-store");
+            root.stringify(response.send());
+        }
+        catch (const std::exception& exception)
+        {
+            sendJsonError(response, Poco::Net::HTTPResponse::HTTP_BAD_REQUEST,
+                          exception.what());
+        }
     }
 };
 } // namespace
@@ -1190,6 +1347,16 @@ public:
     }
 };
 
+class BusinessTracesHandlerFactory final : public Poco::OSP::Web::WebRequestHandlerFactory
+{
+public:
+    Poco::Net::HTTPRequestHandler* createRequestHandler(
+        const Poco::Net::HTTPServerRequest&) override
+    {
+        return new BusinessTracesHandler;
+    }
+};
+
 class HeartbeatBusinessHandlerFactory final : public Poco::OSP::Web::WebRequestHandlerFactory
 {
 public:
@@ -1197,6 +1364,16 @@ public:
         const Poco::Net::HTTPServerRequest&) override
     {
         return new HeartbeatBusinessHandler;
+    }
+};
+
+class BusinessTraceHistoryHandlerFactory final : public Poco::OSP::Web::WebRequestHandlerFactory
+{
+public:
+    Poco::Net::HTTPRequestHandler* createRequestHandler(
+        const Poco::Net::HTTPServerRequest&) override
+    {
+        return new BusinessTraceHistoryHandler;
     }
 };
 
@@ -1242,5 +1419,7 @@ POCO_BEGIN_NAMED_MANIFEST(WebServer, Poco::OSP::Web::WebRequestHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessLifecycleHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::BundleLifecycleHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessConfigHandlerFactory)
+    POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::BusinessTracesHandlerFactory)
+    POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::BusinessTraceHistoryHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::HeartbeatBusinessHandlerFactory)
 POCO_END_MANIFEST

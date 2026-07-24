@@ -333,6 +333,11 @@ class MacchinaServer final : public Poco::Util::ServerApplication
     void heartbeatLoop()
     {
         std::uint64_t sequence = 0;
+        {
+            std::unique_lock<std::mutex> lock(_heartbeatMutex);
+            _heartbeatCondition.wait_for(
+                lock, std::chrono::seconds(3), [&] { return _heartbeatStopping.load(); });
+        }
         while (!_heartbeatStopping)
         {
             const std::string correlation = "heartbeat-" +
@@ -395,6 +400,7 @@ class MacchinaServer final : public Poco::Util::ServerApplication
                 lock, std::chrono::seconds(5), [&] { return _heartbeatStopping.load(); });
         }
     }
+
 #endif
 
     void handleHelp(const std::string&, const std::string&)

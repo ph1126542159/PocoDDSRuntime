@@ -23,6 +23,7 @@ target_link_libraries(pdr-qt3d-subprocess PRIVATE
     Qt6::3DExtras
     PocoDDS::Observability
     PocoDDS::FastDDS
+    PocoDDS::ProcessManagement
     Poco::OSP
     Poco::Util
     Poco::JSON
@@ -37,8 +38,14 @@ add_custom_command(TARGET pdr-qt3d-subprocess POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-qt3d-subprocess.properties"
         "$<TARGET_FILE_DIR:pdr-qt3d-subprocess>/pdr-qt3d-subprocess.properties"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-window-subprocesses.properties"
+        "$<TARGET_FILE_DIR:pdr-qt3d-subprocess>/pdr-window-subprocesses.properties"
     COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:pdr-qt3d-subprocess>/bundles"
+        "$<TARGET_FILE_DIR:pdr-qt3d-subprocess>/windows/window-scene"
+        "$<TARGET_FILE_DIR:pdr-qt3d-subprocess>/windows/window-material"
+        "$<TARGET_FILE_DIR:pdr-qt3d-subprocess>/windows/window-device"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${PDR_BUNDLE_OUTPUT_DIRECTORY}/osp.core_1.7.0.bndl"
         "$<TARGET_FILE_DIR:pdr-qt3d-subprocess>/bundles/"
@@ -87,4 +94,5 @@ endif()
 install(TARGETS pdr-qt3d-subprocess
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}/processes/pdr-qt3d-subprocess")
 install(FILES config/pdr-qt3d-subprocess.properties
+              config/pdr-window-subprocesses.properties
     DESTINATION "${CMAKE_INSTALL_BINDIR}/processes/pdr-qt3d-subprocess")

@@ -1,0 +1,196 @@
+.business-flow {
+  display: grid !important;
+  grid-template-columns: 360px minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  overflow: hidden !important;
+}
+
+.flow-inspector {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  display: block !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  border: 0 !important;
+  border-right: 1px solid #dce3ed !important;
+  background: #fff !important;
+  padding: 30px 28px !important;
+  box-shadow: 8px 0 26px #17203308 !important;
+}
+
+.flow-canvas {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  /* Override the dashboard-wide `main { margin-left: 248px }` rule. */
+  margin: 0 !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  padding: 14px !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+}
+
+.flow-inspector .step-head { display: block !important; padding-bottom: 20px !important; }
+.flow-inspector .step-head > div {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 14px;
+}
+.flow-inspector .step-head h3 {
+  margin: 0 !important;
+  font-size: 30px !important;
+  line-height: 1.3 !important;
+  word-break: break-word;
+}
+.flow-inspector dl {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 11px !important;
+  margin: 18px 0 !important;
+}
+.flow-inspector dl > div {
+  display: grid !important;
+  grid-template-columns: 120px minmax(0, 1fr) !important;
+  gap: 12px !important;
+  padding: 15px 16px !important;
+  background: #f5f7fb !important;
+  border: 1px solid #e5eaf1 !important;
+  border-radius: 10px !important;
+}
+.flow-inspector dt { font-size: 18px !important; color: #6e7b8e !important; }
+.flow-inspector dd {
+  margin: 0 !important;
+  color: #26364d !important;
+  font-size: 20px !important;
+  line-height: 1.45 !important;
+  word-break: break-word !important;
+}
+.flow-parameters { display: grid !important; grid-template-columns: 1fr !important; gap: 18px !important; }
+.flow-parameters section { min-width: 0 !important; }
+.flow-parameters h4 { margin: 0 0 9px !important; color: #344054 !important; font-size: 21px !important; }
+.flow-parameters pre {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 125px !important;
+  max-height: 230px !important;
+  overflow: auto !important;
+  padding: 16px !important;
+  font-size: 17px !important;
+  line-height: 1.55 !important;
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+}
+.flow-error-panel {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 10px !important;
+  margin: 16px 0 !important;
+  padding: 16px !important;
+}
+.flow-error-panel > div { padding-bottom: 10px; border-bottom: 1px solid #f2c2c2; }
+.flow-error-panel > div:last-child { padding-bottom: 0; border-bottom: 0; }
+.flow-diagram { min-width: 900px !important; }
+
+/* Keep the inspector inside the content grid and fit all six heartbeat steps on 1080p screens. */
+.business-modal {
+  grid-template-rows: 70px 92px minmax(0, 1fr) !important;
+}
+.flow-page-tabs {
+  min-height: 70px !important;
+  padding: 0 26px !important;
+}
+.flow-page-tabs > button {
+  padding: 9px 14px !important;
+  font-size: 20px !important;
+}
+.business-modal > header { padding: 14px 30px !important; }
+.business-modal > header h2 { font-size: 30px !important; }
+.business-modal > header p {
+  margin-top: 2px !important;
+  font-size: 18px !important;
+}
+.business-flow {
+  position: relative !important;
+  min-height: 0 !important;
+}
+.flow-inspector {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 1 !important;
+  box-sizing: border-box !important;
+  scroll-behavior: smooth;
+}
+.flow-canvas {
+  position: relative !important;
+  inset: auto !important;
+  box-sizing: border-box !important;
+  padding: 12px 14px 14px !important;
+}
+.flow-canvas-title { margin-bottom: 12px !important; }
+.flow-canvas-title h3 { font-size: 26px !important; }
+.flow-canvas-title p { font-size: 17px !important; }
+.flow-canvas-actions{display:flex;align-items:center;gap:12px}.flow-canvas-actions>button{height:42px;border:1px solid #8eb1ef;border-radius:9px;background:#fff;color:#1d5fce;padding:0 16px;display:inline-flex;align-items:center;gap:8px;font-size:17px;font-weight:750}.flow-canvas-actions>button:hover{background:#eaf2ff;border-color:#6092e5}.flow-canvas-actions>span{font-size:18px;font-weight:750;color:#2563eb;background:#e5eeff;border-radius:999px;padding:8px 14px;white-space:nowrap}
+.flow-diagram { padding-bottom: 16px !important; }
+.flow-lane-head { padding: 10px 0 !important; }
+.flow-lane-head > span {
+  min-width: 230px !important;
+  padding: 9px 15px !important;
+  font-size: 20px !important;
+}
+.flow-lifelines { inset: 59px 0 0 !important; }
+.flow-row { min-height: 88px !important; }
+.flow-row > button {
+  width: min(430px, 86%) !important;
+  padding: 8px 14px !important;
+}
+.flow-row > button small { font-size: 14px !important; }
+.flow-row > button b {
+  margin: 3px 0 !important;
+  font-size: 19px !important;
+}
+.flow-row > button span { font-size: 16px !important; }
+.flow-row > button em {
+  margin-top: 1px !important;
+  font-size: 14px !important;
+}
+
+@media (max-width: 1150px) {
+  .business-flow {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: minmax(380px, 55%) minmax(360px, 45%) !important;
+    overflow: auto !important;
+  }
+  .flow-canvas { grid-column: 1 !important; grid-row: 1 !important; }
+  .flow-inspector {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    height: auto !important;
+    border-right: 0 !important;
+    border-top: 1px solid #dce3ed !important;
+  }
+  .flow-inspector dl { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .flow-inspector dl > div { display: block !important; }
+  .flow-parameters { grid-template-columns: 1fr 1fr !important; }
+}
+/* Dynamic N-process business trace. Each PID/service pair owns a swimlane. */
+.multi-flow-scroll{box-sizing:border-box;width:100%;max-width:100%;height:100%;min-height:0;overflow:scroll;overscroll-behavior:contain;border:1px solid #dfe6ef;border-radius:16px;background:#fff;box-shadow:0 8px 28px #1b2a450c;scrollbar-gutter:stable}
+.multi-flow-scroll::-webkit-scrollbar{width:15px;height:15px}.multi-flow-scroll::-webkit-scrollbar-track{background:#e6ebf2;border-radius:10px}.multi-flow-scroll::-webkit-scrollbar-thumb{background:#8fa2bb;border:3px solid #e6ebf2;border-radius:10px}.multi-flow-scroll::-webkit-scrollbar-thumb:hover{background:#667d9b}.multi-flow-scroll::-webkit-scrollbar-corner{background:#e6ebf2}
+.multi-flow{position:relative;min-width:max-content;background:linear-gradient(#f8fafc 0 92px,#fff 92px)}
+.multi-flow-head{position:absolute;inset:0 0 auto;height:92px;border-bottom:1px solid #dfe6ef}
+.multi-flow-head>div{position:absolute;top:14px;height:62px;display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid #b8cff3;border-radius:11px;background:#eaf2ff;color:#1e5eb9}
+.multi-flow-head>div:nth-child(n+2){border-color:#cdbef0;background:#f3efff;color:#7048bb}
+.multi-flow-head span,.multi-flow-head b,.multi-flow-head small{display:block;min-width:0}.multi-flow-head b{font-size:18px}.multi-flow-head small{font-size:13px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.multi-lifeline{position:absolute;top:92px;bottom:0;width:2px;background:repeating-linear-gradient(to bottom,#a9bddc 0 8px,transparent 8px 16px)}
+.multi-flow-edges{position:absolute;inset:0;pointer-events:none;overflow:visible}.multi-flow-edges path{fill:none;stroke:#78a1df;stroke-width:2.5}.multi-flow-edges path.failed{stroke:#dc5656;stroke-dasharray:7 5}
+.multi-flow-node{position:absolute;z-index:2;height:142px;overflow:hidden;border:2px solid #99bced;border-radius:12px;background:#fff;padding:12px 15px;text-align:left;box-shadow:0 5px 17px #20355d15;transition:.15s}
+.multi-flow-node:hover,.multi-flow-node.active{border-color:#2563eb;outline:5px solid #2563eb18;transform:translateY(-2px)}.multi-flow-node.failed{border-color:#dc5656;background:#fff6f6}
+.multi-flow-node small,.multi-flow-node b,.multi-flow-node span,.multi-flow-node em{display:block}.multi-flow-node small{font-size:13px;line-height:18px;color:#7d8a9e}.multi-flow-node b{min-height:24px;max-height:48px;overflow:hidden;font-size:18px;line-height:24px;margin:5px 0 8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.multi-flow-node span{font-size:15px;line-height:20px;font-weight:750;color:#07865f}.multi-flow-node.failed span{color:#c53f3f}.multi-flow-node em{font-size:13px;line-height:18px;color:#7d8a9e;font-style:normal;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:1450px){.business-flow{grid-template-columns:320px minmax(0,1fr)!important}.flow-inspector{padding:22px 20px!important}}

@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import {
   Activity, AppWindow, ArrowLeft, Box, Boxes, ChevronDown, ChevronRight, CircleGauge, Clock3,
-  Cpu, FileText, HardDrive, Layers3, MemoryStick, Menu, Network, Play, RefreshCw, RotateCw, Search, Server,
+  Cpu, Download, FileText, HardDrive, Layers3, MemoryStick, Menu, Network, Play, RefreshCw, RotateCw, Search, Server,
   Settings2, SlidersHorizontal, Square, Terminal, Trash2, X, Zap
 } from "lucide-react";
 import "./styles.css";
 import "./embedded.css";
+import "./flow-layout.css";
 
 const pageMeta = {
   overview: ["运行总览", "实时掌握运行时状态与资源"],
@@ -119,12 +121,96 @@ function RuntimeInventory({ processes, bundles, reportedMainProcess }) {
   </div>;
 }
 
+function ProcessSwimlanes({ nodes, selectedNode, onSelect }) {
+  const layout = useMemo(() => {
+    const ordered = [...nodes].sort((a, b) =>
+      Number(a.startedUnixMicroseconds || 0) - Number(b.startedUnixMicroseconds || 0));
+    const laneKeys = [];
+    const laneByKey = new Map();
+    ordered.forEach(node => {
+      // A process can publish spans through multiple tracer service names.
+      // Swimlanes represent actual processes, so PID is the stable lane key.
+      const key = String(node.processId || node.serviceName || "unknown");
+      if (!laneByKey.has(key)) {
+        laneByKey.set(key, laneKeys.length);
+        laneKeys.push({ key, pid: node.processId, service: node.serviceName || "未知进程" });
+      }
+    });
+    const laneWidth = 350, rowHeight = 182, headerHeight = 92;
+    const nodeWidth = 286, nodeHeight = 142;
+    const positioned = ordered.map((node, index) => ({
+      ...node, index, lane: laneByKey.get(String(node.processId || node.serviceName || "unknown")),
+      x: laneByKey.get(String(node.processId || node.serviceName || "unknown")) * laneWidth + 32,
+      y: headerHeight + index * rowHeight + 22
+    }));
+    const bySpan = new Map(positioned.map(node => [node.spanId, node]));
+    return {
+      lanes: laneKeys, nodes: positioned,
+      edges: positioned.map(node => ({ from: bySpan.get(node.parentSpanId), to: node })).filter(edge => edge.from),
+      laneWidth, nodeWidth, nodeHeight,
+      width: Math.max(1050, laneKeys.length * laneWidth + 60),
+      // Include the full final card plus a generous bottom reveal area so the
+      // native horizontal scrollbar never covers the last business step.
+      height: Math.max(460, headerHeight + positioned.length * rowHeight + 220)
+    };
+  }, [nodes]);
+  const laneTitle = lane => {
+    if (lane.service === "pdr-runtime") return "主进程";
+    if (lane.service.includes("window-scene")) return "场景窗口";
+    if (lane.service.includes("window-material")) return "材质窗口";
+    if (lane.service.includes("window-device")) return "设备窗口";
+    return lane.service.includes("qt3d") ? "Qt3D 编排进程" : lane.service;
+  };
+  return <div className="multi-flow-scroll"><div className="multi-flow"
+    style={{ width: layout.width, height: layout.height }}>
+    <div className="multi-flow-head">{layout.lanes.map((lane, index) =>
+      <div key={lane.key} style={{ left: index * layout.laneWidth + 22, width: layout.laneWidth - 44 }}>
+        <AppWindow size={21} /><span><b>{laneTitle(lane)}</b>
+          <small>{lane.service} · PID {lane.pid || "—"}</small></span>
+      </div>)}</div>
+    {layout.lanes.map((lane, index) => <i className="multi-lifeline" key={lane.key}
+      style={{ left: index * layout.laneWidth + layout.laneWidth / 2 }} />)}
+    <svg className="multi-flow-edges" width={layout.width} height={layout.height}>
+      {layout.edges.map(({ from, to }) => {
+        const x1 = from.x + layout.nodeWidth / 2, y1 = from.y + layout.nodeHeight;
+        const x2 = to.x + layout.nodeWidth / 2, y2 = to.y;
+        const middle = (y1 + y2) / 2;
+        return <path key={`${from.spanId}-${to.spanId}`}
+          d={`M ${x1} ${y1} C ${x1} ${middle}, ${x2} ${middle}, ${x2} ${y2}`}
+          className={to.status === "failed" ? "failed" : ""} />;
+      })}
+    </svg>
+    {layout.nodes.map(node => <button key={node.spanId}
+      className={`multi-flow-node ${node.status} ${selectedNode?.spanId === node.spanId ? "active" : ""}`}
+      style={{ left: node.x, top: node.y, width: layout.nodeWidth }}
+      onClick={() => onSelect(node)} title={node.operation}>
+      <small>步骤 {String(node.index + 1).padStart(2, "0")}</small>
+      <b>{node.operation}</b>
+      <span>{(Number(node.durationNanoseconds || 0) / 1e6).toFixed(3)} ms</span>
+      <em>{node.serviceName}</em>
+    </button>)}
+  </div></div>;
+}
+
 function BusinessExecutionList({ process }) {
   const [executions, setExecutions] = useState([]);
   const [available, setAvailable] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
+  const inspectorRef = useRef(null);
+
+  useEffect(() => {
+    if (!detail && !historyOpen) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [detail, historyOpen]);
+
+  useEffect(() => {
+    if (inspectorRef.current) inspectorRef.current.scrollTop = 0;
+  }, [selectedNode?.spanId]);
 
   useEffect(() => {
     if (!process) return undefined;
@@ -133,7 +219,7 @@ function BusinessExecutionList({ process }) {
       try {
         const data = await request("/api/v1/heartbeat-businesses");
         if (active) {
-          setExecutions(data.records || []);
+          setExecutions((data.records || []).slice(0, 1000));
           setAvailable(true);
         }
       } catch {
@@ -171,57 +257,240 @@ function BusinessExecutionList({ process }) {
   };
   const linkText = status => status === "success" ? "链路走通" :
     status === "running" ? "执行中" : "链路失败";
+  const exportDiagnosis = () => {
+    if (!detail) return;
+    const byId = new Map(detail.nodes.map(node => [node.spanId, node]));
+    const failed = detail.nodes.filter(node => node.status === "failed");
+    const failedParents = new Set(failed.map(node => node.parentSpanId).filter(Boolean));
+    const rootFailures = failed.filter(node => !failedParents.has(node.spanId));
+    const primary = rootFailures[0] || failed[0] || null;
+    const chain = [];
+    for (let current = primary; current; current = byId.get(current.parentSpanId)) {
+      chain.unshift({
+        operation: current.operation, serviceName: current.serviceName,
+        processId: current.processId, status: current.status,
+        errorCode: current.errorCode || "", errorMessage: current.errorMessage || ""
+      });
+    }
+    const errorCode = primary?.errorCode || detail.item.failedOperation || "UNKNOWN_FAILURE";
+    const recommendations = [];
+    if (/WINDOW_BRANCH|window/i.test(`${errorCode} ${primary?.operation || ""}`)) {
+      recommendations.push("检查失败窗口进程是否仍在运行，以及窗口命令的 correlationId 是否收到对应响应。");
+      recommendations.push("核对失败窗口的输入参数、局部资源初始化和渲染线程日志。");
+      recommendations.push("确认 Qt3D 编排进程已执行补偿，并检查其他窗口结果是否可继续使用。");
+    } else if (failed.length) {
+      recommendations.push("从 primaryFailure 开始，沿 causalChain 向上核对输入输出与父子 Span。");
+      recommendations.push("结合失败节点 logs、errorCode 和 processId 查询对应进程日志。");
+    } else {
+      recommendations.push("当前 Trace 未发现 failed 节点，建议检查超时、丢失响应或业务状态汇总逻辑。");
+    }
+    const report = {
+      schemaVersion: "pdr-business-diagnosis/1.0",
+      exportedAt: new Date().toISOString(),
+      summary: {
+        businessName: detail.item.businessName,
+        businessInstanceId: detail.item.businessInstanceId,
+        traceId: detail.item.traceId,
+        status: detail.item.status,
+        nodeCount: detail.nodes.length,
+        failedNodeCount: failed.length
+      },
+      analysis: {
+        conclusion: primary
+          ? `首要失败点为“${primary.operation}”，错误码 ${errorCode}：${primary.errorMessage || "未提供更详细错误信息"}`
+          : "未找到明确失败节点。",
+        primaryFailure: primary,
+        causalChain: chain,
+        allFailures: failed,
+        recommendations
+      },
+      processes: [...new Map(detail.nodes.map(node => [
+        `${node.processId}:${node.serviceName}`,
+        { processId: node.processId, serviceName: node.serviceName, hostName: node.hostName }
+      ])).values()],
+      nodes: detail.nodes
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `business-diagnosis-${detail.item.traceId || Date.now()}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
 
   return <section className="surface business-execution-card">
     <div className="section-head"><div><h2>业务流程执行列表</h2><p>当前进程的业务实例与执行进度</p></div>
-      <div className="section-head-actions"><span className="inventory-count">{executions.length} 条</span>
+      <div className="section-head-actions">
+        <button className="business-history-query" onClick={() => setHistoryOpen(true)}
+          title="进入业务历史查询页面"><Search size={20} />查询</button>
+        <span className="inventory-count">{executions.length} 条</span>
         <button className={`section-collapse ${collapsed ? "collapsed" : ""}`}
           onClick={() => setCollapsed(value => !value)} aria-expanded={!collapsed}
           title={collapsed ? "展开业务流程执行列表" : "折叠业务流程执行列表"}>
           <ChevronDown size={24} />
         </button>
       </div></div>
-    {!collapsed && <div className="business-execution-list">{executions.map((item, index) =>
+    {!collapsed && <div className="business-execution-list">
+      <div className="business-execution-columns"><span>业务流程 / 实例</span><span>状态</span>
+        <span>步骤</span><span>开始时间</span><span>执行耗时</span></div>
+      {executions.map((item, index) =>
       <article key={item.traceId || item.businessInstanceId || index}
         onDoubleClick={() => openDetail(item)} title="双击查看业务详细流程图">
-        <header><div><b>{item.businessName || item.name || "未命名业务流程"}</b>
+        <div><b>{item.businessName || item.name || "未命名业务流程"}</b>
           <small>{item.businessInstanceId || item.traceId || "实例标识未知"}</small></div>
-          <span className={`business-link ${item.status}`}>{linkText(item.status)}</span></header>
-        <div className="business-execution-facts">
-          <span><small>当前步骤</small><strong>{item.currentStep || item.stepName || `${item.stepCount || 0} 个步骤`}</strong></span>
-          <span><small>开始时间</small><strong>{formatTime(item.startedUnixMicroseconds || item.startedAt || item.startTime)}</strong></span>
-          <span><small>执行耗时</small><strong>{formatDuration(item)}</strong></span>
-        </div>
+        <span className={`business-link ${item.status}`}>{linkText(item.status)}</span>
+        <strong>{item.currentStep || item.stepName || `${item.stepCount || 0} 个步骤`}</strong>
+        <strong>{formatTime(item.startedUnixMicroseconds || item.startedAt || item.startTime)}</strong>
+        <strong>{formatDuration(item)}</strong>
       </article>)}
       {!executions.length && <div className="workbench-empty">
         {available ? "当前进程暂无业务流程执行记录" : "业务流程追踪服务暂未提供数据"}
       </div>}
     </div>}
-    {detail && <div className="business-modal-backdrop" onMouseDown={() => setDetail(null)}>
-      <section className="business-modal" onMouseDown={event => event.stopPropagation()}>
-        <header><div><h2>{detail.item.businessName}</h2><p>{detail.item.businessInstanceId}</p></div>
-          <button onClick={() => setDetail(null)}><X size={28} /></button></header>
+    {detail && createPortal(<div className="business-modal-backdrop">
+      <section className="business-modal">
+        <nav className="flow-page-tabs">
+          <button onClick={() => setDetail(null)}><CircleGauge size={24} />运行总览</button>
+          <ChevronRight size={25} />
+          <button className="active"><Activity size={24} />流程-{detail.item.businessName}</button>
+          <span><i />当前：业务流程页面</span>
+          <button className="flow-page-close" onClick={() => setDetail(null)}><X size={27} />返回总览</button>
+        </nav>
+        <header><div><span className={`business-link ${detail.item.status}`}>
+          {linkText(detail.item.status)}</span><h2>{detail.item.businessName}</h2>
+          <p>业务实例：{detail.item.businessInstanceId} · 共 {detail.nodes.length} 个执行节点</p></div></header>
         <div className="business-flow">
-          <div className="flow-nodes">{detail.nodes.map((node, index) => <React.Fragment key={node.spanId}>
-            {index > 0 && <ChevronRight size={34} />}
-            <button className={`${node.status} ${selectedNode?.spanId === node.spanId ? "active" : ""}`}
-              onClick={() => setSelectedNode(node)}>
-              <small>步骤 {index + 1}</small><b>{node.operation}</b>
-              <span>{(Number(node.durationNanoseconds || 0) / 1e6).toFixed(3)} ms</span>
-            </button>
-          </React.Fragment>)}</div>
-          <aside>{selectedNode ? <><div className="step-head"><span className={`business-link ${selectedNode.status}`}>
-            {selectedNode.status === "success" ? "成功" : selectedNode.status}</span><h3>{selectedNode.operation}</h3></div>
-            <dl><div><dt>耗时</dt><dd>{(Number(selectedNode.durationNanoseconds || 0) / 1e6).toFixed(3)} ms</dd></div>
+          <main className="flow-canvas"><div className="flow-canvas-title"><div><h3>业务执行流程</h3>
+            <p>点击任意节点查看该步骤的耗时、传入及传出参数</p></div>
+            <div className="flow-canvas-actions"><button onClick={exportDiagnosis}
+              title="导出完整链路和失败原因分析"><Download size={20} />导出诊断报告</button>
+              <span>{detail.nodes.length} 个节点</span></div></div>
+            <ProcessSwimlanes nodes={detail.nodes} selectedNode={selectedNode} onSelect={setSelectedNode} />
+          </main>
+          <aside className="flow-inspector" ref={inspectorRef}>{selectedNode ? <><div className="step-head">
+            <div><span className={`business-link ${selectedNode.status}`}>
+              {selectedNode.status === "success" ? "执行成功" : selectedNode.status === "failed" ? "执行失败" : selectedNode.status}</span>
+              <small>当前选中节点</small></div><h3>{selectedNode.operation}</h3></div>
+            {selectedNode.status === "failed" && <section className="flow-error-panel">
+              <div><b>错误码</b><strong>{selectedNode.errorCode || "UNKNOWN_ERROR"}</strong></div>
+              <div><b>失败原因</b><strong>{selectedNode.errorMessage || "未提供失败原因"}</strong></div>
+              <div><b>失败节点</b><strong>{selectedNode.operation}</strong></div>
+            </section>}
+            <dl><div><dt>节点耗时</dt><dd>{(Number(selectedNode.durationNanoseconds || 0) / 1e6).toFixed(3)} ms</dd></div>
               <div><dt>服务 / Bundle</dt><dd>{selectedNode.serviceName} / {selectedNode.bundleName || "—"}</dd></div>
               <div><dt>主机 / PID</dt><dd>{selectedNode.hostName} / {selectedNode.processId}</dd></div></dl>
-            <h4>传入参数</h4><pre>{JSON.stringify(selectedNode.inputs || {}, null, 2)}</pre>
-            <h4>传出参数</h4><pre>{JSON.stringify(selectedNode.outputs || {}, null, 2)}</pre>
-            {selectedNode.errorMessage && <><h4>失败信息</h4><pre>{selectedNode.errorMessage}</pre></>}
+            <div className="flow-parameters"><section><h4>传入参数</h4>
+              <pre>{JSON.stringify(selectedNode.inputs || {}, null, 2)}</pre></section>
+              <section><h4>传出参数</h4>
+                <pre>{JSON.stringify(selectedNode.outputs || {}, null, 2)}</pre></section></div>
           </> : <div className="workbench-empty">点击流程节点查看详情</div>}</aside>
         </div>
       </section>
-    </div>}
+    </div>, document.body)}
+    {historyOpen && createPortal(<div className="business-history-page">
+      <nav className="flow-page-tabs">
+        <button onClick={() => setHistoryOpen(false)}><CircleGauge size={24} />运行总览</button>
+        <ChevronRight size={25} />
+        <button className="active"><Search size={24} />业务历史查询</button>
+        <span><i />当前：业务历史查询页面</span>
+        <button className="flow-page-close" onClick={() => setHistoryOpen(false)}>
+          <X size={27} />返回总览
+        </button>
+      </nav>
+      <main><BusinessHistoryPanel /></main>
+    </div>, document.body)}
+  </section>;
+}
+
+function BusinessHistoryPanel() {
+  const localDateTime = date => {
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  };
+  const [collapsed, setCollapsed] = useState(false);
+  const [from, setFrom] = useState(() => localDateTime(new Date(Date.now() - 3600000)));
+  const [to, setTo] = useState(() => localDateTime(new Date()));
+  const [name, setName] = useState("");
+  const [status, setStatus] = useState("");
+  const [records, setRecords] = useState([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const limit = 100;
+
+  const load = async nextOffset => {
+    setLoading(true); setError("");
+    try {
+      const query = new URLSearchParams({
+        from: String(new Date(from).getTime() * 1000),
+        to: String(new Date(to).getTime() * 1000 + 59999999),
+        name, status, limit: String(limit), offset: String(nextOffset)
+      });
+      const data = await request(`/api/v1/business-trace-history?${query}`);
+      setRecords(data.records || []);
+      setHasMore(Boolean(data.hasMore));
+      setOffset(nextOffset);
+    } catch (requestError) {
+      setRecords([]); setHasMore(false); setError(requestError.message);
+    } finally { setLoading(false); }
+  };
+  const formatTime = value => value
+    ? new Date(Number(value) / 1000).toLocaleString()
+    : "—";
+  const formatDuration = value => {
+    const milliseconds = Number(value) / 1e6;
+    if (!Number.isFinite(milliseconds)) return "—";
+    return milliseconds < 1000 ? `${milliseconds.toFixed(3)} ms` : `${(milliseconds / 1000).toFixed(2)} s`;
+  };
+
+  return <section className="surface business-history-card">
+    <div className="section-head"><div><h2>业务流程历史记录查询</h2><p>按小时 SQLite 分片，保留最近 10 天</p></div>
+      <div className="section-head-actions"><span className="inventory-count">{records.length} 条</span>
+        <button className={`section-collapse ${collapsed ? "collapsed" : ""}`}
+          onClick={() => setCollapsed(value => !value)} aria-expanded={!collapsed}
+          title={collapsed ? "展开历史记录查询" : "折叠历史记录查询"}>
+          <ChevronDown size={24} />
+        </button>
+      </div></div>
+    {!collapsed && <><form className="business-history-filters" onSubmit={event => {
+      event.preventDefault(); load(0);
+    }}>
+      <label><span>开始时间</span><input type="datetime-local" value={from}
+        onChange={event => setFrom(event.target.value)} /></label>
+      <label><span>结束时间</span><input type="datetime-local" value={to}
+        onChange={event => setTo(event.target.value)} /></label>
+      <label><span>流程名称</span><input value={name}
+        onChange={event => setName(event.target.value)} placeholder="支持模糊查询" /></label>
+      <label><span>状态</span><select value={status} onChange={event => setStatus(event.target.value)}>
+        <option value="">全部</option><option value="running">执行中</option>
+        <option value="success">成功</option><option value="failed">失败</option>
+        <option value="cancelled">已取消</option>
+      </select></label>
+      <button type="submit" disabled={loading}><Search size={20} />{loading ? "查询中" : "查询"}</button>
+    </form>
+    {error && <div className="business-history-error">{error}</div>}
+    <div className="business-history-table">
+      <div className="business-history-columns"><span>业务流程 / 实例</span><span>状态</span>
+        <span>步骤</span><span>开始时间</span><span>执行耗时</span></div>
+      {records.map(item => <div className="business-history-row" key={item.traceId}>
+        <div><b>{item.businessName}</b><small>{item.businessInstanceId || item.traceId}</small></div>
+        <Status state={item.status} /><strong>{item.stepCount} 个步骤</strong>
+        <strong>{formatTime(item.startedUnixMicroseconds)}</strong>
+        <strong>{formatDuration(item.durationNanoseconds)}</strong>
+      </div>)}
+      {!records.length && !loading && <div className="workbench-empty">请选择条件查询历史记录</div>}
+    </div>
+    <footer className="business-history-pagination">
+      <span>每页 {limit} 条 · 第 {Math.floor(offset / limit) + 1} 页</span>
+      <div><button type="button" disabled={loading || offset === 0}
+        onClick={() => load(Math.max(0, offset - limit))}>上一页</button>
+        <button type="button" disabled={loading || !hasMore}
+          onClick={() => load(offset + limit)}>下一页</button></div>
+    </footer></>}
   </section>;
 }
 

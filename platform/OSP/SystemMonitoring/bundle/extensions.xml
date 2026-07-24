@@ -41,4 +41,16 @@
              library="pdr.platform.systemMonitoring"
              allowSpecialization="none"
              hidden="true"/>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/business-traces"
+             class="PocoDDS::SystemMonitoring::BusinessTracesHandlerFactory"
+             library="pdr.platform.systemMonitoring"
+             allowSpecialization="all"
+             hidden="true"/>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/business-trace-history"
+             class="PocoDDS::SystemMonitoring::BusinessTraceHistoryHandlerFactory"
+             library="pdr.platform.systemMonitoring"
+             allowSpecialization="none"
+             hidden="true"/>
 </extensions>
