@@ -6,6 +6,7 @@
 #include <Poco/Process.h>
 #include <Poco/JSON/Array.h>
 #include <Poco/JSON/Object.h>
+#include <Poco/Logger.h>
 #include <Poco/OSP/Bundle.h>
 #include <Poco/OSP/BundleLoader.h>
 #include <Poco/OSP/OSPSubsystem.h>
@@ -548,6 +549,7 @@ void writeProcessStatus(
             child->set("name", info.name);
             child->set("pid", info.processId);
             child->set("state", info.state);
+            child->set("online", info.state == "running");
             child->set("location", info.location);
             child->set("manageable", info.manageable);
             children->add(child);
@@ -634,8 +636,9 @@ int runQt3D(const Options& options, Poco::OSP::OSPSubsystem& osp,
                       {"sceneReady", "true"}});
     publisher.writeResult();
     emitComplexBusinessScenarios(tracer);
-    std::cout << "QT3D_SUBPROCESS_READY instance=" << options.instance
-              << " pid=" << Poco::Process::id() << '\n';
+    Poco::Logger::root().information(
+        "QT3D_SUBPROCESS_READY instance=" + options.instance +
+        " pid=" + std::to_string(Poco::Process::id()));
 
     if (options.selfTest)
     {

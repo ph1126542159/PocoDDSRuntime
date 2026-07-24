@@ -660,6 +660,9 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
     } catch (error) { onNotify?.(error.message, true); }
     finally { setBusy(""); }
   };
+  const isChildOnline = child => child.online ??
+    ((child.location || "local") === "local" &&
+      String(child.state).toLowerCase() === "running");
 
   return <div className="process-workbench">
     <div className="process-guide">
@@ -698,8 +701,8 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
               <div><b>{child.name}</b><small>{child.pid ? `PID ${child.pid}` : "尚未分配 PID"}</small></div>
               <ChevronRight size={27} /></div>
             <div className="child-process-facts">
-              <span><small>在线状态</small><strong className={child.online ? "online" : "offline"}>
-                <i />{child.online ? "在线" : "离线"}</strong></span>
+              <span><small>在线状态</small><strong className={isChildOnline(child) ? "online" : "offline"}>
+                <i />{isChildOnline(child) ? "在线" : "离线"}</strong></span>
               <span><small>进程位置</small><strong>
                 <span className={`location-badge ${child.location || "local"}`}>
                   {(child.location || "local") === "remote" ? "远程进程" : "本地进程"}
