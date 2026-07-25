@@ -1,0 +1,50 @@
+openapi: 3.1.0
+info:
+  title: PocoDDSRuntime Management API
+  version: 0.1.0
+paths:
+  /api/v1/system-metrics:
+    get:
+      responses: { "200": { description: System metric history } }
+  /api/v1/process-logs:
+    get:
+      responses: { "200": { description: Process log records } }
+  /api/v1/process-detail:
+    get:
+      responses: { "200": { description: Process details } }
+  /api/v1/process-lifecycle:
+    post:
+      responses: { "200": { description: Lifecycle action accepted } }
+  /api/v1/bundle-lifecycle:
+    post:
+      responses: { "200": { description: Bundle lifecycle action accepted } }
+  /api/v1/process-config:
+    get:
+      responses: { "200": { description: Editable configuration } }
+    post:
+      responses: { "200": { description: Configuration updated } }
+  /api/v1/heartbeat-businesses:
+    get:
+      responses: { "200": { description: Heartbeat business records } }
+  /api/v1/business-traces:
+    get:
+      responses: { "200": { description: Recent business traces } }
+  /api/v1/business-trace-history:
+    get:
+      responses: { "200": { description: Persisted business trace history } }
+  /health/live:
+    get:
+      operationId: getLiveness
+      responses:
+        "200": { description: Runtime process is live }
+  /health/ready:
+    get:
+      operationId: getReadiness
+      responses:
+        "200": { description: Runtime is ready }
+        "503": { description: Runtime is degraded or down }
+  /health/detail:
+    get:
+      operationId: getHealthDetail
+      responses:
+        "200": { description: Aggregated component health }

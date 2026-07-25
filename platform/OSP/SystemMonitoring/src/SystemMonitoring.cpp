@@ -31,6 +31,7 @@
 #include "Poco/Util/Application.h"
 #include "Poco/Util/PropertyFileConfiguration.h"
 #include "PocoDDS/Observability/TraceStore.h"
+#include "PocoDDS/Health/Health.h"
 #include "PocoDDS/ProcessManagement/SubprocessManager.h"
 
 #include <algorithm>
@@ -43,6 +44,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <memory>
 
 #if defined(POCO_OS_FAMILY_WINDOWS)
 #include <Windows.h>
@@ -1285,7 +1287,127 @@ public:
         }
     }
 };
+
+class StaticHealthContributor final : public PocoDDS::Health::IHealthContributor
+{
+public:
+    explicit StaticHealthContributor(PocoDDS::Health::Report report):
+        _report(std::move(report))
+    {
+    }
+    PocoDDS::Health::Report health() const override { return _report; }
+private:
+    PocoDDS::Health::Report _report;
+};
+
+const char* healthStatusName(PocoDDS::Health::Status status)
+{
+    switch (status)
+    {
+    case PocoDDS::Health::Status::up: return "UP";
+    case PocoDDS::Health::Status::degraded: return "DEGRADED";
+    case PocoDDS::Health::Status::down: return "DOWN";
+    }
+    return "DOWN";
+}
+
+class HealthHandler final : public Poco::Net::HTTPRequestHandler
+{
+public:
+    explicit HealthHandler(Poco::OSP::BundleContext::Ptr context):
+        _context(std::move(context))
+    {
+    }
+
+    void handleRequest(Poco::Net::HTTPServerRequest& request,
+                       Poco::Net::HTTPServerResponse& response) override
+    {
+        PocoDDS::Health::HealthRegistry registry;
+        registry.add(std::make_shared<StaticHealthContributor>(
+            PocoDDS::Health::Report{"runtime", PocoDDS::Health::Status::up, "HTTP server active"}));
+
+        std::vector<Poco::OSP::Bundle::Ptr> bundles;
+        _context->listBundles(bundles);
+        std::size_t activeBundles = 0;
+        for (const auto& bundle : bundles)
+            if (bundle->state() == Poco::OSP::Bundle::BUNDLE_ACTIVE)
+                ++activeBundles;
+        registry.add(std::make_shared<StaticHealthContributor>(
+            PocoDDS::Health::Report{
+                "bundles",
+                activeBundles > 0 ? PocoDDS::Health::Status::up : PocoDDS::Health::Status::down,
+                std::to_string(activeBundles) + "/" + std::to_string(bundles.size()) + " active"}));
+
+        if (auto* manager = PocoDDS::ProcessManagement::SubprocessManager::active())
+        {
+            const auto processes = manager->processes();
+            registry.add(std::make_shared<StaticHealthContributor>(
+                PocoDDS::Health::Report{
+                    "subprocesses",
+                    manager->runningCount() == processes.size()
+                        ? PocoDDS::Health::Status::up
+                        : PocoDDS::Health::Status::degraded,
+                    std::to_string(manager->runningCount()) + "/" +
+                        std::to_string(processes.size()) + " running"}));
+        }
+        else
+        {
+            registry.add(std::make_shared<StaticHealthContributor>(
+                PocoDDS::Health::Report{"subprocesses", PocoDDS::Health::Status::degraded,
+                                        "manager not initialized"}));
+        }
+
+        const auto report = registry.collect();
+        const std::string path = Poco::URI(request.getURI()).getPath();
+        const bool liveness = path == "/health/live";
+        const bool readiness = path == "/health/ready";
+        if (path != "/health" && path != "/health/" && !liveness && !readiness &&
+            path != "/health/detail")
+        {
+            sendJsonError(response, Poco::Net::HTTPResponse::HTTP_NOT_FOUND,
+                          "unknown health endpoint");
+            return;
+        }
+
+        Poco::JSON::Object root;
+        root.set("status", healthStatusName(report.status));
+        root.set("live", report.live());
+        root.set("ready", report.ready());
+        if (!liveness && !readiness)
+        {
+            Poco::JSON::Array components;
+            for (const auto& component : report.components)
+            {
+                Poco::JSON::Object item;
+                item.set("name", component.component);
+                item.set("status", healthStatusName(component.status));
+                item.set("detail", component.detail);
+                components.add(item);
+            }
+            root.set("components", components);
+        }
+        const bool acceptable = liveness ? report.live() : (readiness ? report.ready() : true);
+        response.setStatus(acceptable ? Poco::Net::HTTPResponse::HTTP_OK
+                                      : Poco::Net::HTTPResponse::HTTP_SERVICE_UNAVAILABLE);
+        response.setContentType("application/json; charset=utf-8");
+        response.set("Cache-Control", "no-store");
+        root.stringify(response.send());
+    }
+
+private:
+    Poco::OSP::BundleContext::Ptr _context;
+};
 } // namespace
+
+class HealthHandlerFactory final : public Poco::OSP::Web::WebRequestHandlerFactory
+{
+public:
+    Poco::Net::HTTPRequestHandler* createRequestHandler(
+        const Poco::Net::HTTPServerRequest&) override
+    {
+        return new HealthHandler(context());
+    }
+};
 
 class MetricsHandlerFactory final : public Poco::OSP::Web::WebRequestHandlerFactory
 {
@@ -1413,6 +1535,7 @@ POCO_BEGIN_MANIFEST(Poco::OSP::BundleActivator)
 POCO_END_MANIFEST
 
 POCO_BEGIN_NAMED_MANIFEST(WebServer, Poco::OSP::Web::WebRequestHandlerFactory)
+    POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::HealthHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::MetricsHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessLogsHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessDetailHandlerFactory)

@@ -4,7 +4,8 @@ import { createRoot } from "react-dom/client";
 import {
   Activity, AppWindow, ArrowLeft, Box, Boxes, ChevronDown, ChevronRight, CircleGauge, Clock3,
   Cpu, Download, FileText, HardDrive, Layers3, MemoryStick, Menu, Network, Play, RefreshCw, RotateCw, Search, Server,
-  Settings2, SlidersHorizontal, Square, Terminal, Trash2, X, Zap
+  Settings2, SlidersHorizontal, Square, Terminal, Trash2, X, Zap, ShieldCheck,
+  AlertTriangle, CheckCircle2, Database, GitBranch
 } from "lucide-react";
 import "./styles.css";
 import "./embedded.css";
@@ -62,6 +63,57 @@ const numeric = (value, fallback = 0) => {
   return Number.isFinite(result) ? result : fallback;
 };
 const percent = value => `${numeric(value).toFixed(1)}%`;
+
+function validateConfigValue(key, value) {
+  const ranges = {
+    "osp.web.server.port": [1, 65535],
+    "pdr.fastdds.domainId": [0, 232],
+    "pdr.subprocess.shutdownTimeoutMilliseconds": [1, 3600000],
+    "observability.history.retentionDays": [1, 36500],
+    "pdr.modbus.port": [1, 65535],
+    "pdr.modbus.unitId": [0, 247],
+    "pdr.serial.baudRate": [1, 4000000],
+    "pdr.gnss.baudRate": [1, 4000000]
+  };
+  if (!ranges[key]) return "";
+  if (!/^-?\d+$/.test(String(value).trim())) return "必须是整数";
+  const number = Number(value);
+  const [minimum, maximum] = ranges[key];
+  return number < minimum || number > maximum ? `有效范围 ${minimum}–${maximum}` : "";
+}
+
+function HealthOverview({ health }) {
+  const status = String(health?.status || "UNKNOWN").toUpperCase();
+  const healthy = status === "UP";
+  const components = health?.components || [];
+  const capabilities = [
+    ["配置校验", "启动 fail-fast", ShieldCheck],
+    ["Workflow", "步骤与补偿", GitBranch],
+    ["可靠性", "限流、熔断与背压", Activity],
+    ["持久化", "Repository 与迁移", Database]
+  ];
+  return <section className={`platform-health ${healthy ? "up" : "attention"}`}>
+    <header>
+      <div className="health-title">
+        <span>{healthy ? <CheckCircle2 /> : <AlertTriangle />}</span>
+        <div><small>平台健康状态</small><h2>{healthy ? "运行就绪" : status === "UNKNOWN" ? "状态获取中" : "需要关注"}</h2>
+          <p>来自 /health/detail 的 Runtime、Bundle 与子进程聚合结果</p></div>
+      </div>
+      <div className="health-flags"><span className={health?.live ? "ok" : "bad"}>LIVE {health?.live ? "正常" : "异常"}</span>
+        <span className={health?.ready ? "ok" : "bad"}>READY {health?.ready ? "就绪" : "未就绪"}</span></div>
+    </header>
+    <div className="health-grid">
+      <div className="health-components">{components.map(component =>
+        <article key={component.name}><i className={String(component.status).toLowerCase()} />
+          <div><b>{component.name}</b><small>{component.detail || "无详情"}</small></div>
+          <strong>{component.status}</strong></article>)}
+        {!components.length && <div className="health-loading">等待健康数据…</div>}
+      </div>
+      <div className="capability-grid">{capabilities.map(([name, detail, Icon]) =>
+        <article key={name}><Icon /><div><b>{name}</b><small>{detail}</small></div><span>已接入</span></article>)}</div>
+    </div>
+  </section>;
+}
 
 function Sparkline({ values, color }) {
   const safe = values.length ? values.map(value => numeric(value)) : [0];
@@ -649,6 +701,11 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
     finally { setBusy(""); }
   };
   const applyConfiguration = async key => {
+    const validationError = validateConfigValue(key, drafts[key] ?? "");
+    if (validationError) {
+      onNotify?.(`${key}：${validationError}`, true);
+      return;
+    }
     setBusy(`config:${key}`);
     try {
       const result = await request("/api/v1/process-config", {
@@ -767,8 +824,12 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
           <b>{key}</b><code>{String(value)}</code>
           {editable.has(key) ? <div className="config-edit">
             <input value={String(drafts[key] ?? value)}
+              className={validateConfigValue(key, drafts[key] ?? value) ? "invalid" : ""}
               onChange={event => setDrafts(current => ({ ...current, [key]: event.target.value }))} />
-            <button disabled={busy || String(drafts[key] ?? value) === String(value)}
+            {validateConfigValue(key, drafts[key] ?? value) &&
+              <small className="config-validation">{validateConfigValue(key, drafts[key] ?? value)}</small>}
+            <button disabled={busy || String(drafts[key] ?? value) === String(value) ||
+                Boolean(validateConfigValue(key, drafts[key] ?? value))}
               onClick={() => applyConfiguration(key)}><Zap size={21} />立即生效</button>
           </div> : <span className="readonly-config">只读</span>}
         </div>)}{!configEntries.length && <div className="workbench-empty">当前进程没有可读取的配置</div>}</div>}
@@ -830,6 +891,12 @@ function ConfigModal({ target, onClose, onDone }) {
   const update = (index, field, value) => setRows(current =>
     current.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row));
   const save = async () => {
+    const invalid = rows.find(row => row.key.trim() &&
+      validateConfigValue(row.key.trim(), row.value));
+    if (invalid) {
+      onDone(`${invalid.key}：${validateConfigValue(invalid.key.trim(), invalid.value)}`, true);
+      return;
+    }
     setSaving(true);
     try {
       const changes = Object.fromEntries(rows.filter(row => row.key.trim()).map(row => [row.key.trim(), row.value]));
@@ -849,7 +916,10 @@ function ConfigModal({ target, onClose, onDone }) {
       <div className="config-list">
         {rows.map((row, index) => <div className="config-row" key={index}>
           <input value={row.key} placeholder="配置键" onChange={event => update(index, "key", event.target.value)} />
-          <input value={row.value} placeholder="配置值" onChange={event => update(index, "value", event.target.value)} />
+          <input value={row.value} placeholder="配置值"
+            className={validateConfigValue(row.key.trim(), row.value) ? "invalid" : ""}
+            title={validateConfigValue(row.key.trim(), row.value)}
+            onChange={event => update(index, "value", event.target.value)} />
           <button onClick={() => setRows(current => current.filter((_, i) => i !== index))}><X size={16} /></button>
         </div>)}
         {!rows.length && <div className="modal-empty">暂无配置项，可在下方添加</div>}
@@ -895,14 +965,17 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [topology, setTopology] = useState({ processes: [], services: [], modules: [], bundles: [] });
   const [resourceHistory, setResourceHistory] = useState([]);
+  const [health, setHealth] = useState(null);
   const [updated, setUpdated] = useState(null);
   const [configTarget, setConfigTarget] = useState(null);
   const [toast, setToast] = useState(null);
   const refresh = useCallback(async () => {
-    const [data, monitoring] = await Promise.all([
+    const [data, monitoring, healthDetail] = await Promise.all([
       request("/api/v1/topology"),
-      request("/api/v1/system-metrics").catch(() => ({ samples: [] }))
+      request("/api/v1/system-metrics").catch(() => ({ samples: [] })),
+      request("/health/detail").catch(() => null)
     ]);
+    if (healthDetail) setHealth(healthDetail);
     const samples = monitoring.samples || [];
     const monitoredResources = monitoring.current || {};
     if (Object.keys(monitoredResources).length)
@@ -956,7 +1029,9 @@ function App() {
       <div className="brand"><span><Activity size={21} /></span><div><b>PocoDDS</b><small>Runtime Console</small></div></div>
       <nav>{navItems.map(([id, Icon]) => <button key={id} className={page === id ? "active" : ""}
         onClick={() => { setPage(id); setMenuOpen(false); }}><Icon size={18} /><span>{pageMeta[id][0]}</span><ChevronRight size={15} /></button>)}</nav>
-      <div className="runtime-state"><i /><div><b>Runtime Online</b><small>{topology.host || "Local host"}</small></div></div>
+      <div className={`runtime-state ${health?.ready === false ? "degraded" : ""}`}><i /><div>
+        <b>{health?.ready === false ? "Runtime Degraded" : "Runtime Online"}</b>
+        <small>{topology.host || "Local host"}</small></div></div>
     </aside>
     <main>
       <header className="topbar">
@@ -966,7 +1041,8 @@ function App() {
           <button className="refresh" onClick={() => refresh().catch(error => notify(error.message, true))}><RefreshCw size={17} />刷新</button></div>
       </header>
       <div className="content">
-        {page === "overview" && <ProcessWorkbench mainProcess={topology.mainProcess} onNotify={notify} />}
+        {page === "overview" && <><HealthOverview health={health} />
+          <ProcessWorkbench mainProcess={topology.mainProcess} onNotify={notify} /></>}
         {page === "processes" && <ProcessWorkspace items={processItems} />}
         {["services", "modules", "bundles"].includes(page) &&
           <EntityTable items={currentItems} onConfig={setConfigTarget} onLife={life} />}

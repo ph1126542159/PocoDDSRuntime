@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/runtime-config.schema.json",
+  "title": "PocoDDSRuntime configuration",
+  "type": "object",
+  "required": ["osp.web.server.host", "osp.web.server.port", "pdr.fastdds.domainId"],
+  "properties": {
+    "osp.web.server.host": { "type": "string", "minLength": 1 },
+    "osp.web.server.port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "pdr.fastdds.domainId": { "type": "integer", "minimum": 0, "maximum": 232 },
+    "pdr.subprocess.shutdownTimeoutMilliseconds": { "type": "integer", "minimum": 1 },
+    "observability.history.retentionDays": { "type": "integer", "minimum": 1 },
+    "pdr.modbus.port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "pdr.modbus.unitId": { "type": "integer", "minimum": 0, "maximum": 247 },
+    "pdr.serial.baudRate": { "type": "integer", "minimum": 1 },
+    "pdr.gnss.baudRate": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": true
+}

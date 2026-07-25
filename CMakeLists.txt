@@ -151,6 +151,11 @@ set(MYIOT_OSP_BUNDLE_OSNAME "${MYIOT_PLATFORM_OSNAME}")
 set(MYIOT_OSP_BUNDLE_OSARCH "${MYIOT_PLATFORM_OSARCH}")
 
 set(CMAKE_FOLDER "Platform")
+add_subdirectory(application)
+add_subdirectory(platform/configuration)
+add_subdirectory(platform/reliability)
+add_subdirectory(platform/health)
+add_subdirectory(platform/persistence)
 add_subdirectory(platform/CodeGeneration)
 add_subdirectory(platform/Geo)
 add_subdirectory(platform/Serial)
@@ -183,6 +188,16 @@ add_subdirectory(server)
 
 unset(CMAKE_FOLDER)
 pdr_configure_test_output_tree("${CMAKE_CURRENT_SOURCE_DIR}")
+if(BUILD_TESTING)
+    add_test(NAME contract-files
+        COMMAND "${CMAKE_COMMAND}"
+            -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ValidateContracts.cmake")
+    add_test(NAME documentation-files
+        COMMAND "${CMAKE_COMMAND}"
+            -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ValidateDocs.cmake")
+endif()
 
 # Runtime deployment layout. The current runtime bundles are generated directly
 # into the owning process repository and installed into the same layout.

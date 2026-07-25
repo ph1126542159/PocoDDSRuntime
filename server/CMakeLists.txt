@@ -4,6 +4,7 @@ add_executable(pdr-runtime
 target_link_libraries(pdr-runtime
     PRIVATE
         PocoDDS::BundleManagement
+        PocoDDS::Configuration
         PocoDDS::ProcessManagement
         Poco::OSP
         Poco::Util

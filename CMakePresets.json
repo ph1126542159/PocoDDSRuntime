@@ -1,0 +1,55 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "embedded",
+      "inherits": "base",
+      "description": "Embedded/PetaLinux foundation profile",
+      "cacheVariables": {
+        "PDR_ENABLE_OBSERVABILITY": "OFF",
+        "MYIOT_ENABLE_DATA_MODULES": "OFF"
+      }
+    },
+    {
+      "name": "edge-test",
+      "inherits": "base",
+      "description": "Edge and test-station profile",
+      "cacheVariables": {
+        "PDR_ENABLE_OBSERVABILITY": "ON",
+        "MYIOT_ENABLE_DATA_MODULES": "OFF"
+      }
+    },
+    {
+      "name": "server",
+      "inherits": "base",
+      "description": "Server profile with data and observability modules",
+      "cacheVariables": {
+        "PDR_ENABLE_OBSERVABILITY": "ON",
+        "MYIOT_ENABLE_DATA_MODULES": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "embedded", "configurePreset": "embedded" },
+    { "name": "edge-test", "configurePreset": "edge-test" },
+    { "name": "server", "configurePreset": "server" }
+  ],
+  "testPresets": [
+    {
+      "name": "edge-test",
+      "configurePreset": "edge-test",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

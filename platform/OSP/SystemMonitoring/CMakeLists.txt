@@ -3,6 +3,7 @@ myiot_add_osp_bundle(PDR_SystemMonitoring_Bundle "pdr.platform.systemMonitoring"
     LINK_LIBS
         Poco::OSPWeb
         PocoDDS::ProcessManagement
+        PocoDDS::Health
         PocoDDS::Observability
         Poco::OSP
         Poco::JSON

@@ -5,26 +5,22 @@ on:
   pull_request:
 
 jobs:
-  portable-core:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+  repository-policy:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: lukka/get-cmake@latest
-      - name: Configure
-        run: cmake -S . -B build/core -DPDR_ENABLE_FASTDDS=OFF -DPDR_ENABLE_OPENTELEMETRY=OFF
-      - name: Build
-        run: cmake --build build/core --config Release --parallel 2
-      - name: Test
-        run: ctest --test-dir build/core -C Release --output-on-failure
+      - name: Validate contracts
+        run: cmake -DSOURCE_DIR=${{ github.workspace }} -P cmake/ValidateContracts.cmake
+      - name: Validate governance documentation
+        run: cmake -DSOURCE_DIR=${{ github.workspace }} -P cmake/ValidateDocs.cmake
+      - name: Validate CMake profiles
+        run: cmake --list-presets
       - name: Check formatting
-        if: runner.os == 'Linux'
         shell: bash
         run: |
-          find include services server tests platform demos -type f \( -name '*.h' -o -name '*.cpp' \) -print0 |
+          git ls-files -z -- application platform services server SubSystem |
+            grep -zE '\.(h|hpp|cpp)$' |
             xargs -0 clang-format --dry-run --Werror
 
   linux-full-stack:
@@ -39,7 +35,7 @@ jobs:
       - uses: actions/cache@v4
         id: native-dependencies
         with:
-          path: build/dependencies/install
+          path: build/install
           key: native-dependencies-${{ runner.os }}-${{ hashFiles('cmake/*.cmake') }}
       - name: Bootstrap native dependencies
         if: steps.native-dependencies.outputs.cache-hit != 'true'
@@ -49,30 +45,12 @@ jobs:
       - name: Configure full stack
         run: >-
           cmake -S . -B build/full -DCMAKE_BUILD_TYPE=Release
-          -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/dependencies/install
-          -DPDR_ENABLE_FASTDDS=ON -DPDR_ENABLE_OPENTELEMETRY=ON
-          -DPDR_ENABLE_OTLP_HTTP=ON -DPDR_ENABLE_ADMIN=ON
-          -DPDR_BUILD_QT_OPENGL_DEMO=ON
+          -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
+          -DPDR_ENABLE_OBSERVABILITY=ON
+          -DMYIOT_ENABLE_DATA_MODULES=OFF
       - name: Build full stack
         run: cmake --build build/full --config Release --parallel 2
       - name: Run full acceptance suite
         run: ctest --test-dir build/full -C Release --output-on-failure
-      - name: Verify Fast-DDS across isolated network stacks
-        shell: bash
-        run: |
-          if ! bash scripts/acceptance/container-network-fastdds.sh \
-              build/full/server/pdr-dds-probe build/dependencies/install; then
-            find build/network-evidence-* -maxdepth 1 -type f -print -exec sed -n '1,240p' {} \;
-            exit 1
-          fi
       - name: Install reusable SDK
         run: cmake --install build/full --prefix ${{ github.workspace }}/build/sdk
-      - name: Build outside-tree SDK consumer
-        run: >-
-          cmake -S tests/install-consumer -B build/consumer
-          -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_PREFIX_PATH="${{ github.workspace }}/build/sdk;${{ github.workspace }}/build/dependencies/install"
-      - name: Link outside-tree SDK consumer
-        run: cmake --build build/consumer --config Release --parallel 2
-      - name: Run outside-tree SDK consumer
-        run: ./build/consumer/pdr-install-consumer

@@ -1,5 +1,27 @@
 # PocoDDSRuntime 平台化开发计划
 
+## 当前执行状态（2026-07-25）
+
+本计划不是“全部已完成”的功能清单。以下状态已按仓库代码、配置、CI 和可执行测试重新核验：
+
+| 项目 | 状态 | 当前证据 | 尚未完成 |
+| --- | --- | --- | --- |
+| 1. Application/Workflow | 基础完成 | `application/` 已提供公共命令上下文、Result/Error、注册表、顺序步骤、取消和反向补偿；`application-smoke` 通过 | 现有 UI、REST、DDS 和具体业务按产品迭代逐步迁移 |
+| 2. 通信契约 | 基础完成 | OpenAPI 已登记现有管理/健康 API；AsyncAPI 已登记当前业务 Trace、心跳和 Qt3D Topic；契约检查通过 | 发布版本之间的自动语义 Diff 尚未接入第三方工具 |
+| 3. 配置中心与校验 | 主机版完成 | `platform/configuration` 在 Runtime 初始化时执行必填、类型和范围 fail-fast，Schema 和自动测试已同步 | WebUI 配置导入/导出和审计属于后续产品功能 |
+| 4. 可靠性公共库 | 基础完成 | 已提供 Deadline、退避、Circuit Breaker、Bulkhead、有界队列、幂等窗口、Lease、ShutdownSignal 和故障分类；测试通过 | 具体设备的安全复位和重连策略由设备实现逐项接入 |
+| 5. 健康状态模型 | 主机版完成 | 已提供 `IHealthContributor` 聚合，并接入 `/health/live`、`/health/ready`、`/health/detail`、Bundle 和子进程状态；Home WebUI 展示 LIVE/READY、组件详情和降级状态 | 真实设备贡献者随设备接入；板端验收本轮暂缓 |
+| 6. Metrics/结构化日志 | 部分完成 | 已有 SystemMonitoring API、Home 资源图表、业务 Trace、健康总览和统一日志格式器 | OpenTelemetry Metrics、协议/DDS/工作流业务指标不完整 |
+| 7. 通用持久化/迁移 | 基础完成 | `platform/persistence` 已提供 `IRepository`、`IUnitOfWork`、有序 MigrationPlan 和测试 | PostgreSQL、备份恢复属于具体部署适配；生产数据库环境本轮不作为完成条件 |
+| 8. 安全基线 | 未完成 | 当前 SimpleAuth 仅适合兼容/本地场景 | Argon2id/OIDC、RBAC、DDS Security、Secret Provider、SBOM 等未实现 |
+| 9. 升级与回滚 | 未完成 | Bundle/运行时已有构建和部署基础 | 签名、兼容矩阵、原子升级、失败回滚和设备 A/B 适配未实现 |
+| 10. 分层测试体系 | 主机自动化完成 | 已覆盖组件、进程、DDS、SQLite、配置非法值、Workflow 补偿、可靠性、健康、持久化、契约和文档检查 | 截图指定的真实 HIL 与 24/72 小时长稳本轮暂缓 |
+| 11. CI/CD | 基础修复完成 | CI 已改用真实目录、真实 CMake 开关和统一 `build/install`，并移除不存在的验收目标/SDK consumer；格式检查不再引用已删除目录 | 本次只完成静态审计和本机测试；云端 Linux 工作流仍需推送后验证，Windows/macOS CI 需要在依赖缓存方案明确后恢复 |
+| 12. 文档即代码 | 基础完成 | 已补分层规则、部署 Profile、ADR 约定、Runbook、排障、恢复、新服务/设备/协议/子进程指南、兼容矩阵及 CI 检查 | MkDocs/Doxygen 站点属于展示增强，不阻塞平台使用 |
+| 三种部署 Profile | 基础完成 | 根目录 `CMakePresets.json` 已提供 `embedded`、`edge-test`、`server` | 各 Bundle 的细粒度 Feature Flag 尚未全部建立 |
+
+本轮暂缓项按用户确认固定为：真实板卡 HIL、PetaLinux 板端验收、生产 OIDC/企业账号、生产证书体系、OTA/A-B 分区闭环、GitHub 云端 CI 结果、24/72 小时长稳。它们不能用主机测试替代，也不计入本轮未完成缺陷。
+
 ## 总体结论
 
 当前 PocoDDSRuntime 已经具备不错的“运行时骨架”，包括 OSP Bundle、Fast DDS、设备/协议抽象、多进程管理、业务链路追踪、Web 管理界面和组件文档。

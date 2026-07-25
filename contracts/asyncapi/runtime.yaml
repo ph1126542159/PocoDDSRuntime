@@ -1,0 +1,42 @@
+asyncapi: 3.0.0
+info:
+  title: PocoDDSRuntime Event Contracts
+  version: 0.1.0
+channels:
+  observabilitySpan:
+    address: pdr.observability.span
+    messages: { envelope: { $ref: "#/components/messages/Envelope" } }
+  heartbeatRequest:
+    address: pdr.process.heartbeat.request
+    messages: { envelope: { $ref: "#/components/messages/Envelope" } }
+  heartbeatResponse:
+    address: pdr.process.heartbeat.response
+    messages: { envelope: { $ref: "#/components/messages/Envelope" } }
+  qt3dWorkflowRequest:
+    address: pdr.qt3d.workflow.request
+    messages: { envelope: { $ref: "#/components/messages/Envelope" } }
+  qt3dWorkflowResponse:
+    address: pdr.qt3d.workflow.response
+    messages: { envelope: { $ref: "#/components/messages/Envelope" } }
+  qt3dWindowCommand:
+    address: pdr.qt3d.window.command
+    messages: { envelope: { $ref: "#/components/messages/Envelope" } }
+  qt3dWindowResponse:
+    address: pdr.qt3d.window.response
+    messages: { envelope: { $ref: "#/components/messages/Envelope" } }
+operations: {}
+components:
+  messages:
+    Envelope:
+      payload:
+        type: object
+        required: [sequence, kind, operation, correlationId, payload]
+        properties:
+          sequence: { type: integer, minimum: 0 }
+          kind: { type: string }
+          operation: { type: string }
+          correlationId: { type: string }
+          traceParent: { type: string }
+          businessName: { type: string }
+          businessInstanceId: { type: string }
+          payload: { type: string }

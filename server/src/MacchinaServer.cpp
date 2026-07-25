@@ -28,6 +28,7 @@
 #include "Poco/Util/OptionSet.h"
 #include "Poco/Util/ServerApplication.h"
 #include "PocoDDS/BundleManagement/BundleManager.h"
+#include "PocoDDS/Configuration/ConfigurationValidator.h"
 #include "PocoDDS/ProcessManagement/SubprocessManager.h"
 #if defined(PDR_ENABLE_OBSERVABILITY)
 #include "PocoDDS/DDS/Runtime.h"
@@ -172,6 +173,7 @@ class MacchinaServer final : public Poco::Util::ServerApplication
             loadConfiguration();
         for (const auto& configuration : _configurationFiles)
             loadConfiguration(configuration);
+        PocoDDS::Configuration::ConfigurationValidator().validateOrThrow(config());
 
         // Custom configuration files are loaded by this composition root after
         // Poco has performed its initial logging setup. Reconfigure explicitly
