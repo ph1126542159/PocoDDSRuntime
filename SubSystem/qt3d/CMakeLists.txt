@@ -5,6 +5,12 @@ if(NOT PDR_ENABLE_QT3D_SUBPROCESS)
     return()
 endif()
 
+if(NOT PDR_ENABLE_OBSERVABILITY)
+    message(STATUS
+        "pdr-qt3d-subprocess is disabled because PDR_ENABLE_OBSERVABILITY is OFF.")
+    return()
+endif()
+
 find_program(PDR_QTPATHS_EXECUTABLE NAMES qtpaths6 qtpaths)
 if(PDR_QTPATHS_EXECUTABLE)
     execute_process(
