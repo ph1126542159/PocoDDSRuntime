@@ -4,6 +4,8 @@ PocoDDSRuntime is a C++17 OSP service container derived from the macchina.io
 composition model. OSP owns local Bundle lifecycle and service registration;
 Fast DDS replaces the former RemotingNG cross-process proxy/skeleton layer.
 
+PocoDDSRuntime 是面向复杂 C++ 应用的通用运行时框架，以多进程隔离、OSP Bundle 模块化和 Fast DDS 分布式通信为核心，支持桌面、边缘、设备控制及分布式服务系统快速构建。
+
 The project deliberately does not contain RemotingNG-generated `RemoteObject`,
 `Skeleton`, `ServerHelper` or `EventDispatcher` code.
 
