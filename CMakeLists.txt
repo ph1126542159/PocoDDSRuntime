@@ -205,7 +205,7 @@ install(DIRECTORY "${PDR_BUNDLE_OUTPUT_DIRECTORY}/"
     DESTINATION "${CMAKE_INSTALL_BINDIR}/bundles"
     FILES_MATCHING PATTERN "*.bndl")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
-              "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-subprocesses.properties"
+              "${PDR_GENERATED_SUBPROCESS_CONFIG}"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
 # Public macchina.io platform extensions retained by this runtime.

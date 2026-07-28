@@ -129,6 +129,14 @@ function(myiot_copy_windows_runtime_dlls target_name)
                 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
             VERBATIM)
         file(GLOB runtime_dlls "${PDR_INSTALL_PREFIX}/bin/*.dll")
+        if(OPENSSL_INCLUDE_DIR)
+            get_filename_component(openssl_root "${OPENSSL_INCLUDE_DIR}" DIRECTORY)
+            file(GLOB openssl_runtime_dlls
+                "${openssl_root}/bin/libcrypto*.dll"
+                "${openssl_root}/bin/libssl*.dll")
+            list(APPEND runtime_dlls ${openssl_runtime_dlls})
+        endif()
+        list(REMOVE_DUPLICATES runtime_dlls)
         foreach(runtime_dll IN LISTS runtime_dlls)
             add_custom_command(TARGET myiot_windows_runtime_dlls POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
