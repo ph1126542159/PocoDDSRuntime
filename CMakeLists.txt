@@ -104,18 +104,18 @@ list(PREPEND CMAKE_PREFIX_PATH "${PDR_INSTALL_PREFIX}")
 option(MYIOT_ENABLE_DATA_MODULES "Build Poco Data-related OSP bundles" OFF)
 option(PDR_ENABLE_OBSERVABILITY
     "Build the OpenTelemetry business observability module" ON)
+option(PDR_AUTO_BOOTSTRAP_DEPENDENCIES
+    "Build missing third-party dependencies during project configuration" ON)
 set(SHARED_LIBRARY_VERSION 1 CACHE STRING "Compatibility version for migrated platform libraries")
 
 include(PDRWarnings)
 include(PDRProcessLayout)
-include(PDRPoco)
-include(PDRFastDDS)
-include(PDRPahoMqtt)
+include(PDRDependencies)
+pdr_bootstrap_missing_dependencies()
 pdr_require_poco()
 pdr_require_fastdds()
 pdr_require_paho_mqtt()
 if(PDR_ENABLE_OBSERVABILITY)
-    include(PDROpenTelemetry)
     pdr_require_opentelemetry()
 endif()
 

@@ -124,6 +124,10 @@ function(myiot_copy_windows_runtime_dlls target_name)
     # work and remains a prerequisite of every consumer.
     if(NOT TARGET myiot_windows_runtime_dlls)
         add_custom_target(myiot_windows_runtime_dlls)
+        add_custom_command(TARGET myiot_windows_runtime_dlls POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+            VERBATIM)
         file(GLOB runtime_dlls "${PDR_INSTALL_PREFIX}/bin/*.dll")
         foreach(runtime_dll IN LISTS runtime_dlls)
             add_custom_command(TARGET myiot_windows_runtime_dlls POST_BUILD

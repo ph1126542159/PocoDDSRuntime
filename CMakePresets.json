@@ -1,10 +1,9 @@
 {
-  "version": 6,
+  "version": 5,
   "configurePresets": [
     {
       "name": "base",
       "hidden": true,
-      "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
@@ -38,12 +37,28 @@
         "PDR_ENABLE_OBSERVABILITY": "ON",
         "MYIOT_ENABLE_DATA_MODULES": "ON"
       }
+    },
+    {
+      "name": "full",
+      "inherits": "server",
+      "displayName": "Full build (all targets)",
+      "description": "Default desktop profile; automatically bootstraps all dependencies",
+      "binaryDir": "${sourceDir}/build/full",
+      "cacheVariables": {
+        "PDR_AUTO_BOOTSTRAP_DEPENDENCIES": "ON"
+      }
     }
   ],
   "buildPresets": [
     { "name": "embedded", "configurePreset": "embedded" },
     { "name": "edge-test", "configurePreset": "edge-test" },
-    { "name": "server", "configurePreset": "server" }
+    { "name": "server", "configurePreset": "server" },
+    {
+      "name": "full",
+      "configurePreset": "full",
+      "configuration": "Release",
+      "jobs": 2
+    }
   ],
   "testPresets": [
     {

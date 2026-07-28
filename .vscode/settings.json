@@ -1,0 +1,7 @@
+{
+    "cmake.useCMakePresets": "always",
+    "cmake.configureOnOpen": true,
+    "cmake.configureArgs": [],
+    "cmake.configurePreset": "full",
+    "cmake.buildPreset": "full"
+}
