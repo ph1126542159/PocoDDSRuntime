@@ -38,6 +38,23 @@ function(pdr_configure_subprocess target)
             "$<TARGET_FILE_DIR:${target}>"
         COMMAND_EXPAND_LISTS
         VERBATIM)
+
+    # OpenSSL is discovered through FindOpenSSL and its imported targets do not
+    # expose the Windows runtime DLLs to TARGET_RUNTIME_DLLS.  Copy those DLLs
+    # explicitly so subprocess executables are independently launchable.
+    if(WIN32 AND OPENSSL_INCLUDE_DIR)
+        get_filename_component(openssl_root "${OPENSSL_INCLUDE_DIR}" DIRECTORY)
+        file(GLOB openssl_runtime_dlls
+            "${openssl_root}/bin/libcrypto*.dll"
+            "${openssl_root}/bin/libssl*.dll")
+        foreach(openssl_runtime_dll IN LISTS openssl_runtime_dlls)
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${openssl_runtime_dll}"
+                    "$<TARGET_FILE_DIR:${target}>"
+                VERBATIM)
+        endforeach()
+    endif()
 endfunction()
 
 function(pdr_configure_test_output_tree directory)
