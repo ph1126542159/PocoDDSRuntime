@@ -638,9 +638,9 @@ void WebEventServiceImpl::receiveImpl(Poco::SharedPtr<Poco::Net::WebSocket> pWS)
 				{
 					std::string data;
 					while (it != end) data += *it++;
-					for (std::set<std::string>::const_iterator it = subjectNames.begin(); it != subjectNames.end(); ++it)
+					for (std::set<std::string>::const_iterator subjectIt = subjectNames.begin(); subjectIt != subjectNames.end(); ++subjectIt)
 					{
-						if (*it == SYSTEM_PING)
+						if (*subjectIt == SYSTEM_PING)
 						{
 							std::string pong(NOTIFY);
 							pong += ' ';
@@ -653,7 +653,7 @@ void WebEventServiceImpl::receiveImpl(Poco::SharedPtr<Poco::Net::WebSocket> pWS)
 						}
 						else
 						{
-							notify(*it, data);
+							notify(*subjectIt, data);
 						}
 					}
 				}

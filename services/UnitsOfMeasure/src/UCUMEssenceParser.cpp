@@ -35,7 +35,7 @@ public:
 	{
 	}
 
-	void startElement(const Poco::XML::XMLString& uri, const Poco::XML::XMLString& localName, const Poco::XML::XMLString& qname, const Poco::XML::Attributes& attributes)
+	void startElement(const Poco::XML::XMLString&, const Poco::XML::XMLString& localName, const Poco::XML::XMLString&, const Poco::XML::Attributes& attributes)
 	{
 		if (localName == "prefix" || localName == "base-unit" || localName == "unit")
 		{
@@ -53,7 +53,7 @@ public:
 		}
 	}
 
-	void endElement(const Poco::XML::XMLString& uri, const Poco::XML::XMLString& localName, const Poco::XML::XMLString& qname)
+	void endElement(const Poco::XML::XMLString&, const Poco::XML::XMLString& localName, const Poco::XML::XMLString&)
 	{
 		if (localName == "prefix")
 		{
@@ -101,7 +101,7 @@ public:
 		}
 	}
 
-	void storeContent(const std::string& elem, const std::string& content)
+	void storeContent(const std::string& elem, const std::string&)
 	{
 		Poco::trimInPlace(_chars);
 		_attrs[elem] = (_chars);

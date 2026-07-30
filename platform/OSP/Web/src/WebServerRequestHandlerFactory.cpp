@@ -33,7 +33,7 @@ WebServerRequestHandlerFactory::~WebServerRequestHandlerFactory()
 }
 
 
-Poco::Net::HTTPRequestHandler* WebServerRequestHandlerFactory::createRequestHandler(const Poco::Net::HTTPServerRequest& request)
+Poco::Net::HTTPRequestHandler* WebServerRequestHandlerFactory::createRequestHandler(const Poco::Net::HTTPServerRequest&)
 {
 	return new WebServerRequestHandler(_dispatcher, _secure);
 }

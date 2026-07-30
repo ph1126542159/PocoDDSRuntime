@@ -198,7 +198,7 @@ void WebServerExtensionPoint::handleCommon(Bundle::ConstPtr pBundle, Poco::XML::
 }
 
 
-void WebServerExtensionPoint::onBundleStopped(const void* pSender, BundleEvent& ev)
+void WebServerExtensionPoint::onBundleStopped(const void*, BundleEvent& ev)
 {
 	FastMutex::ScopedLock lock(_mutex);
 

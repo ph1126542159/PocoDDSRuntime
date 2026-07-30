@@ -44,7 +44,7 @@ public:
 	virtual int currentThreads() const = 0;
 		/// Returns the number of currently used connection threads.
 
-	virtual int totalConnections() const = 0;
+	virtual Poco::Int64 totalConnections() const = 0;
 		/// Returns the total number of handled connections.
 		
 	virtual int currentConnections() const = 0;

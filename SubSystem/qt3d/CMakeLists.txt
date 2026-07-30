@@ -74,6 +74,7 @@ if(WIN32 AND TARGET Qt6::windeployqt)
         COMMAND $<TARGET_FILE:Qt6::windeployqt>
             --no-translations
             --no-system-d3d-compiler
+            --no-compiler-runtime
             "$<TARGET_FILE:pdr-qt3d-subprocess>"
         VERBATIM)
 endif()

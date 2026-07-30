@@ -107,7 +107,7 @@ void WebFilterExtensionPoint::handleFilter(Bundle::ConstPtr pBundle, Poco::XML::
 }
 
 
-void WebFilterExtensionPoint::onBundleStopped(const void* pSender, BundleEvent& ev)
+void WebFilterExtensionPoint::onBundleStopped(const void*, BundleEvent& ev)
 {
 	FastMutex::ScopedLock lock(_mutex);
 

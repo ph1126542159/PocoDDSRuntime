@@ -61,7 +61,7 @@ public:
 		return _server.currentThreads();
 	}
 
-	int totalConnections() const
+	Poco::Int64 totalConnections() const
 	{
 		return _server.totalConnections();
 	}
@@ -183,7 +183,7 @@ public:
 				
 				pContext->logger().information(format("Starting HTTPS server on port %d.", port));
 				
-				Poco::Net::SocketAddress addr(host, port); 
+				Poco::Net::SocketAddress addr(host, static_cast<Poco::UInt16>(port));
 				SecureServerSocket svs(addr);
 				_pHTTPServer = new HTTPServer(new WebServerRequestHandlerFactory(*pWebServerDispatcher, true), pWebServerDispatcher->threadPool(), svs, pParams);
 				_pHTTPServer->start();

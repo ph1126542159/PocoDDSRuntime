@@ -182,7 +182,7 @@ void WebSession::updateVersion(Poco::Int64 version)
 }
 
 
-void WebSession::onBundleStopping(const void* pSender, BundleEvent& ev)
+void WebSession::onBundleStopping(const void*, BundleEvent& ev)
 {
 	if (ev.bundle() == _pContext->thisBundle())
 	{

@@ -210,8 +210,8 @@ NetworkEnvironmentServiceImpl::~NetworkEnvironmentServiceImpl()
 
 std::string NetworkEnvironmentServiceImpl::findActiveNetworkInterface(IPVersion ipVersion)
 {
-	Poco::Net::NetworkInterface::NetworkInterfaceList ifs = Poco::Net::NetworkInterface::list();
-	for (Poco::Net::NetworkInterface::NetworkInterfaceList::iterator it = ifs.begin(); it != ifs.end(); ++it)
+	Poco::Net::NetworkInterface::List ifs = Poco::Net::NetworkInterface::list();
+	for (Poco::Net::NetworkInterface::List::iterator it = ifs.begin(); it != ifs.end(); ++it)
 	{
 		if (!it->address().isWildcard() && !it->address().isLoopback()) 
 		{

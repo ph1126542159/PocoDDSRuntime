@@ -40,7 +40,7 @@ namespace WebEvent {
 class WebEventRequestHandlerFactory: public WebRequestHandlerFactory
 {
 public:
-	Poco::Net::HTTPRequestHandler* createRequestHandler(const Poco::Net::HTTPServerRequest& request)
+	Poco::Net::HTTPRequestHandler* createRequestHandler(const Poco::Net::HTTPServerRequest&)
 	{
 		return new WebEventRequestHandler(_pWebEventServiceImpl, context());
 	}

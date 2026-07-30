@@ -418,7 +418,7 @@ std::string WebSessionManager::createToken(const Poco::Net::HTTPServerRequest& r
 	Poco::RandomInputStream ris;
 	for (int i = 0; i < 32; i++)
 	{
-		char c = ris.get();
+		char c = static_cast<char>(ris.get());
 		sha1.update(c);
 	}
 	sha1.update(request.clientAddress().toString());

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Activity, ArrowRight, KeyRound, ShieldCheck, UserRound } from "lucide-react";
 import "./styles.css";
@@ -11,6 +11,11 @@ function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const restoreForm = () => setBusy(false);
+    window.addEventListener("pageshow", restoreForm);
+    return () => window.removeEventListener("pageshow", restoreForm);
+  }, []);
   const submit = event => {
     event.preventDefault();
     setBusy(true); setError("");

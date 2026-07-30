@@ -63,7 +63,7 @@ public:
 		return _server.currentThreads();
 	}
 
-	int totalConnections() const
+	Poco::Int64 totalConnections() const
 	{
 		return _server.totalConnections();
 	}
@@ -185,7 +185,7 @@ public:
 				
 				pContext->logger().information(format("Starting HTTP server on port %d.", port));
 				
-				Poco::Net::SocketAddress addr(host, port); 
+				Poco::Net::SocketAddress addr(host, static_cast<Poco::UInt16>(port));
 				ServerSocket svs(addr);
 				_pHTTPServer = new HTTPServer(new WebServerRequestHandlerFactory(*pWebServerDispatcher, false), pWebServerDispatcher->threadPool(), svs, pParams);
 				_pHTTPServer->start();
