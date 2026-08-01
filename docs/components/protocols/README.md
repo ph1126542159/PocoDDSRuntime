@@ -14,19 +14,27 @@
 | WebTunnel | 服务描述接口 | 配合平台 WebTunnel |
 | XBee | API 帧和 IO Sample | 串口 |
 
-各协议独立链接；聚合目标 `PocoDDS::Protocols` 仅用于表达协议层依赖。
+安装后的 CMake Package 会导出所有协议目标。优先独立链接实际使用的协议；聚合目标 `PocoDDS::Protocols` 用于确实需要完整协议集合的产品：
 
 ## 实现和接入规则
 
 所有有生命周期的协议实现 `PocoDDS::Protocols::Protocol`，统一暴露 `name()`、`open()`、`close()` 和 `isOpen()`。协议类负责连接和原始报文，不负责把业务字段注册为 OSP 服务；设备层或业务 Bundle 完成该映射。
 
+MQTT、ROS 和 UDP 返回统一的 `ProtocolDiagnostics` 快照，包括成功/失败操作、重连、收发消息与字节、超时、回调异常和最后错误。诊断读取是线程安全的，Runtime/Web 层不需要针对每个协议重新定义计数字段。
+
 ```cmake
+find_package(PocoDDSRuntime CONFIG REQUIRED COMPONENTS Modbus CAN)
 target_link_libraries(my_bundle PRIVATE
     PocoDDS::Modbus
     PocoDDS::CAN)
+# 完整集合需请求 COMPONENTS Protocols 后链接 PocoDDS::Protocols
 ```
 
-协议库原则上不主动读取 `pdr-runtime.properties`。DeviceGateway 读取 `pdr.modbus.*`、`pdr.serial.*`、`pdr.can.*`、`pdr.xbee.*` 等配置，再把参数传给协议/设备构造函数。MQTT、ROS、UDP、BtLE 和 WebTunnel 尚无统一运行时配置，需由使用者定义。
+组件化 Package 只加载所需传递依赖。例如基础 `SDK` 或 CAN 不要求 Paho；MQTT 会自动加载 Paho/OpenSSL，ROS 和 WebTunnel 会加载 NetSSL。未知组件在配置阶段失败。
+
+协议库原则上不主动读取 `pdr-runtime.properties`。DeviceGateway 读取 `pdr.modbus.*`、`pdr.serial.*`、`pdr.can.*`、`pdr.xbee.*` 等设备配置；ProtocolGateway 读取 `pdr.mqtt.*`、`pdr.ros.*` 和 `pdr.udp.*` 多实例配置。两个 Bundle 都把参数传给协议/设备构造函数，协议库本身保持可独立复用。BtLE 和 WebTunnel 尚无统一运行时配置，需由使用者定义。
+
+ProtocolGateway 将 MQTT、ROS Bridge、UDP 实例注册为 `pdr.protocol.*` OSP 服务。`/api/v1/protocols` 返回配置身份、打开状态和统一诊断；所有 `required=true` 实例必须打开，否则启动失败或 readiness 下降。可选实例打开失败不会阻断 Runtime，但会保留关闭状态和最后错误供 Web/API 排查。
 
 ## 测试
 

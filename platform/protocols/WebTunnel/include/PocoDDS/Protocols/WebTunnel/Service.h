@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -25,18 +27,32 @@ public:
 
     void setConnectionHandler(ConnectionHandler handler)
     {
+        std::lock_guard lock(_handlerMutex);
         _connectionHandler = std::move(handler);
     }
 
-protected:
-    void reportConnection(bool connected) const
+    [[nodiscard]] std::size_t connectionHandlerFailures() const noexcept
     {
-        if (_connectionHandler)
-            _connectionHandler(connected);
+        return _connectionHandlerFailures.load(std::memory_order_relaxed);
+    }
+
+protected:
+    void reportConnection(bool connected) const noexcept
+    {
+        ConnectionHandler handler;
+        {
+            std::lock_guard lock(_handlerMutex);
+            handler = _connectionHandler;
+        }
+        if (!handler) return;
+        try { handler(connected); }
+        catch (...) { _connectionHandlerFailures.fetch_add(1, std::memory_order_relaxed); }
     }
 
 private:
+    mutable std::mutex _handlerMutex;
     ConnectionHandler _connectionHandler;
+    mutable std::atomic<std::size_t> _connectionHandlerFailures{0};
 };
 
 } // namespace PocoDDS::Protocols::WebTunnel

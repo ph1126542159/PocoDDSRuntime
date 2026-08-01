@@ -6,6 +6,8 @@
 
 开发时修改源文件后执行对应 npm build，再执行 CMake 构建打包；不要只修改生成后的 `bundle/webui/assets`。
 
+Home 的 JS/CSS 文件名包含内容哈希，`index.html` 由 Vite 自动引用当前版本，避免 Runtime Bundle 更新后浏览器继续使用旧诊断页面。CMake 以 `index.html` 作为前端构建产物，不依赖固定的 `app.js` 或 `app.css`。
+
 ## 构建链和服务器配置
 
 ```text

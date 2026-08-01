@@ -1,10 +1,14 @@
 #pragma once
 
+#include "PocoDDS/Protocols/Protocol.h"
+#include "PocoDDS/Protocols/ProtocolDiagnostics.h"
+
 #include <Poco/JSON/Object.h>
 #include <Poco/Net/WebSocket.h>
 #include <Poco/URI.h>
 
 #include <functional>
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -13,9 +17,22 @@
 namespace PocoDDS::Protocols::ROS
 {
 
-class BridgeClient
+class BridgeClient final : public PocoDDS::Protocols::DiagnosticProtocol
 {
 public:
+    struct Options
+    {
+        Poco::URI uri;
+        std::size_t maximumMessageSize{1024 * 1024};
+        int connectTimeoutSeconds{10};
+        std::string authorization;
+        std::string trustStore;
+        std::string clientCertificate;
+        std::string privateKey;
+        bool verifyServerCertificate{true};
+        bool verifyHostname{true};
+    };
+
     struct SubscribeOptions
     {
         std::string type;
@@ -27,11 +44,17 @@ public:
 
     using MessageHandler = std::function<void(const Poco::JSON::Object::Ptr&)>;
 
-    explicit BridgeClient(Poco::URI uri);
+    explicit BridgeClient(Options options);
+    explicit BridgeClient(Poco::URI uri, std::size_t maximumMessageSize = 1024 * 1024);
     ~BridgeClient();
 
     BridgeClient(const BridgeClient&) = delete;
     BridgeClient& operator=(const BridgeClient&) = delete;
+
+    std::string name() const override;
+    void open() override;
+    void close() noexcept override;
+    bool isOpen() const noexcept override;
 
     void connect();
     void disconnect();
@@ -44,6 +67,7 @@ public:
 
     Poco::JSON::Object::Ptr receiveMessage(const Poco::Timespan& timeout);
     void setMessageHandler(MessageHandler handler);
+    ProtocolDiagnostics diagnostics() const override;
 
     static std::string makeSubscribeRequest(
         const std::string& topic,
@@ -55,9 +79,20 @@ private:
     void sendText(const std::string& payload);
 
     Poco::URI _uri;
+    std::size_t _maximumMessageSize;
+    int _connectTimeoutSeconds;
+    std::string _authorization;
+    std::string _trustStore;
+    std::string _clientCertificate;
+    std::string _privateKey;
+    bool _verifyServerCertificate;
+    bool _verifyHostname;
     std::unique_ptr<Poco::Net::WebSocket> _socket;
+    std::string _receiveBuffer;
+    bool _receivingTextFragments{false};
     std::map<std::string, std::string> _subscriptions;
     MessageHandler _handler;
+    ProtocolDiagnostics _diagnostics;
     mutable std::mutex _mutex;
 };
 

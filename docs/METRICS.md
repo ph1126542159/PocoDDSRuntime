@@ -72,4 +72,4 @@ Invoke-RestMethod http://127.0.0.1:9080/api/v1/metrics
 
 `metrics` 测试会启动本地 HTTP 接收器，验证 `/v1/metrics`、资源属性、指标正文和直方图桶，而不只验证内存快照。
 
-首页侧栏的“指标中心”提供 Runtime、DDS、设备、工作流、协议汇总、Bluetooth LE、WebTunnel、HTTP、系统以及导出缓存十个子页面。生产监控栈位于 `deploy/observability`，包含 mTLS Collector、Prometheus、Grafana Dashboard 和告警规则。
+首页侧栏的“指标中心”提供 Runtime、DDS、设备、工作流、协议汇总、MQTT、ROS Bridge、UDP、Bluetooth LE、WebTunnel、HTTP、系统以及导出缓存十三个子页面。运行总览还直接显示 MQTT、ROS Bridge、UDP 的操作数、错误数和收发字节。生产监控栈位于 `deploy/observability`，包含 mTLS Collector、Prometheus、Grafana Dashboard 和告警规则。

@@ -10,6 +10,7 @@ add_library(WebTunnel ${SRCS})
 add_library(Poco::WebTunnel ALIAS WebTunnel)
 set_target_properties(WebTunnel
     PROPERTIES
+    EXPORT_NAME WebTunnel
     VERSION "1" SOVERSION "1"
     OUTPUT_NAME PocoWebTunnel
     DEFINE_SYMBOL WebTunnel_EXPORTS
@@ -24,4 +25,8 @@ target_include_directories(WebTunnel
 )
 
 POCO_INSTALL(WebTunnel)
+install(TARGETS WebTunnel EXPORT PocoDDSRuntimeTargets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 POCO_GENERATE_PACKAGE(WebTunnel)

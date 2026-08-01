@@ -10,11 +10,9 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        entryFileNames: "assets/app.js",
-        chunkFileNames: "assets/[name].js",
-        assetFileNames: asset => asset.name?.endsWith(".css")
-          ? "assets/app[extname]"
-          : "assets/[name][extname]"
+        entryFileNames: "assets/app-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]"
       }
     }
   }

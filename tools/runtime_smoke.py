@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import json
 import os
 import re
@@ -14,7 +15,9 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+from ctypes import wintypes
 from pathlib import Path
 
 
@@ -83,8 +86,44 @@ def stop_tree(process: subprocess.Popen[bytes]) -> None:
             os.killpg(process.pid, signal.SIGKILL)
 
 
-def probe(url: str, timeout: float) -> tuple[int, str]:
-    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+def process_resources(process: subprocess.Popen[bytes]) -> tuple[int, int]:
+    if os.name != "nt":
+        status = Path(f"/proc/{process.pid}/status").read_text(encoding="utf-8")
+        rss_line = next(line for line in status.splitlines() if line.startswith("VmRSS:"))
+        return int(rss_line.split()[1]) * 1024, len(list(Path(f"/proc/{process.pid}/fd").iterdir()))
+
+    class Counters(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+            ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+            ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t),
+            ("PrivateUsage", ctypes.c_size_t),
+        ]
+    counters = Counters()
+    counters.cb = ctypes.sizeof(counters)
+    handle = wintypes.HANDLE(process._handle)  # type: ignore[attr-defined]
+    if not ctypes.windll.psapi.GetProcessMemoryInfo(  # type: ignore[attr-defined]
+        handle, ctypes.byref(counters), counters.cb
+    ):
+        raise OSError("GetProcessMemoryInfo failed")
+    count = wintypes.DWORD()
+    if not ctypes.windll.kernel32.GetProcessHandleCount(  # type: ignore[attr-defined]
+        handle, ctypes.byref(count)
+    ):
+        raise OSError("GetProcessHandleCount failed")
+    return int(counters.WorkingSetSize), int(count.value)
+
+
+def probe(url: str, timeout: float, method: str = "GET", body: str | None = None) -> tuple[int, str]:
+    data = body.encode("utf-8") if body is not None else None
+    headers = {"Accept": "application/json"}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status, response.read().decode("utf-8", errors="replace")
@@ -116,13 +155,36 @@ def parse_args() -> argparse.Namespace:
                         help="regular expression that must appear in an endpoint response")
     parser.add_argument("--clear-code-cache", action="store_true",
                         help="remove WORKING_DIRECTORY/codeCache before launch")
+    parser.add_argument("--follow-html-assets", action="store_true",
+                        help="fetch same-origin script and stylesheet assets referenced by HTML")
+    parser.add_argument("--post", action="append", default=[], metavar="ENDPOINT=JSON",
+                        help="POST JSON after startup probes; may be repeated in sequence")
+    parser.add_argument("--post-delay", type=float, default=0.0,
+                        help="seconds to wait after startup probes before POST actions")
+    parser.add_argument("--post-interval", type=float, default=0.0,
+                        help="seconds to monitor endpoints after each POST action")
+    parser.add_argument("--post-health-interval", type=float, default=5.0,
+                        help="endpoint/resource sampling interval during --post-interval")
+    parser.add_argument("--sample-resources", action="store_true",
+                        help="sample Runtime RSS and handles before, during and after POST actions")
+    parser.add_argument("--resource-baseline-after-post", type=int, default=0, metavar="N",
+                        help="evaluate growth after the Nth POST, excluding one-time lazy startup")
+    parser.add_argument("--max-rss-growth-mib", type=float, default=64.0)
+    parser.add_argument("--max-handle-growth", type=int, default=32)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    if args.timeout <= 0 or args.stability_window < 0:
-        raise SystemExit("--timeout must be positive and --stability-window non-negative")
+    if (args.timeout <= 0 or args.stability_window < 0 or args.post_delay < 0 or
+            args.post_interval < 0 or args.post_health_interval <= 0 or
+            args.resource_baseline_after_post < 0):
+        raise SystemExit(
+            "--timeout and --post-health-interval must be positive; delays and "
+            "--stability-window must be non-negative"
+        )
+    if args.resource_baseline_after_post > len(args.post):
+        raise SystemExit("--resource-baseline-after-post cannot exceed the number of POST actions")
     executable = args.executable.resolve()
     work = (args.working_directory or executable.parent).resolve()
     config = (args.config or work / "pdr-runtime.properties").resolve()
@@ -149,6 +211,14 @@ def main() -> int:
         result["expectedStatuses"] = expected_statuses
     process: subprocess.Popen[bytes] | None = None
     log_stream = None
+    response_bodies: list[tuple[str, str]] = []
+    resource_samples: list[dict[str, object]] = []
+
+    def sample_resources(stage: str) -> None:
+        if not args.sample_resources or process is None:
+            return
+        rss, handles = process_resources(process)
+        resource_samples.append({"stage": stage, "rssBytes": rss, "handles": handles})
     try:
         if not executable.is_file():
             raise FileNotFoundError(f"runtime executable not found: {executable}")
@@ -201,6 +271,7 @@ def main() -> int:
                     last_error = f"{endpoint} returned HTTP {status}, expected {expected}"
                 else:
                     result["probes"].append({"endpoint": endpoint, "status": status, "body": body[:2048]})
+                    response_bodies.append((endpoint, body))
                     pending.pop(0)
                     continue
             except (OSError, urllib.error.URLError) as error:
@@ -208,7 +279,86 @@ def main() -> int:
             time.sleep(0.2)
         if pending:
             raise RuntimeError(last_error)
-        response_content = "\n".join(str(item["body"]) for item in result["probes"])
+        sample_resources("startup")
+        if args.post_delay:
+            post_deadline = time.monotonic() + args.post_delay
+            while time.monotonic() < post_deadline:
+                if process.poll() is not None:
+                    raise RuntimeError(f"runtime exited with code {process.returncode}")
+                time.sleep(min(0.1, post_deadline - time.monotonic()))
+        for post_index, item in enumerate(args.post, start=1):
+            endpoint, separator, body = item.partition("=")
+            if not separator or not endpoint.startswith("/"):
+                raise ValueError(f"invalid --post value (expected /ENDPOINT=JSON): {item}")
+            json.loads(body)
+            status, response_body = probe(
+                f"http://{args.host}:{port}{endpoint}", min(2.0, args.timeout), "POST", body
+            )
+            result["probes"].append(
+                {"endpoint": endpoint, "method": "POST", "status": status,
+                 "body": response_body[:2048]}
+            )
+            response_bodies.append((endpoint, response_body))
+            if status < 200 or status >= 300:
+                raise RuntimeError(f"POST {endpoint} returned HTTP {status}: {response_body[:256]}")
+            sample_resources(f"post-{post_index}")
+            observation_deadline = time.monotonic() + args.post_interval
+            observation_sample = 0
+            while time.monotonic() < observation_deadline:
+                if process.poll() is not None:
+                    raise RuntimeError(f"runtime exited with code {process.returncode}")
+                for observed_endpoint in dict.fromkeys(args.endpoint):
+                    observed_status, observed_body = probe(
+                        f"http://{args.host}:{port}{observed_endpoint}",
+                        min(1.0, args.timeout),
+                    )
+                    expected = expected_statuses.get(observed_endpoint, 200)
+                    if observed_status != expected:
+                        detail = observed_body[:512]
+                        if observed_endpoint == "/health/ready":
+                            try:
+                                _, detail_body = probe(
+                                    f"http://{args.host}:{port}/health/detail",
+                                    min(1.0, args.timeout),
+                                )
+                                detail = detail_body[:1024]
+                            except (OSError, urllib.error.URLError):
+                                pass
+                        raise RuntimeError(
+                            f"{observed_endpoint} returned HTTP {observed_status}, expected "
+                            f"{expected} after POST {post_index}: {detail}"
+                        )
+                observation_sample += 1
+                sample_resources(f"post-{post_index}-observe-{observation_sample}")
+                time.sleep(min(
+                    args.post_health_interval,
+                    max(0.0, observation_deadline - time.monotonic()),
+                ))
+        if args.post:
+            result["posts"] = args.post
+            result["postIntervalSeconds"] = args.post_interval
+            result["postHealthIntervalSeconds"] = args.post_health_interval
+        if args.follow_html_assets:
+            origin = f"http://{args.host}:{port}"
+            references: list[str] = []
+            for source_endpoint, body in response_bodies:
+                for reference in re.findall(
+                    r'''(?:src|href)=["']([^"']+\.(?:js|css)(?:\?[^"']*)?)["']''', body):
+                    references.append(urllib.parse.urljoin(origin + source_endpoint, reference))
+            for asset_url in dict.fromkeys(references):
+                parsed = urllib.parse.urlparse(asset_url)
+                if parsed.hostname != args.host or parsed.port != port:
+                    raise RuntimeError(f"refusing to fetch cross-origin HTML asset: {asset_url}")
+                status, body = probe(asset_url, min(2.0, args.timeout))
+                if status != 200:
+                    raise RuntimeError(f"HTML asset returned HTTP {status}: {asset_url}")
+                endpoint = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+                result["probes"].append(
+                    {"endpoint": endpoint, "status": status, "body": body[:2048]}
+                )
+                response_bodies.append((endpoint, body))
+            result["followedHtmlAssets"] = len(references)
+        response_content = "\n".join(body for _, body in response_bodies)
         missing_bodies = [
             pattern for pattern in args.require_body
             if re.search(pattern, response_content) is None
@@ -224,16 +374,52 @@ def main() -> int:
             if process.poll() is not None:
                 raise RuntimeError(f"runtime exited with code {process.returncode}")
             for endpoint in dict.fromkeys(args.endpoint):
-                status, _ = probe(
+                status, body = probe(
                     f"http://{args.host}:{port}{endpoint}", min(1.0, args.timeout)
                 )
                 expected = expected_statuses.get(endpoint, 200)
                 if status != expected:
+                    detail = body[:512]
+                    if endpoint == "/health/ready":
+                        try:
+                            _, detail_body = probe(
+                                f"http://{args.host}:{port}/health/detail",
+                                min(1.0, args.timeout),
+                            )
+                            detail = detail_body[:1024]
+                        except (OSError, urllib.error.URLError):
+                            pass
                     raise RuntimeError(
                         f"{endpoint} returned HTTP {status}, expected {expected} "
-                        "during stability window"
+                        f"during stability window: {detail}"
                     )
             time.sleep(min(0.25, max(0.0, stability_deadline - time.monotonic())))
+        sample_resources("stable")
+        if resource_samples:
+            baseline_index = 0
+            if args.resource_baseline_after_post:
+                post_stage = f"post-{args.resource_baseline_after_post}"
+                matching_indices = [
+                    index for index, sample in enumerate(resource_samples)
+                    if sample["stage"] == post_stage or
+                    str(sample["stage"]).startswith(post_stage + "-observe-")
+                ]
+                if not matching_indices:
+                    raise RuntimeError(f"resource baseline sample missing after POST {args.resource_baseline_after_post}")
+                baseline_index = matching_indices[-1]
+            evaluated_samples = resource_samples[baseline_index:]
+            rss_growth = int(evaluated_samples[-1]["rssBytes"]) - int(evaluated_samples[0]["rssBytes"])
+            handle_growth = int(evaluated_samples[-1]["handles"]) - int(evaluated_samples[0]["handles"])
+            result["resourceSamples"] = resource_samples
+            result["resourceBaselineStage"] = evaluated_samples[0]["stage"]
+            result["rssGrowthBytes"] = rss_growth
+            result["handleGrowth"] = handle_growth
+            result["peakRssBytes"] = max(int(sample["rssBytes"]) for sample in evaluated_samples)
+            result["peakHandles"] = max(int(sample["handles"]) for sample in evaluated_samples)
+            if rss_growth > args.max_rss_growth_mib * 1024 * 1024:
+                raise RuntimeError(f"Runtime RSS growth exceeded limit: {rss_growth} bytes")
+            if handle_growth > args.max_handle_growth:
+                raise RuntimeError(f"Runtime handle growth exceeded limit: {handle_growth}")
         if args.require_log:
             if log_path is None:
                 raise ValueError("--require-log requires --log or --report")

@@ -1,9 +1,12 @@
 /build/
+/build-*/
 /.vs/
 /.vscode/*
 !/.vscode/settings.json
 *.user
 *.log
+__pycache__/
+*.py[cod]
 /webui/node_modules/
 deploy/observability/certificates/*.key
 deploy/observability/certificates/*.crt

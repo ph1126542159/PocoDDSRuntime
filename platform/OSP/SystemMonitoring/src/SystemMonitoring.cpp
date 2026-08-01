@@ -36,6 +36,7 @@
 #include "PocoDDS/ProcessManagement/SubprocessManager.h"
 #include "PocoDDS/Devices/Device.h"
 #include "PocoDDS/Devices/DeviceService.h"
+#include "PocoDDS/Protocols/ProtocolService.h"
 
 #include <algorithm>
 #include <atomic>
@@ -550,6 +551,138 @@ private:
     Poco::OSP::BundleContext::Ptr _context;
 };
 
+Poco::JSON::Object::Ptr protocolDiagnosticsJson(
+    const PocoDDS::Protocols::ProtocolDiagnostics& details)
+{
+    Poco::JSON::Object::Ptr diagnostics = new Poco::JSON::Object;
+    diagnostics->set("successfulOperations", details.successfulOperations);
+    diagnostics->set("failedOperations", details.failedOperations);
+    diagnostics->set("reconnectAttempts", details.reconnectAttempts);
+    diagnostics->set("sentMessages", details.sentMessages);
+    diagnostics->set("receivedMessages", details.receivedMessages);
+    diagnostics->set("sentBytes", details.sentBytes);
+    diagnostics->set("receivedBytes", details.receivedBytes);
+    diagnostics->set("timeouts", details.timeouts);
+    diagnostics->set("handlerFailures", details.handlerFailures);
+    diagnostics->set("lastError", details.lastError);
+    return diagnostics;
+}
+
+class ProtocolsHandler final : public Poco::Net::HTTPRequestHandler
+{
+public:
+    explicit ProtocolsHandler(Poco::OSP::BundleContext::Ptr context): _context(context) {}
+
+    void handleRequest(Poco::Net::HTTPServerRequest& request,
+                       Poco::Net::HTTPServerResponse& response) override
+    {
+        if (request.getMethod() == Poco::Net::HTTPRequest::HTTP_POST)
+            return handleLifecycle(request, response);
+        if (request.getMethod() != Poco::Net::HTTPRequest::HTTP_GET)
+            return sendJsonError(response, Poco::Net::HTTPResponse::HTTP_METHOD_NOT_ALLOWED,
+                                 "protocol endpoint only supports GET and POST");
+
+        Poco::JSON::Array::Ptr protocols = new Poco::JSON::Array;
+        auto services = _context->registry().find("pdr.protocol");
+        std::sort(services.begin(), services.end(), [](const auto& left, const auto& right) {
+            return left->properties().get("pdr.protocol.id", left->name()) <
+                right->properties().get("pdr.protocol.id", right->name());
+        });
+        for (const auto& service : services)
+        {
+            const auto& properties = service->properties();
+            Poco::JSON::Object::Ptr item = new Poco::JSON::Object;
+            item->set("id", properties.get("pdr.protocol.id", service->name()));
+            item->set("type", properties.get("pdr.protocol.type", "unknown"));
+            item->set("bundle", properties.get("pdr.bundle", ""));
+            item->set("service", service->name());
+            item->set("required", properties.getBool("pdr.protocol.required", false));
+            item->set("autoReconnect",
+                      properties.getBool("pdr.protocol.autoReconnect", false));
+            try
+            {
+                auto provider = service->castedInstance<PocoDDS::Protocols::ProtocolService>();
+                const auto details = provider->diagnostics();
+                item->set("name", provider->name());
+                item->set("open", provider->isOpen());
+                item->set("desiredOpen", provider->desiredOpen());
+                item->set("diagnostics", protocolDiagnosticsJson(details));
+            }
+            catch (const std::exception& error)
+            {
+                item->set("open", false);
+                item->set("error", error.what());
+            }
+            protocols->add(item);
+        }
+        Poco::JSON::Object root;
+        root.set("schemaVersion", 1);
+        root.set("count", protocols->size());
+        root.set("protocols", protocols);
+        response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
+        response.setContentType("application/json; charset=utf-8");
+        response.set("Cache-Control", "no-store");
+        root.stringify(response.send());
+    }
+
+private:
+    void handleLifecycle(Poco::Net::HTTPServerRequest& request,
+                         Poco::Net::HTTPServerResponse& response)
+    {
+        try
+        {
+            Poco::JSON::Parser parser;
+            auto body = parser.parse(request.stream()).extract<Poco::JSON::Object::Ptr>();
+            const std::string id = body->getValue<std::string>("id");
+            const std::string action = body->getValue<std::string>("action");
+            Poco::OSP::ServiceRef::Ptr selected;
+            for (const auto& service : _context->registry().find("pdr.protocol"))
+            {
+                if (service->properties().get("pdr.protocol.id", service->name()) == id)
+                {
+                    selected = service;
+                    break;
+                }
+            }
+            if (!selected)
+                return sendJsonError(response, Poco::Net::HTTPResponse::HTTP_NOT_FOUND,
+                                     "protocol instance not found");
+            auto provider = selected->castedInstance<PocoDDS::Protocols::ProtocolService>();
+            try
+            {
+                if (action == "open") provider->open();
+                else if (action == "close") provider->close();
+                else if (action == "restart") provider->restart();
+                else
+                    return sendJsonError(response, Poco::Net::HTTPResponse::HTTP_BAD_REQUEST,
+                                         "unsupported protocol lifecycle action");
+            }
+            catch (const std::exception& error)
+            {
+                return sendJsonError(response, Poco::Net::HTTPResponse::HTTP_BAD_GATEWAY,
+                                     error.what());
+            }
+
+            Poco::JSON::Object result;
+            result.set("message", "protocol lifecycle operation completed");
+            result.set("id", id);
+            result.set("action", action);
+            result.set("open", provider->isOpen());
+            result.set("diagnostics", protocolDiagnosticsJson(provider->diagnostics()));
+            response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
+            response.setContentType("application/json; charset=utf-8");
+            response.set("Cache-Control", "no-store");
+            result.stringify(response.send());
+        }
+        catch (const std::exception& error)
+        {
+            sendJsonError(response, Poco::Net::HTTPResponse::HTTP_BAD_REQUEST, error.what());
+        }
+    }
+
+    Poco::OSP::BundleContext::Ptr _context;
+};
+
 class ProcessLogsHandler final : public Poco::Net::HTTPRequestHandler
 {
 public:
@@ -783,6 +916,7 @@ private:
                 child->set("host", info.location == "local" ?
                                        Poco::Environment::nodeName() : "远程主机");
                 child->set("manageable", info.manageable);
+                child->set("required", info.required);
                 children->add(child);
             }
             return;
@@ -1457,14 +1591,23 @@ public:
         if (auto* manager = PocoDDS::ProcessManagement::SubprocessManager::active())
         {
             const auto processes = manager->processes();
+            const auto required = static_cast<std::size_t>(std::count_if(
+                processes.begin(), processes.end(),
+                [](const auto& process) { return process.required; }));
+            const auto runningRequired = static_cast<std::size_t>(std::count_if(
+                processes.begin(), processes.end(), [](const auto& process) {
+                    return process.required && process.state == "running";
+                }));
             registry.add(std::make_shared<StaticHealthContributor>(
                 PocoDDS::Health::Report{
                     "subprocesses",
-                    manager->runningCount() == processes.size()
+                    runningRequired == required
                         ? PocoDDS::Health::Status::up
                         : PocoDDS::Health::Status::degraded,
                     std::to_string(manager->runningCount()) + "/" +
-                        std::to_string(processes.size()) + " running"}));
+                        std::to_string(processes.size()) + " running, " +
+                        std::to_string(runningRequired) + "/" +
+                        std::to_string(required) + " required"}));
         }
         else
         {
@@ -1472,6 +1615,38 @@ public:
                 PocoDDS::Health::Report{"subprocesses", PocoDDS::Health::Status::degraded,
                                         "manager not initialized"}));
         }
+
+        const auto protocolServices = _context->registry().find("pdr.protocol");
+        std::size_t openProtocols = 0;
+        std::size_t requiredProtocols = 0;
+        std::size_t openRequiredProtocols = 0;
+        for (const auto& service : protocolServices)
+        {
+            const bool required =
+                service->properties().getBool("pdr.protocol.required", false);
+            if (required) ++requiredProtocols;
+            try
+            {
+                const auto provider =
+                    service->castedInstance<PocoDDS::Protocols::ProtocolService>();
+                if (provider->isOpen())
+                {
+                    ++openProtocols;
+                    if (required) ++openRequiredProtocols;
+                }
+            }
+            catch (...) {}
+        }
+        registry.add(std::make_shared<StaticHealthContributor>(
+            PocoDDS::Health::Report{
+                "protocols",
+                openRequiredProtocols == requiredProtocols
+                    ? PocoDDS::Health::Status::up
+                    : PocoDDS::Health::Status::down,
+                std::to_string(openProtocols) + "/" +
+                    std::to_string(protocolServices.size()) + " open; " +
+                    std::to_string(openRequiredProtocols) + "/" +
+                    std::to_string(requiredProtocols) + " required open"}));
 
         const auto report = registry.collect();
         const std::string path = Poco::URI(request.getURI()).getPath();
@@ -1552,6 +1727,16 @@ public:
         const Poco::Net::HTTPServerRequest&) override
     {
         return new DevicesHandler(context());
+    }
+};
+
+class ProtocolsHandlerFactory final : public Poco::OSP::Web::WebRequestHandlerFactory
+{
+public:
+    Poco::Net::HTTPRequestHandler* createRequestHandler(
+        const Poco::Net::HTTPServerRequest&) override
+    {
+        return new ProtocolsHandler(context());
     }
 };
 
@@ -1674,6 +1859,7 @@ POCO_BEGIN_NAMED_MANIFEST(WebServer, Poco::OSP::Web::WebRequestHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::MetricsHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::OpenTelemetryMetricsHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::DevicesHandlerFactory)
+    POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProtocolsHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessLogsHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessDetailHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessLifecycleHandlerFactory)

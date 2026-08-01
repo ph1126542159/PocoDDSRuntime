@@ -1,4 +1,5 @@
 add_subdirectory(DeviceGateway)
+add_subdirectory(ProtocolGateway)
 add_subdirectory(UnitsOfMeasure)
 add_subdirectory(NetworkEnvironment)
 add_subdirectory(DeviceStatus)

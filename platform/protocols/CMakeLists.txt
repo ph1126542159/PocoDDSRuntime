@@ -1,5 +1,6 @@
 add_library(PDRProtocols INTERFACE)
 add_library(PocoDDS::Protocols ALIAS PDRProtocols)
+set_target_properties(PDRProtocols PROPERTIES EXPORT_NAME Protocols)
 
 add_subdirectory(BtLE)
 add_subdirectory(CAN)
@@ -32,6 +33,13 @@ if(BUILD_TESTING)
     target_link_libraries(pdr-protocol-smoke PRIVATE PocoDDS::Protocols)
     pdr_set_warnings(pdr-protocol-smoke)
     add_test(NAME protocol-smoke COMMAND pdr-protocol-smoke)
+
+    add_executable(pdr-protocol-service-smoke tests/ProtocolServiceSmoke.cpp)
+    target_link_libraries(pdr-protocol-service-smoke PRIVATE PocoDDS::Protocols Poco::OSP)
+    pdr_set_warnings(pdr-protocol-service-smoke)
+    add_test(NAME protocol-service-smoke COMMAND pdr-protocol-service-smoke)
+    set_tests_properties(protocol-service-smoke PROPERTIES LABELS "protocol;release")
 endif()
 
+install(TARGETS PDRProtocols EXPORT PocoDDSRuntimeTargets)
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

@@ -107,9 +107,11 @@ architecture. On a normal Windows build that single prefix is `build/install`.
 Installed applications consume the stable foundation through one CMake target:
 
 ```cmake
-find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED)
+find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED COMPONENTS SDK)
 target_link_libraries(my_application PRIVATE PocoDDS::SDK)
 ```
+
+省略 `COMPONENTS` 与请求 `SDK` 等价，保留已有项目兼容性；基础 SDK 不会查找 Paho MQTT。
 
 `PocoDDS::SDK` exposes Application, DeviceCore, typed configuration, reliability,
 health, persistence and SDK version APIs without requiring business code to include
@@ -117,13 +119,34 @@ Fast DDS, Qt, OSP or OpenTelemetry implementation headers. The
 `sdk-external-consumer` test installs the framework and builds a separate CMake
 project against that installed package.
 
+Protocol applications can link one protocol or the complete installed protocol SDK:
+
+```cmake
+find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED COMPONENTS SDK MQTT UDP)
+target_link_libraries(my_application PRIVATE PocoDDS::MQTT PocoDDS::UDP)
+# Or, when the product genuinely uses the complete protocol set:
+find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED COMPONENTS SDK Protocols)
+target_link_libraries(my_application PRIVATE PocoDDS::Protocols)
+```
+
+The package exports `BtLE`, `CAN`, `Modbus`, `MQTT`, `ROS`, `SerialProtocol`,
+`UDP`, `WebTunnelProtocol` and `XBee` targets with their transitive dependencies.
+The external-consumer test compiles protocol headers and links the aggregate target
+from an isolated install tree.
+
 Use the developer command to check the environment or create a standard module:
 
 ```powershell
-./tools/pdr.ps1 doctor
+./tools/pdr.ps1 doctor --prefix build/install `
+  --report build/reports/developer-doctor.json
+./tools/pdr.ps1 validate-config config/pdr-runtime.properties `
+  --prefix build/install --report build/reports/config-validation.json
 ./tools/pdr.ps1 new service TemperatureService --output services
 ./tools/pdr.ps1 new device CanTemperatureSensor --output platform/devices
 ./tools/pdr.ps1 new workflow BoardPowerOnTest --output application/workflows
+./tools/pdr.ps1 verify platform/devices/CanTemperatureSensor `
+  --prefix build/install --config Release `
+  --report build/reports/can-temperature-sensor-verify.json
 ```
 
 Generated modules contain a public header, implementation, CMake target, smoke
@@ -131,6 +154,16 @@ test and integration README. Existing non-empty output directories are never
 overwritten unless `--force` is explicitly supplied.
 The device template implements the real `PocoDDS::Devices::Device` lifecycle,
 snapshot and command interfaces and includes indexed multi-instance configuration.
+`pdr doctor` validates the selected installed SDK prefix, exported `PocoDDS::SDK`
+target, Poco package, Python, CMake and CTest. Failed checks include actionable
+remedies, and the optional JSON report can be attached to CI or support evidence.
+`pdr validate-config` uses the same C++ validator as Runtime to check layered base
+and site configuration without starting OSP, protocols, listeners or subprocesses.
+The install tree includes `bin/pdr.py`, `bin/pdr.ps1` and `bin/pdr-config-check`;
+the installed CLI automatically uses its own package root as the default prefix.
+`pdr verify` consumes the installed SDK, then configures, builds and runs CTest in
+an isolated temporary directory. Its optional JSON report retains commands, exit
+codes and output without leaving build artifacts beside the generated source.
 
 ## Windows build
 

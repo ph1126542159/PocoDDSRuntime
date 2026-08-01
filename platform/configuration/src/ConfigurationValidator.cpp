@@ -2,6 +2,7 @@
 #include "PocoDDS/Configuration/IndexedConfiguration.h"
 
 #include "Poco/Exception.h"
+#include "Poco/Environment.h"
 #include "Poco/NumberParser.h"
 #include "Poco/Util/AbstractConfiguration.h"
 
@@ -249,6 +250,157 @@ std::vector<ValidationIssue> ConfigurationValidator::validate(
         validateId(instance, "pdr.led");
         if (instance.enabled)
             requireString(config, instance.prefix + ".path", issues);
+    }
+    std::unordered_set<std::string> protocolIds;
+    const auto validateProtocolId = [&](const IndexedInstance& instance) {
+        if (!instance.enabled) return;
+        if (instance.id.empty())
+            issues.push_back({instance.prefix + ".id", "required non-empty string"});
+        else if (!protocolIds.insert(instance.id).second)
+            issues.push_back({instance.prefix + ".id", "duplicate protocol id " + instance.id});
+    };
+    const auto validateProtocolRecovery = [&](const IndexedInstance& instance) {
+        const auto delayKey = instance.prefix + ".reconnectDelayMilliseconds";
+        const auto maximumKey = instance.prefix + ".reconnectMaximumDelayMilliseconds";
+        integerRange(config, delayKey, 100, 3600000, false, issues);
+        integerRange(config, maximumKey, 100, 3600000, false, issues);
+        int delay = 1000;
+        int maximum = 30000;
+        const bool delayValid = Poco::NumberParser::tryParse(
+            config.getString(delayKey, "1000"), delay);
+        const bool maximumValid = Poco::NumberParser::tryParse(
+            config.getString(maximumKey, "30000"), maximum);
+        if (delayValid && maximumValid && maximum < delay)
+            issues.push_back({maximumKey, "must be greater than or equal to reconnect delay"});
+    };
+    for (const auto& instance : validateFamily("pdr.mqtt", false, 0, "mqtt"))
+    {
+        validateProtocolId(instance);
+        if (!instance.enabled) continue;
+        requireString(config, instance.prefix + ".serverUri", issues);
+        const auto serverUri = config.getString(instance.prefix + ".serverUri", "");
+        const auto validateEnvironmentBacked = [&](const char* name) {
+            const std::string directKey = instance.prefix + "." + name;
+            const std::string environmentKey = directKey + "Environment";
+            const std::string direct = config.getString(directKey, "");
+            const std::string variable = config.getString(environmentKey, "");
+            if (!direct.empty() && !variable.empty())
+                issues.push_back({environmentKey,
+                                  "mutually exclusive with " + directKey});
+            if (!variable.empty())
+            {
+                if (!std::regex_match(variable, std::regex("[A-Za-z_][A-Za-z0-9_]*")))
+                    issues.push_back({environmentKey,
+                                      "must be a valid environment variable name"});
+                else if (!Poco::Environment::has(variable) ||
+                         Poco::Environment::get(variable).empty())
+                    issues.push_back({environmentKey,
+                                      "environment variable is not set or empty: " + variable});
+            }
+        };
+        validateEnvironmentBacked("username");
+        validateEnvironmentBacked("password");
+        validateEnvironmentBacked("privateKeyPassword");
+        const bool tls = serverUri.rfind("ssl://", 0) == 0 ||
+                         serverUri.rfind("wss://", 0) == 0;
+        const bool hasTlsMaterial =
+            !config.getString(instance.prefix + ".trustStore", "").empty() ||
+            !config.getString(instance.prefix + ".keyStore", "").empty() ||
+            !config.getString(instance.prefix + ".privateKey", "").empty() ||
+            !config.getString(instance.prefix + ".privateKeyPassword", "").empty() ||
+            !config.getString(instance.prefix + ".enabledCipherSuites", "").empty();
+        if (hasTlsMaterial && !tls)
+            issues.push_back({instance.prefix + ".serverUri",
+                              "TLS material requires ssl:// or wss://"});
+        if (!config.getString(instance.prefix + ".privateKey", "").empty() &&
+            config.getString(instance.prefix + ".keyStore", "").empty())
+            issues.push_back({instance.prefix + ".keyStore",
+                              "required when privateKey is configured"});
+        if (!config.getString(instance.prefix + ".privateKeyPassword", "").empty() &&
+            config.getString(instance.prefix + ".privateKey", "").empty())
+            issues.push_back({instance.prefix + ".privateKey",
+                              "required when privateKeyPassword is configured"});
+        if (tls && config.getString("security.profile", "development") == "production")
+        {
+            if (!config.getBool(instance.prefix + ".verifyServerCertificate", true))
+                issues.push_back({instance.prefix + ".verifyServerCertificate",
+                                  "must be true in production"});
+            if (!config.getBool(instance.prefix + ".verifyHostname", true))
+                issues.push_back({instance.prefix + ".verifyHostname",
+                                  "must be true in production"});
+        }
+        integerRange(config, instance.prefix + ".keepAliveSeconds", 0, 86400, false, issues);
+        integerRange(config, instance.prefix + ".connectTimeoutSeconds", 1, 3600, false, issues);
+        validateProtocolRecovery(instance);
+    }
+    for (const auto& instance : validateFamily("pdr.ros", false, 0, "ros"))
+    {
+        validateProtocolId(instance);
+        if (!instance.enabled) continue;
+        requireString(config, instance.prefix + ".uri", issues);
+        const auto uri = config.getString(instance.prefix + ".uri", "");
+        const bool ws = uri.rfind("ws://", 0) == 0;
+        const bool wss = uri.rfind("wss://", 0) == 0;
+        if (!uri.empty() && !ws && !wss)
+            issues.push_back({instance.prefix + ".uri", "scheme must be ws or wss"});
+        const std::string authorizationKey = instance.prefix + ".authorization";
+        const std::string authorizationEnvironmentKey =
+            instance.prefix + ".authorizationEnvironment";
+        const std::string authorization = config.getString(authorizationKey, "");
+        const std::string authorizationVariable =
+            config.getString(authorizationEnvironmentKey, "");
+        if (!authorization.empty() && !authorizationVariable.empty())
+            issues.push_back({authorizationEnvironmentKey,
+                              "mutually exclusive with " + authorizationKey});
+        if (!authorizationVariable.empty())
+        {
+            if (!std::regex_match(authorizationVariable,
+                                  std::regex("[A-Za-z_][A-Za-z0-9_]*")))
+                issues.push_back({authorizationEnvironmentKey,
+                                  "must be a valid environment variable name"});
+            else if (!Poco::Environment::has(authorizationVariable) ||
+                     Poco::Environment::get(authorizationVariable).empty())
+                issues.push_back({authorizationEnvironmentKey,
+                                  "environment variable is not set or empty: " +
+                                      authorizationVariable});
+        }
+        const bool hasTlsMaterial =
+            !config.getString(instance.prefix + ".trustStore", "").empty() ||
+            !config.getString(instance.prefix + ".clientCertificate", "").empty() ||
+            !config.getString(instance.prefix + ".privateKey", "").empty();
+        if (hasTlsMaterial && !wss)
+            issues.push_back({instance.prefix + ".uri", "TLS material requires wss://"});
+        const bool hasClientCertificate =
+            !config.getString(instance.prefix + ".clientCertificate", "").empty();
+        const bool hasPrivateKey =
+            !config.getString(instance.prefix + ".privateKey", "").empty();
+        if (hasClientCertificate != hasPrivateKey)
+            issues.push_back({instance.prefix + ".clientCertificate",
+                              "client certificate and private key must be configured together"});
+        integerRange(config, instance.prefix + ".maximumMessageSize", 1, 2147483647,
+                     false, issues);
+        integerRange(config, instance.prefix + ".connectTimeoutSeconds", 1, 3600,
+                     false, issues);
+        if (wss && config.getString("security.profile", "development") == "production")
+        {
+            if (!config.getBool(instance.prefix + ".verifyServerCertificate", true))
+                issues.push_back({instance.prefix + ".verifyServerCertificate",
+                                  "must be true in production"});
+            if (!config.getBool(instance.prefix + ".verifyHostname", true))
+                issues.push_back({instance.prefix + ".verifyHostname",
+                                  "must be true in production"});
+        }
+        validateProtocolRecovery(instance);
+    }
+    for (const auto& instance : validateFamily("pdr.udp", false, 0, "udp"))
+    {
+        validateProtocolId(instance);
+        if (!instance.enabled) continue;
+        requireString(config, instance.prefix + ".localHost", issues);
+        requireString(config, instance.prefix + ".remoteHost", issues);
+        integerRange(config, instance.prefix + ".localPort", 0, 65535, false, issues);
+        integerRange(config, instance.prefix + ".remotePort", 1, 65535, false, issues);
+        validateProtocolRecovery(instance);
     }
     const std::string securityProfile = config.getString("security.profile", "development");
     if (securityProfile != "development" && securityProfile != "production")

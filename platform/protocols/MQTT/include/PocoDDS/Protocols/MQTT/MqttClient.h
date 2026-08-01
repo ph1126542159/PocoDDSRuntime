@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PocoDDS/Protocols/Protocol.h"
+#include "PocoDDS/Protocols/ProtocolDiagnostics.h"
 
 #include "Poco/Mutex.h"
 
@@ -30,17 +31,9 @@ struct Message
     bool duplicate{false};
 };
 
-struct ClientDiagnostics
-{
-    std::uint64_t successfulOperations{0};
-    std::uint64_t failedOperations{0};
-    std::uint64_t reconnectAttempts{0};
-    std::uint64_t receivedMessages{0};
-    std::uint64_t handlerFailures{0};
-    std::string lastError;
-};
+using ClientDiagnostics = PocoDDS::Protocols::ProtocolDiagnostics;
 
-class MqttClient final : public PocoDDS::Protocols::Protocol
+class MqttClient final : public PocoDDS::Protocols::DiagnosticProtocol
 {
 public:
     struct Options
@@ -49,6 +42,13 @@ public:
         std::string clientId;
         std::string username;
         std::string password;
+        std::string trustStore;
+        std::string keyStore;
+        std::string privateKey;
+        std::string privateKeyPassword;
+        std::string enabledCipherSuites;
+        bool verifyServerCertificate{true};
+        bool verifyHostname{true};
         int keepAliveSeconds{30};
         bool cleanSession{true};
         int connectTimeoutSeconds{10};
@@ -71,7 +71,7 @@ public:
     void subscribe(const std::string& topic, QoS qos = QoS::atLeastOnce);
     void unsubscribe(const std::string& topic);
     void setMessageHandler(MessageHandler handler);
-    ClientDiagnostics diagnostics() const;
+    ClientDiagnostics diagnostics() const override;
 
 private:
     static void onConnectionLost(void* context, char* cause);
@@ -86,7 +86,9 @@ private:
 
     Options _options;
     MQTTClient _client{nullptr};
-    std::atomic<bool> _connected{false};
+    mutable std::atomic<bool> _connected{false};
+    std::atomic<bool> _intentionalDisconnect{false};
+    std::atomic<std::int64_t> _ignoreLossUntilNanoseconds{0};
     bool _everConnected{false};
     mutable Poco::FastMutex _operationMutex;
     mutable Poco::FastMutex _mutex;

@@ -14,4 +14,4 @@
 1. 删除字段、收紧范围或改变单位属于不兼容变更，必须提升主版本。
 2. 新增可选字段属于兼容变更。
 3. `requestId`、`traceId`、`deviceId` 是跨入口公共元数据，不得复用为业务字段。
-4. CI 的 `contract-files` 保证契约文件完整，`compatibility-baseline` 阻止同一主版本删除或收紧已发布契约。
+4. CI 的 `contract-files` 保证契约文件完整，`configuration-contract` 对照 C++ Validator 检查全局数值范围、全部索引族、协议边界及已发布必填项的兼容子集，`compatibility-baseline` 阻止同一主版本删除或收紧已发布契约。历史 Schema 未要求 `pdr.subprocess.shutdownTimeoutMilliseconds`，同一主版本只发布其类型和范围；Runtime 与离线校验仍要求实际部署提供该字段。

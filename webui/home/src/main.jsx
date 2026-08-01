@@ -191,12 +191,57 @@ function BusinessMetrics({ data }) {
   </section>;
 }
 
+function ProtocolSummary({ data, inventory, onLifecycle }) {
+  const points = data?.metrics || [];
+  const instances = inventory?.protocols || [];
+  const protocols = [
+    { id: "mqtt", label: "MQTT", detail: "Broker 发布订阅", tone: "blue" },
+    { id: "rosbridge", label: "ROS Bridge", detail: "WebSocket Topic", tone: "violet" },
+    { id: "udp", label: "UDP", detail: "数据报收发", tone: "green" }
+  ];
+  const sum = (name, protocol, predicate = () => true) => points
+    .filter(point => point.name === name && point.attributes?.protocol === protocol &&
+      predicate(point.attributes || {}))
+    .reduce((total, point) => total + numeric(point.value), 0);
+  return <section className="surface">
+    <div className="section-head"><div><h2>现场协议运行诊断</h2>
+      <p>来自 /api/v1/metrics 的操作、错误与字节统计</p></div>
+      <span className="inventory-count">MQTT · ROS · UDP</span></div>
+    <div className="metrics business-metrics-grid">{protocols.map(protocol => {
+      const operations = sum("pdr.protocol.operations", protocol.id);
+      const errors = sum("pdr.protocol.operations", protocol.id,
+        labels => labels.result === "error");
+      const bytes = sum("pdr.protocol.io", protocol.id);
+      const managed = instances.filter(item => item.type === protocol.id);
+      const open = managed.filter(item => item.open).length;
+      return <Metric key={protocol.id} icon={Network} label={protocol.label}
+        value={operations} caption={`${open}/${managed.length} 已打开 · ${errors} 次错误 · ${bytes.toLocaleString()} B`}
+        tone={protocol.tone} />;
+    })}</div>
+    {!!instances.length && <div className="table-scroll"><table className="metrics-table"><thead><tr>
+      <th>实例</th><th>类型</th><th>状态</th><th>发送/接收</th><th>超时</th><th>最近错误</th><th>操作</th></tr></thead>
+      <tbody>{instances.map(item => <tr key={item.id}>
+        <td><b>{item.id}</b><small>{item.name || item.service}{item.autoReconnect ? " · 自动恢复" : ""}</small></td>
+        <td>{item.type}</td><td><Status state={item.open ? "ready" :
+          item.desiredOpen && item.autoReconnect ? "recovering" : "down"} /></td>
+        <td>{numeric(item.diagnostics?.sentMessages)} / {numeric(item.diagnostics?.receivedMessages)}</td>
+        <td>{numeric(item.diagnostics?.timeouts)}</td>
+        <td>{item.diagnostics?.lastError || item.error || "—"}</td>
+        <td><button className="icon-button" title="重新连接"
+          onClick={() => onLifecycle(item, "restart")}><RotateCw size={16} /></button></td>
+      </tr>)}</tbody></table></div>}
+  </section>;
+}
+
 const metricDomains = [
   { id: "runtime", label: "Runtime", prefixes: ["pdr.runtime.", "process."] },
   { id: "dds", label: "DDS", prefixes: ["pdr.dds."] },
   { id: "device", label: "设备", prefixes: ["pdr.device."] },
   { id: "workflow", label: "工作流", prefixes: ["pdr.workflow."] },
   { id: "protocol", label: "协议汇总", prefixes: ["pdr.protocol."] },
+  { id: "mqtt", label: "MQTT", prefixes: ["pdr.protocol."], protocol: "mqtt" },
+  { id: "rosbridge", label: "ROS Bridge", prefixes: ["pdr.protocol."], protocol: "rosbridge" },
+  { id: "udp", label: "UDP", prefixes: ["pdr.protocol."], protocol: "udp" },
   { id: "btle", label: "Bluetooth LE", prefixes: ["pdr.btle.", "pdr.protocol."], protocol: "btle" },
   { id: "webtunnel", label: "WebTunnel", prefixes: ["pdr.webtunnel.", "pdr.protocol."], protocol: "webtunnel" },
   { id: "http", label: "HTTP", prefixes: ["http.server."] },
@@ -1102,18 +1147,21 @@ function App() {
   const [health, setHealth] = useState(null);
   const [businessMetrics, setBusinessMetrics] = useState({ metrics: [] });
   const [deviceInventory, setDeviceInventory] = useState({ count: 0, devices: [] });
+  const [protocolInventory, setProtocolInventory] = useState({ count: 0, protocols: [] });
   const [updated, setUpdated] = useState(null);
   const [configTarget, setConfigTarget] = useState(null);
   const [toast, setToast] = useState(null);
   const refresh = useCallback(async () => {
-    const [data, monitoring, healthDetail, metricData, devices] = await Promise.all([
+    const [data, monitoring, healthDetail, metricData, devices, protocols] = await Promise.all([
       request("/api/v1/topology"),
       request("/api/v1/system-metrics").catch(() => ({ samples: [] })),
       request("/health/detail").catch(() => null),
       request("/api/v1/metrics").catch(() => ({ metrics: [] })),
-      request("/api/v1/devices").catch(() => ({ count: 0, devices: [] }))
+      request("/api/v1/devices").catch(() => ({ count: 0, devices: [] })),
+      request("/api/v1/protocols").catch(() => ({ count: 0, protocols: [] }))
     ]);
     setDeviceInventory(devices);
+    setProtocolInventory(protocols);
     setBusinessMetrics(metricData);
     if (healthDetail) setHealth(healthDetail);
     const samples = monitoring.samples || [];
@@ -1152,6 +1200,16 @@ function App() {
       notify(data.message || "操作已完成"); setTimeout(refresh, 400);
     } catch (error) { notify(error.message, true); }
   };
+  const protocolLife = async (item, action) => {
+    if (!window.confirm(`确认重新连接协议实例 ${item.id}？`)) return;
+    try {
+      const data = await request("/api/v1/protocols", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, action }) });
+      notify(data.message || "协议操作已完成");
+      await refresh();
+    } catch (error) { notify(error.message, true); await refresh(); }
+  };
   const counts = useMemo(() => ({
     process: (topology.mainProcess ? 1 : 0) +
       topology.processes.filter(item => String(item.name).toLowerCase() !== "conhost.exe").length,
@@ -1183,6 +1241,7 @@ function App() {
       <div className="content">
         {page === "overview" && <><HealthOverview health={health} />
           <BusinessMetrics data={businessMetrics} />
+          <ProtocolSummary data={businessMetrics} inventory={protocolInventory} onLifecycle={protocolLife} />
           <ProcessWorkbench mainProcess={topology.mainProcess} onNotify={notify} /></>}
         {page === "processes" && <ProcessWorkspace items={processItems} />}
         {page === "devices" && <DeviceInventory inventory={deviceInventory} />}

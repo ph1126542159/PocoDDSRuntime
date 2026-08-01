@@ -13,6 +13,7 @@ target_include_directories(PDRProtocolXBee
 target_link_libraries(PDRProtocolXBee
     PUBLIC PocoDDS::SerialProtocol Poco::Foundation)
 pdr_set_warnings(PDRProtocolXBee)
+set_target_properties(PDRProtocolXBee PROPERTIES EXPORT_NAME XBee)
 
 if(BUILD_TESTING)
     add_executable(pdr-xbee-smoke tests/XBeeSmoke.cpp)
@@ -21,5 +22,6 @@ if(BUILD_TESTING)
     add_test(NAME xbee-smoke COMMAND pdr-xbee-smoke)
 endif()
 
-install(TARGETS PDRProtocolXBee ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+install(TARGETS PDRProtocolXBee EXPORT PocoDDSRuntimeTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

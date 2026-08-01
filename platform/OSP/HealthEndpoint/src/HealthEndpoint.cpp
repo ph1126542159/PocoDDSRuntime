@@ -15,6 +15,7 @@
 #include "PocoDDS/Devices/Device.h"
 #include "PocoDDS/Devices/DeviceService.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
@@ -80,12 +81,21 @@ public:
         if (auto* manager = ProcessManagement::SubprocessManager::active())
         {
             const auto processes = manager->processes();
+            const auto required = static_cast<std::size_t>(std::count_if(
+                processes.begin(), processes.end(),
+                [](const auto& process) { return process.required; }));
+            const auto runningRequired = static_cast<std::size_t>(std::count_if(
+                processes.begin(), processes.end(), [](const auto& process) {
+                    return process.required && process.state == "running";
+                }));
             registry.add(std::make_shared<StaticContributor>(Health::Report{
                 "subprocesses",
-                manager->runningCount() == processes.size() ? Health::Status::up
-                                                            : Health::Status::degraded,
+                runningRequired == required ? Health::Status::up
+                                            : Health::Status::degraded,
                 std::to_string(manager->runningCount()) + "/" +
-                    std::to_string(processes.size()) + " running"}));
+                    std::to_string(processes.size()) + " running, " +
+                    std::to_string(runningRequired) + "/" +
+                    std::to_string(required) + " required"}));
         }
 
         std::size_t requiredDevices = 0;

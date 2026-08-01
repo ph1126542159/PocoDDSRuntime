@@ -121,11 +121,14 @@ include(PDRProcessLayout)
 include(PDRDependencies)
 pdr_bootstrap_missing_dependencies()
 pdr_require_poco()
-pdr_require_fastdds()
 pdr_require_paho_mqtt()
 if(PDR_ENABLE_OBSERVABILITY)
+    # Load the complete Protobuf export used by OpenTelemetry before Fast DDS.
+    # Fast DDS may otherwise create CMake's reduced legacy Protobuf targets,
+    # which conflict with the remaining targets in protobuf-config.cmake.
     pdr_require_opentelemetry()
 endif()
+pdr_require_fastdds()
 
 # GCC 8 and older keep filesystem symbols in a separate compatibility
 # library. Poco 1.15's static Foundation archive uses those symbols through
@@ -252,6 +255,11 @@ if(BUILD_TESTING)
         add_test(NAME compatibility-policy
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_compatibility.py")
+        add_test(NAME configuration-contract
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_config_contract.py")
+        set_tests_properties(configuration-contract PROPERTIES
+            LABELS "configuration;release")
         add_test(NAME soak-runner-smoke
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/soak_runner.py"
@@ -273,6 +281,12 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_device_acceptance.py")
         set_tests_properties(device-acceptance-policy PROPERTIES
             LABELS "device;release"
+            TIMEOUT 10)
+        add_test(NAME protocol-acceptance-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_protocol_acceptance.py")
+        set_tests_properties(protocol-acceptance-policy PROPERTIES
+            LABELS "protocol;release"
             TIMEOUT 10)
         add_test(NAME security-config
             COMMAND "${Python3_EXECUTABLE}"
@@ -309,11 +323,77 @@ if(BUILD_TESTING)
                     -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
                     -DPDR_CONFIG=$<CONFIG>
                     -DPDR_RUNTIME_FILE_NAME=$<TARGET_FILE_NAME:pdr-runtime>
+                    -DPDR_CONFIG_CHECK_FILE_NAME=$<TARGET_FILE_NAME:pdr-config-check>
                     -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunRuntimePackageSmoke.cmake")
             set_tests_properties(runtime-package-smoke PROPERTIES
                 LABELS "runtime;release"
                 RESOURCE_LOCK pdr_runtime_http
                 TIMEOUT 60)
+            if(PDR_BUILD_WEBUI)
+                add_test(NAME runtime-web-protocol-diagnostics
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --timeout 20
+                        --stability-window 2
+                        --clear-code-cache
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --endpoint "/home/"
+                        --endpoint "/api/v1/protocols"
+                        --endpoint "/api/v1/metrics"
+                        --follow-html-assets
+                        --require-body "assets/app-[A-Za-z0-9_-]+\\.js"
+                        --require-body "现场协议运行诊断"
+                        --require-body "Broker 发布订阅"
+                        --require-body "ROS Bridge"
+                        --require-body "\"protocols\""
+                        --set "pdr.udp.count=1"
+                        --set "pdr.udp.0.id=runtime-udp"
+                        --set "pdr.udp.0.localHost=127.0.0.1"
+                        --set "pdr.udp.0.localPort=0"
+                        --set "pdr.udp.0.remoteHost=127.0.0.1"
+                        --set "pdr.udp.0.remotePort=9"
+                        --set "pdr.udp.0.required=true"
+                        --set "pdr.ros.count=1"
+                        --set "pdr.ros.0.id=runtime-ros-offline"
+                        --set "pdr.ros.0.uri=ws://127.0.0.1:1"
+                        --set "pdr.ros.0.required=false"
+                        --set "pdr.ros.0.autoReconnect=false"
+                        --post "/api/v1/protocols={\"id\":\"runtime-udp\",\"action\":\"close\"}"
+                        --post "/api/v1/protocols={\"id\":\"runtime-udp\",\"action\":\"open\"}"
+                        --require-log "Optional protocol runtime-ros-offline failed to open"
+                        --require-log "Protocol gateway started with 2 protocol instance"
+                        --require-body "runtime-udp"
+                        --require-body "runtime-ros-offline"
+                        --require-body "\"type\":\"udp\""
+                        --require-body "\"open\":true"
+                        --require-body "\"open\":false"
+                        --require-body "\"action\":\"close\""
+                        --require-body "\"action\":\"open\""
+                        --require-body "pdr.protocol.operations"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-web-protocol-diagnostics.json")
+                set_tests_properties(runtime-web-protocol-diagnostics PROPERTIES
+                    LABELS "runtime;protocol;release;webui"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 45)
+            endif()
+            add_test(NAME runtime-protocol-gateway-integration
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_protocol_gateway_integration.py"
+                    --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --install-bin "${PDR_INSTALL_PREFIX}/bin"
+                    --cycles 5
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-protocol-gateway-integration.json")
+            set_tests_properties(runtime-protocol-gateway-integration PROPERTIES
+                LABELS "runtime;protocol;integration;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
             add_test(NAME runtime-multi-device-smoke
                 COMMAND "${Python3_EXECUTABLE}"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
@@ -521,6 +601,10 @@ install(DIRECTORY "${PDR_BUNDLE_OUTPUT_DIRECTORY}/"
     FILES_MATCHING PATTERN "*.bndl")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
               "${PDR_GENERATED_SUBPROCESS_CONFIG}"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.py"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.ps1"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
 # A fresh package must be directly startable. Poco's FileChannel does not
 # create the parent directory, and the OSP runtime also expects these writable

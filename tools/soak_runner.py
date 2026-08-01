@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 
-def windows_resources(process: subprocess.Popen[Any]) -> tuple[int, int]:
+def windows_process_resources(handle: int) -> tuple[int, int]:
     class Counters(ctypes.Structure):
         _fields_ = [
             ("cb", wintypes.DWORD),
@@ -36,29 +36,125 @@ def windows_resources(process: subprocess.Popen[Any]) -> tuple[int, int]:
 
     counters = Counters()
     counters.cb = ctypes.sizeof(counters)
-    handle = wintypes.HANDLE(process._handle)  # type: ignore[attr-defined]
+    process_handle = wintypes.HANDLE(handle)
     if not ctypes.windll.psapi.GetProcessMemoryInfo(  # type: ignore[attr-defined]
-        handle, ctypes.byref(counters), counters.cb
+        process_handle, ctypes.byref(counters), counters.cb
     ):
         raise OSError("GetProcessMemoryInfo failed")
     count = wintypes.DWORD()
     if not ctypes.windll.kernel32.GetProcessHandleCount(  # type: ignore[attr-defined]
-        handle, ctypes.byref(count)
+        process_handle, ctypes.byref(count)
     ):
         raise OSError("GetProcessHandleCount failed")
     return int(counters.WorkingSetSize), int(count.value)
 
 
-def posix_resources(process: subprocess.Popen[Any]) -> tuple[int, int]:
-    status = Path(f"/proc/{process.pid}/status").read_text(encoding="utf-8")
+def windows_descendants(root_pid: int) -> set[int]:
+    class ProcessEntry32(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.c_size_t),
+            ("th32ModuleID", wintypes.DWORD),
+            ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD),
+            ("pcPriClassBase", wintypes.LONG),
+            ("dwFlags", wintypes.DWORD),
+            ("szExeFile", wintypes.WCHAR * 260),
+        ]
+
+    snapshot = ctypes.windll.kernel32.CreateToolhelp32Snapshot(0x00000002, 0)  # type: ignore[attr-defined]
+    if snapshot == ctypes.c_void_p(-1).value:
+        raise OSError("CreateToolhelp32Snapshot failed")
+    parent_by_pid: dict[int, int] = {}
+    try:
+        entry = ProcessEntry32()
+        entry.dwSize = ctypes.sizeof(entry)
+        more = ctypes.windll.kernel32.Process32FirstW(snapshot, ctypes.byref(entry))  # type: ignore[attr-defined]
+        while more:
+            parent_by_pid[int(entry.th32ProcessID)] = int(entry.th32ParentProcessID)
+            more = ctypes.windll.kernel32.Process32NextW(snapshot, ctypes.byref(entry))  # type: ignore[attr-defined]
+    finally:
+        ctypes.windll.kernel32.CloseHandle(snapshot)  # type: ignore[attr-defined]
+    descendants = {root_pid}
+    changed = True
+    while changed:
+        changed = False
+        for pid, parent_pid in parent_by_pid.items():
+            if parent_pid in descendants and pid not in descendants:
+                descendants.add(pid)
+                changed = True
+    return descendants
+
+
+def windows_resources(process: subprocess.Popen[Any], include_tree: bool) -> tuple[int, int, int]:
+    if not include_tree:
+        rss, handles = windows_process_resources(process._handle)  # type: ignore[attr-defined]
+        return rss, handles, 1
+    total_rss = total_handles = process_count = 0
+    for pid in windows_descendants(process.pid):
+        handle = ctypes.windll.kernel32.OpenProcess(0x0400 | 0x0010, False, pid)  # type: ignore[attr-defined]
+        if not handle:
+            continue
+        try:
+            rss, handles = windows_process_resources(handle)
+            total_rss += rss
+            total_handles += handles
+            process_count += 1
+        except OSError:
+            pass
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)  # type: ignore[attr-defined]
+    if process_count == 0:
+        raise OSError("no process-tree resources could be sampled")
+    return total_rss, total_handles, process_count
+
+
+def posix_process_resources(pid: int) -> tuple[int, int]:
+    status = Path(f"/proc/{pid}/status").read_text(encoding="utf-8")
     match = next(line for line in status.splitlines() if line.startswith("VmRSS:"))
     rss = int(match.split()[1]) * 1024
-    handles = len(list(Path(f"/proc/{process.pid}/fd").iterdir()))
+    handles = len(list(Path(f"/proc/{pid}/fd").iterdir()))
     return rss, handles
 
 
-def resources(process: subprocess.Popen[Any]) -> tuple[int, int]:
-    return windows_resources(process) if os.name == "nt" else posix_resources(process)
+def posix_descendants(root_pid: int) -> set[int]:
+    descendants = {root_pid}
+    changed = True
+    while changed:
+        changed = False
+        for status_path in Path("/proc").glob("[0-9]*/status"):
+            try:
+                lines = status_path.read_text(encoding="utf-8").splitlines()
+                parent_pid = int(next(line for line in lines if line.startswith("PPid:")).split()[1])
+                pid = int(status_path.parent.name)
+            except (OSError, StopIteration, ValueError):
+                continue
+            if parent_pid in descendants and pid not in descendants:
+                descendants.add(pid)
+                changed = True
+    return descendants
+
+
+def posix_resources(process: subprocess.Popen[Any], include_tree: bool) -> tuple[int, int, int]:
+    pids = posix_descendants(process.pid) if include_tree else {process.pid}
+    total_rss = total_handles = process_count = 0
+    for pid in pids:
+        try:
+            rss, handles = posix_process_resources(pid)
+        except (OSError, StopIteration):
+            continue
+        total_rss += rss
+        total_handles += handles
+        process_count += 1
+    if process_count == 0:
+        raise OSError("no process-tree resources could be sampled")
+    return total_rss, total_handles, process_count
+
+
+def resources(process: subprocess.Popen[Any], include_tree: bool) -> tuple[int, int, int]:
+    return windows_resources(process, include_tree) if os.name == "nt" else posix_resources(process, include_tree)
 
 
 def terminate(process: subprocess.Popen[Any]) -> None:
@@ -104,6 +200,10 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-rss-growth-mib", type=float, default=64.0)
     parser.add_argument("--max-handle-growth", type=int, default=32)
+    parser.add_argument(
+        "--resource-scope", choices=("tree", "process"), default="tree",
+        help="sample the complete child process tree (default) or only the launched process",
+    )
     parser.add_argument("--health-url", help="readiness/liveness URL probed at every sample")
     parser.add_argument("--health-timeout", type=float, default=2.0)
     parser.add_argument("--max-consecutive-health-failures", type=int, default=0)
@@ -142,11 +242,12 @@ def main() -> int:
             if process.poll() is not None:
                 violations.append(f"process exited early with code {process.returncode}")
                 break
-            rss, handles = resources(process)
+            rss, handles, process_count = resources(process, args.resource_scope == "tree")
             sample = {
                 "elapsedSeconds": round(time.monotonic() - start, 3),
                 "rssBytes": rss,
                 "handles": handles,
+                "processCount": process_count,
             }
             if args.health_url:
                 healthy, status, detail = health_status(args.health_url, args.health_timeout)
@@ -163,10 +264,26 @@ def main() -> int:
             samples.append(sample)
             time.sleep(min(args.interval, max(0.0, deadline - time.monotonic())))
         if process.poll() is None:
-            rss, handles = resources(process)
-            samples.append(
-                {"elapsedSeconds": round(time.monotonic() - start, 3), "rssBytes": rss, "handles": handles}
-            )
+            rss, handles, process_count = resources(process, args.resource_scope == "tree")
+            sample = {
+                "elapsedSeconds": round(time.monotonic() - start, 3),
+                "rssBytes": rss,
+                "handles": handles,
+                "processCount": process_count,
+            }
+            if args.health_url:
+                healthy, status, detail = health_status(args.health_url, args.health_timeout)
+                sample.update({"healthy": healthy, "healthStatus": status})
+                if not healthy:
+                    sample["healthError"] = detail
+                    consecutive_health_failures += 1
+                    total_health_failures += 1
+                    maximum_consecutive_health_failures = max(
+                        maximum_consecutive_health_failures, consecutive_health_failures
+                    )
+                else:
+                    consecutive_health_failures = 0
+            samples.append(sample)
     finally:
         terminate(process)
 
@@ -193,11 +310,13 @@ def main() -> int:
         "durationSeconds": args.duration,
         "warmupSeconds": args.warmup,
         "command": args.command,
+        "resourceScope": args.resource_scope,
         "sampleCount": len(samples),
         "rssGrowthBytes": rss_growth,
         "peakRssBytes": max((sample["rssBytes"] for sample in samples), default=0),
         "handleGrowth": handle_growth,
         "peakHandles": max((sample["handles"] for sample in samples), default=0),
+        "peakProcessCount": max((sample["processCount"] for sample in samples), default=0),
         "healthUrl": args.health_url,
         "healthFailureCount": total_health_failures,
         "maximumConsecutiveHealthFailures": maximum_consecutive_health_failures,

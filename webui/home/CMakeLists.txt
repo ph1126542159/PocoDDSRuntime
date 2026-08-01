@@ -5,12 +5,9 @@ file(GLOB_RECURSE pdr_webui_home_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*"
     "${CMAKE_CURRENT_SOURCE_DIR}/static/*")
 set(pdr_webui_home_assets_output
-    "${CMAKE_CURRENT_SOURCE_DIR}/bundle/webui/assets/app.js")
+    "${CMAKE_CURRENT_SOURCE_DIR}/bundle/webui/index.html")
 add_custom_command(
     OUTPUT "${pdr_webui_home_assets_output}"
-    BYPRODUCTS
-        "${CMAKE_CURRENT_SOURCE_DIR}/bundle/webui/assets/app.css"
-        "${CMAKE_CURRENT_SOURCE_DIR}/bundle/webui/index.html"
     COMMAND "${PDR_NPM_EXECUTABLE}" run build
     DEPENDS ${pdr_webui_home_sources}
             "${CMAKE_CURRENT_SOURCE_DIR}/package.json"

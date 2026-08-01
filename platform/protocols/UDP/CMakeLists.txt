@@ -10,5 +10,15 @@ target_include_directories(PDRProtocolUDP
 
 target_link_libraries(PDRProtocolUDP PUBLIC Poco::Net Poco::Foundation)
 pdr_set_warnings(PDRProtocolUDP)
-install(TARGETS PDRProtocolUDP ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+set_target_properties(PDRProtocolUDP PROPERTIES EXPORT_NAME UDP)
+
+if(BUILD_TESTING)
+    add_executable(pdr-udp-smoke tests/UdpSmoke.cpp)
+    target_link_libraries(pdr-udp-smoke PRIVATE PocoDDS::UDP)
+    pdr_set_warnings(pdr-udp-smoke)
+    add_test(NAME udp-smoke COMMAND pdr-udp-smoke)
+    set_tests_properties(udp-smoke PROPERTIES LABELS "protocol;release")
+endif()
+install(TARGETS PDRProtocolUDP EXPORT PocoDDSRuntimeTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

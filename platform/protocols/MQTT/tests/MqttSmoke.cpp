@@ -82,41 +82,48 @@ int main()
     std::thread broker([&] {
         try
         {
-            auto socket = server.acceptConnection();
-            const auto connect = receivePacket(socket);
-            if ((connect.header >> 4) != 1)
-                throw std::runtime_error("expected MQTT CONNECT");
-            sendPacket(socket, 0x20, {0x00, 0x00});
+            for (int connection = 0; connection < 2; ++connection)
+            {
+                auto socket = server.acceptConnection();
+                const auto connect = receivePacket(socket);
+                if ((connect.header >> 4) != 1)
+                    throw std::runtime_error("expected MQTT CONNECT");
+                sendPacket(socket, 0x20, {0x00, 0x00});
 
-            const auto subscribe = receivePacket(socket);
-            if ((subscribe.header >> 4) != 8 || subscribe.body.size() < 2)
-                throw std::runtime_error("expected MQTT SUBSCRIBE");
-            sendPacket(socket, 0x90,
-                       {subscribe.body[0], subscribe.body[1], 0x01});
+                const auto subscribe = receivePacket(socket);
+                if ((subscribe.header >> 4) != 8 || subscribe.body.size() < 2)
+                    throw std::runtime_error("expected MQTT SUBSCRIBE");
+                sendPacket(socket, 0x90,
+                           {subscribe.body[0], subscribe.body[1], 0x01});
 
-            const std::string topic = "pdr/test";
-            const std::string payload = "from-broker";
-            std::vector<std::uint8_t> publishBody{
-                static_cast<std::uint8_t>(topic.size() >> 8),
-                static_cast<std::uint8_t>(topic.size())};
-            publishBody.insert(publishBody.end(), topic.begin(), topic.end());
-            publishBody.insert(publishBody.end(), payload.begin(), payload.end());
-            sendPacket(socket, 0x30, publishBody);
+                const std::string topic = "pdr/test";
+                const std::string payload = connection == 0
+                    ? "from-broker" : "after-reconnect";
+                std::vector<std::uint8_t> publishBody{
+                    static_cast<std::uint8_t>(topic.size() >> 8),
+                    static_cast<std::uint8_t>(topic.size())};
+                publishBody.insert(publishBody.end(), topic.begin(), topic.end());
+                publishBody.insert(publishBody.end(), payload.begin(), payload.end());
+                sendPacket(socket, 0x30, publishBody);
 
-            const auto publish = receivePacket(socket);
-            if ((publish.header >> 4) != 3 || (publish.header & 0x06) != 0x02 ||
-                publish.body.size() < 4)
-                throw std::runtime_error("expected MQTT QoS 1 PUBLISH");
-            const std::size_t topicLength =
-                (static_cast<std::size_t>(publish.body[0]) << 8) | publish.body[1];
-            const std::size_t packetIdOffset = 2 + topicLength;
-            if (packetIdOffset + 2 > publish.body.size())
-                throw std::runtime_error("invalid MQTT PUBLISH");
-            sendPacket(socket, 0x40,
-                       {publish.body[packetIdOffset], publish.body[packetIdOffset + 1]});
-            const auto disconnect = receivePacket(socket);
-            if ((disconnect.header >> 4) != 14)
-                throw std::runtime_error("expected MQTT DISCONNECT");
+                if (connection == 0)
+                {
+                    const auto publish = receivePacket(socket);
+                    if ((publish.header >> 4) != 3 || (publish.header & 0x06) != 0x02 ||
+                        publish.body.size() < 4)
+                        throw std::runtime_error("expected MQTT QoS 1 PUBLISH");
+                    const std::size_t topicLength =
+                        (static_cast<std::size_t>(publish.body[0]) << 8) | publish.body[1];
+                    const std::size_t packetIdOffset = 2 + topicLength;
+                    if (packetIdOffset + 2 > publish.body.size())
+                        throw std::runtime_error("invalid MQTT PUBLISH");
+                    sendPacket(socket, 0x40,
+                               {publish.body[packetIdOffset], publish.body[packetIdOffset + 1]});
+                }
+                const auto disconnect = receivePacket(socket);
+                if ((disconnect.header >> 4) != 14)
+                    throw std::runtime_error("expected MQTT DISCONNECT");
+            }
         }
         catch (const std::exception& exception)
         {
@@ -127,6 +134,7 @@ int main()
     std::mutex mutex;
     std::condition_variable changed;
     std::string receivedPayload;
+    int receivedCount = 0;
     PocoDDS::Protocols::MQTT::MqttClient::Options options;
     options.serverUri = "tcp://127.0.0.1:" + std::to_string(server.address().port());
     options.clientId = "pdr-mqtt-smoke";
@@ -136,8 +144,10 @@ int main()
         {
             std::lock_guard<std::mutex> lock(mutex);
             receivedPayload = message.payload;
+            ++receivedCount;
             changed.notify_all();
         }
+        throw std::runtime_error("application callback failure");
     });
     client.open();
     client.subscribe("pdr/test");
@@ -146,16 +156,41 @@ int main()
         changed.wait_for(lock, std::chrono::seconds(3),
                          [&] { return !receivedPayload.empty(); });
     }
-    client.publish("pdr/test", "from-client");
+    for (int attempt = 0;
+         attempt < 300 && client.diagnostics().receivedMessages < 1;
+         ++attempt)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    const std::string clientPayload = "from-client";
+    client.publish("pdr/test", clientPayload);
+    client.close();
+    client.open();
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        changed.wait_for(lock, std::chrono::seconds(3),
+                         [&] { return receivedCount >= 2; });
+    }
+    for (int attempt = 0;
+         attempt < 300 && client.diagnostics().receivedMessages < 2;
+         ++attempt)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     client.close();
     broker.join();
 
-    if (!brokerError.empty() || receivedPayload != "from-broker")
+    const auto diagnostics = client.diagnostics();
+    if (!brokerError.empty() || receivedPayload != "after-reconnect" ||
+        receivedCount != 2 || diagnostics.reconnectAttempts != 1 ||
+        diagnostics.sentMessages != 1 || diagnostics.sentBytes != clientPayload.size() ||
+        diagnostics.receivedMessages != 2 || diagnostics.receivedBytes == 0 ||
+        diagnostics.handlerFailures != 2)
     {
         std::cerr << "MQTT_SMOKE_FAIL broker=" << brokerError
-                  << " payload=" << receivedPayload << '\n';
+                  << " payload=" << receivedPayload
+                  << " received=" << receivedCount
+                  << " reconnects=" << diagnostics.reconnectAttempts
+                  << " handlerFailures=" << diagnostics.handlerFailures << '\n';
         return 2;
     }
-    std::cout << "MQTT_SMOKE_PASS subscribe=1 publish=1 payload=" << receivedPayload << '\n';
+    std::cout << "MQTT_SMOKE_PASS subscribe=restored publish=1 payload="
+              << receivedPayload << '\n';
     return 0;
 }

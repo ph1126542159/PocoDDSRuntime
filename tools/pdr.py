@@ -4,14 +4,27 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 
 KINDS = ("service", "device", "workflow")
+
+
+def tool_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def default_install_prefix(root: Path | None = None) -> Path:
+    candidate = (root or tool_root()).resolve()
+    installed_package = candidate / "lib" / "cmake" / "PocoDDSRuntime"
+    return candidate if installed_package.is_dir() else candidate / "build" / "install"
 
 
 def valid_name(value: str) -> str:
@@ -27,7 +40,7 @@ def templates(kind: str, name: str) -> dict[str, str]:
     common_cmake = f'''cmake_minimum_required(VERSION 3.24)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     project({name} LANGUAGES CXX)
-    find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED)
+    find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED COMPONENTS SDK)
     include(CTest)
 endif()
 
@@ -289,6 +302,14 @@ Generated PocoDDSRuntime {kind} module.
 
 Add `add_subdirectory(<module-path>)` to the owning product CMake file. The module
 uses only the public `PocoDDS::SDK` target and includes a smoke test.
+
+Before integration, verify the module against an installed SDK in an isolated build:
+
+```text
+pdr verify . --prefix <install-prefix> --config Release
+```
+
+Add `--report verify-report.json` to retain configure, build and CTest evidence.
 {device_notes}
 '''
     return {
@@ -318,21 +339,219 @@ def create_module(args: argparse.Namespace) -> int:
 
 
 def doctor(args: argparse.Namespace) -> int:
-    root = Path(args.root).resolve()
-    checks = [
-        ("repository", (root / "CMakeLists.txt").is_file() and (root / "application").is_dir()),
-        ("cmake", shutil.which("cmake") is not None or (Path("C:/Qt/Tools/CMake_64/bin/cmake.exe")).is_file()),
-        ("python", sys.version_info >= (3, 9)),
-        ("dependency-prefix", (root / "build/install/cmake/PocoConfig.cmake").is_file()),
-        ("sdk-package", (root / "build/PocoDDSRuntimeConfig.cmake").is_file()),
-    ]
-    for label, passed in checks:
-        print(f"[{'OK' if passed else 'FAIL'}] {label}")
-    failed = [label for label, passed in checks if not passed]
+    root = Path(args.root).resolve() if args.root else tool_root()
+    prefix = Path(args.prefix).resolve() if args.prefix else default_install_prefix(root)
+    checks: list[dict[str, object]] = []
+
+    def add(identifier: str, passed: bool, detail: str, remedy: str = "") -> None:
+        check: dict[str, object] = {"id": identifier, "passed": passed, "detail": detail}
+        if remedy and not passed:
+            check["remedy"] = remedy
+        checks.append(check)
+
+    source_layout = (root / "CMakeLists.txt").is_file() and (root / "application").is_dir()
+    installed_layout = (prefix / "lib" / "cmake" / "PocoDDSRuntime").is_dir()
+    layout = "source" if source_layout else "installed" if installed_layout else "unknown"
+    add(
+        "layout", source_layout or installed_layout, f"{layout}: root={root}; prefix={prefix}",
+        "pass --root for a source tree or --prefix for an installed PocoDDSRuntime package",
+    )
+    python_version = ".".join(str(part) for part in sys.version_info[:3])
+    add("python", sys.version_info >= (3, 9), python_version, "install Python 3.9 or newer")
+    try:
+        cmake = executable(args.cmake, "cmake")
+        version_result = subprocess.run(
+            [cmake, "--version"], text=True, capture_output=True, check=False
+        )
+        match = re.search(r"cmake version (\d+)\.(\d+)\.(\d+)", version_result.stdout)
+        version = tuple(int(part) for part in match.groups()) if match else (0, 0, 0)
+        add(
+            "cmake", version_result.returncode == 0 and version >= (3, 24, 0),
+            f"{cmake} ({'.'.join(map(str, version))})",
+            "install CMake 3.24 or newer or pass --cmake",
+        )
+    except (FileNotFoundError, OSError) as error:
+        add("cmake", False, str(error), "install CMake 3.24 or newer or pass --cmake")
+    try:
+        ctest = executable(args.ctest, "ctest")
+        add("ctest", True, ctest)
+    except (FileNotFoundError, OSError) as error:
+        add("ctest", False, str(error), "install CTest or pass --ctest")
+
+    package_dir = prefix / "lib" / "cmake" / "PocoDDSRuntime"
+    config = package_dir / "PocoDDSRuntimeConfig.cmake"
+    targets = package_dir / "PocoDDSRuntimeTargets.cmake"
+    poco = prefix / "cmake" / "PocoConfig.cmake"
+    add(
+        "sdk-package", config.is_file(), str(config),
+        "install PocoDDSRuntime to the selected --prefix",
+    )
+    targets_content = targets.read_text(encoding="utf-8", errors="replace") if targets.is_file() else ""
+    add(
+        "sdk-target", "add_library(PocoDDS::SDK" in targets_content, str(targets),
+        "reinstall an SDK package that exports PocoDDS::SDK",
+    )
+    add(
+        "poco-package", poco.is_file(), str(poco),
+        "install Poco dependencies to the selected --prefix",
+    )
+
+    for check in checks:
+        print(f"[{'OK' if check['passed'] else 'FAIL'}] {check['id']}: {check['detail']}")
+        if not check["passed"] and "remedy" in check:
+            print(f"       fix: {check['remedy']}")
+    failed = [str(check["id"]) for check in checks if not check["passed"]]
+    report = {
+        "schemaVersion": 1,
+        "root": str(root),
+        "prefix": str(prefix),
+        "passed": not failed,
+        "checks": checks,
+    }
+    if args.report:
+        report_path = Path(args.report).resolve()
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, indent=2), encoding="utf-8", newline="\n")
     if failed:
         print("doctor found missing requirements: " + ", ".join(failed), file=sys.stderr)
         return 1
     return 0
+
+
+def executable(value: str | None, name: str) -> str:
+    if value:
+        path = Path(value).resolve()
+        if not path.is_file():
+            raise FileNotFoundError(f"{name} executable not found: {path}")
+        return str(path)
+    discovered = shutil.which(name)
+    if discovered:
+        return discovered
+    qt_candidate = Path(f"C:/Qt/Tools/CMake_64/bin/{name}.exe")
+    if qt_candidate.is_file():
+        return str(qt_candidate)
+    raise FileNotFoundError(f"{name} executable not found; pass --{name}")
+
+
+def run_stage(name: str, command: list[str]) -> dict[str, object]:
+    started = datetime.now(timezone.utc)
+    completed = subprocess.run(command, text=True, capture_output=True, check=False)
+    return {
+        "name": name,
+        "startedAt": started.isoformat(),
+        "command": command,
+        "exitCode": completed.returncode,
+        "stdout": completed.stdout,
+        "stderr": completed.stderr,
+        "passed": completed.returncode == 0,
+    }
+
+
+def verify_module(args: argparse.Namespace) -> int:
+    module = Path(args.module).resolve()
+    report_path = Path(args.report).resolve() if args.report else None
+    report: dict[str, object] = {
+        "schemaVersion": 1,
+        "module": str(module),
+        "configuration": args.config,
+        "passed": False,
+        "stages": [],
+    }
+    result = 1
+    try:
+        if not (module / "CMakeLists.txt").is_file():
+            raise FileNotFoundError(f"module CMakeLists.txt not found: {module}")
+        cmake = executable(args.cmake, "cmake")
+        ctest = executable(args.ctest, "ctest")
+        prefixes = [str(Path(item).resolve()) for item in args.prefix]
+        if not prefixes:
+            prefixes.append(str(default_install_prefix()))
+        with tempfile.TemporaryDirectory(prefix="pdr-verify-") as temporary:
+            build = Path(temporary) / "build"
+            configure = [cmake, "-S", str(module), "-B", str(build)]
+            if args.generator:
+                configure.extend(["-G", args.generator])
+            if args.platform:
+                configure.extend(["-A", args.platform])
+            if prefixes:
+                configure.append("-DCMAKE_PREFIX_PATH=" + ";".join(prefixes))
+            poco_dir = Path(args.poco_dir).resolve() if args.poco_dir else next(
+                (Path(prefix) / "cmake" for prefix in prefixes
+                 if (Path(prefix) / "cmake" / "PocoConfig.cmake").is_file()),
+                None,
+            )
+            if poco_dir:
+                configure.append("-DPoco_DIR=" + str(poco_dir))
+                report["pocoDir"] = str(poco_dir)
+            commands = [
+                ("configure", configure),
+                ("build", [cmake, "--build", str(build), "--config", args.config]),
+                ("test", [ctest, "--test-dir", str(build), "-C", args.config,
+                          "--output-on-failure"]),
+            ]
+            for stage_name, command in commands:
+                stage = run_stage(stage_name, command)
+                report["stages"].append(stage)  # type: ignore[union-attr]
+                if not stage["passed"]:
+                    print(stage["stdout"], end="", file=sys.stderr)
+                    print(stage["stderr"], end="", file=sys.stderr)
+                    print(f"verify failed during {stage_name}", file=sys.stderr)
+                    result = 2
+                    break
+            else:
+                report["passed"] = True
+                result = 0
+                print(f"verified module: {module}")
+    except (FileNotFoundError, OSError) as error:
+        report["error"] = str(error)
+        print(f"verify failed: {error}", file=sys.stderr)
+        result = 2
+    finally:
+        report["finishedAt"] = datetime.now(timezone.utc).isoformat()
+        if report_path:
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(json.dumps(report, indent=2), encoding="utf-8", newline="\n")
+    return result
+
+
+def validate_config(args: argparse.Namespace) -> int:
+    prefix = Path(args.prefix).resolve() if args.prefix else default_install_prefix()
+    default_name = "pdr-config-check.exe" if sys.platform == "win32" else "pdr-config-check"
+    checker = Path(args.executable).resolve() if args.executable else prefix / "bin" / default_name
+    configurations = [Path(item).resolve() for item in args.configuration]
+    report = {
+        "schemaVersion": 1,
+        "executable": str(checker),
+        "configurationFiles": [str(item) for item in configurations],
+        "passed": False,
+    }
+    result = 2
+    if not checker.is_file():
+        report["error"] = f"configuration checker not found: {checker}"
+        print(f"config validation failed: {report['error']}", file=sys.stderr)
+    else:
+        completed = subprocess.run(
+            [str(checker), *(str(item) for item in configurations)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        report.update({
+            "exitCode": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+            "passed": completed.returncode == 0,
+        })
+        if completed.stdout:
+            print(completed.stdout, end="")
+        if completed.stderr:
+            print(completed.stderr, end="", file=sys.stderr)
+        result = completed.returncode
+    if args.report:
+        report_path = Path(args.report).resolve()
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, indent=2), encoding="utf-8", newline="\n")
+    return result
 
 
 def parser() -> argparse.ArgumentParser:
@@ -345,8 +564,32 @@ def parser() -> argparse.ArgumentParser:
     new.add_argument("--force", action="store_true")
     new.set_defaults(handler=create_module)
     check = commands.add_parser("doctor", help="check the local development environment")
-    check.add_argument("--root", default=Path(__file__).resolve().parents[1])
+    check.add_argument("--root")
+    check.add_argument("--prefix", help="installed PocoDDSRuntime/dependency prefix")
+    check.add_argument("--cmake")
+    check.add_argument("--ctest")
+    check.add_argument("--report")
     check.set_defaults(handler=doctor)
+    verify = commands.add_parser("verify", help="configure, build and test a generated module")
+    verify.add_argument("module")
+    verify.add_argument("--prefix", action="append", default=[],
+                        help="SDK/dependency install prefix; may be repeated")
+    verify.add_argument("--poco-dir", help="directory containing PocoConfig.cmake")
+    verify.add_argument("--config", default="Release")
+    verify.add_argument("--generator")
+    verify.add_argument("--platform")
+    verify.add_argument("--cmake")
+    verify.add_argument("--ctest")
+    verify.add_argument("--report")
+    verify.set_defaults(handler=verify_module)
+    config_check = commands.add_parser(
+        "validate-config", help="validate layered Runtime configuration without starting services"
+    )
+    config_check.add_argument("configuration", nargs="+")
+    config_check.add_argument("--prefix", help="installed PocoDDSRuntime prefix")
+    config_check.add_argument("--executable", help="pdr-config-check executable")
+    config_check.add_argument("--report")
+    config_check.set_defaults(handler=validate_config)
     return result
 
 

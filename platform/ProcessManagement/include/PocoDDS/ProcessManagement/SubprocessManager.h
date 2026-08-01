@@ -34,6 +34,7 @@ struct SubprocessInfo
     std::string state{"stopped"};
     unsigned long processId{0};
     bool manageable{true};
+    bool required{true};
 };
 
 class PDR_PROCESS_MANAGEMENT_API SubprocessManager final

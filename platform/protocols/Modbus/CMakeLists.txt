@@ -12,6 +12,7 @@ target_include_directories(PDRProtocolModbus
 pdr_set_warnings(PDRProtocolModbus)
 target_link_libraries(PDRProtocolModbus
     PUBLIC Poco::Net Poco::Foundation)
+set_target_properties(PDRProtocolModbus PROPERTIES EXPORT_NAME Modbus)
 if(BUILD_TESTING)
     add_executable(pdr-modbus-disconnect-recovery tests/DisconnectRecoveryTest.cpp)
     target_link_libraries(pdr-modbus-disconnect-recovery PRIVATE PocoDDS::Modbus)
@@ -21,5 +22,6 @@ if(BUILD_TESTING)
         LABELS "fault-injection;nightly;protocol"
         TIMEOUT 10)
 endif()
-install(TARGETS PDRProtocolModbus ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+install(TARGETS PDRProtocolModbus EXPORT PocoDDSRuntimeTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

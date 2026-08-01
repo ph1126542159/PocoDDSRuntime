@@ -1,27 +1,55 @@
 #include "PocoDDS/Protocols/MQTT/MqttClient.h"
 #include "PocoDDS/Protocols/ProtocolMetrics.h"
 
+#include <chrono>
 #include <stdexcept>
 #include <utility>
 
 namespace PocoDDS::Protocols::MQTT
 {
+namespace
+{
+bool isTlsUri(const std::string& uri)
+{
+    return uri.rfind("ssl://", 0) == 0 || uri.rfind("wss://", 0) == 0;
+}
+}
+
 MqttClient::MqttClient(Options options) : _options(std::move(options))
 {
     if (_options.serverUri.empty() || _options.clientId.empty())
         throw std::invalid_argument("MQTT server URI and client ID are required");
     if (_options.keepAliveSeconds < 0 || _options.connectTimeoutSeconds <= 0)
         throw std::invalid_argument("MQTT keep-alive must be non-negative and connect timeout positive");
+    const bool tls = isTlsUri(_options.serverUri);
+    const bool hasTlsMaterial = !_options.trustStore.empty() || !_options.keyStore.empty() ||
+                                !_options.privateKey.empty() ||
+                                !_options.privateKeyPassword.empty() ||
+                                !_options.enabledCipherSuites.empty();
+    if (hasTlsMaterial && !tls)
+        throw std::invalid_argument("MQTT TLS material requires an ssl:// or wss:// server URI");
+    if (!_options.privateKey.empty() && _options.keyStore.empty())
+        throw std::invalid_argument("MQTT private key requires a client key store/certificate");
+    if (!_options.privateKeyPassword.empty() && _options.privateKey.empty())
+        throw std::invalid_argument("MQTT private key password requires a private key");
     requireSuccess(MQTTClient_create(&_client,
                                      _options.serverUri.c_str(),
                                      _options.clientId.c_str(),
                                      MQTTCLIENT_PERSISTENCE_NONE,
                                      nullptr),
                    "create");
-    requireSuccess(MQTTClient_setCallbacks(
-                       _client, this, &MqttClient::onConnectionLost,
-                       &MqttClient::onMessageArrived, &MqttClient::onDeliveryComplete),
-                   "set callbacks");
+    try
+    {
+        requireSuccess(MQTTClient_setCallbacks(
+                           _client, this, &MqttClient::onConnectionLost,
+                           &MqttClient::onMessageArrived, &MqttClient::onDeliveryComplete),
+                       "set callbacks");
+    }
+    catch (...)
+    {
+        MQTTClient_destroy(&_client);
+        throw;
+    }
 }
 
 MqttClient::~MqttClient()
@@ -39,8 +67,9 @@ std::string MqttClient::name() const
 void MqttClient::open()
 {
     Poco::FastMutex::ScopedLock operationLock(_operationMutex);
-    if (_connected)
+    if (_connected && MQTTClient_isConnected(_client))
         return;
+    _connected = false;
     PocoDDS::Protocols::ProtocolMetricTimer metric("mqtt", "connect");
 
     MQTTClient_connectOptions options = MQTTClient_connectOptions_initializer;
@@ -49,6 +78,20 @@ void MqttClient::open()
     options.connectTimeout = _options.connectTimeoutSeconds;
     options.username = _options.username.empty() ? nullptr : _options.username.c_str();
     options.password = _options.password.empty() ? nullptr : _options.password.c_str();
+    MQTTClient_SSLOptions sslOptions = MQTTClient_SSLOptions_initializer;
+    if (isTlsUri(_options.serverUri))
+    {
+        sslOptions.trustStore = _options.trustStore.empty() ? nullptr : _options.trustStore.c_str();
+        sslOptions.keyStore = _options.keyStore.empty() ? nullptr : _options.keyStore.c_str();
+        sslOptions.privateKey = _options.privateKey.empty() ? nullptr : _options.privateKey.c_str();
+        sslOptions.privateKeyPassword = _options.privateKeyPassword.empty()
+            ? nullptr : _options.privateKeyPassword.c_str();
+        sslOptions.enabledCipherSuites = _options.enabledCipherSuites.empty()
+            ? nullptr : _options.enabledCipherSuites.c_str();
+        sslOptions.enableServerCertAuth = _options.verifyServerCertificate ? 1 : 0;
+        sslOptions.verify = _options.verifyHostname ? 1 : 0;
+        options.ssl = &sslOptions;
+    }
     try
     {
         if (_everConnected)
@@ -62,6 +105,7 @@ void MqttClient::open()
                                _client, topic.c_str(), static_cast<int>(qos)),
                            "restore subscription");
         _connected = true;
+        _intentionalDisconnect = false;
         _everConnected = true;
         markSuccess();
         metric.success();
@@ -69,6 +113,11 @@ void MqttClient::open()
     catch (const std::exception& error)
     {
         _connected = false;
+        if (MQTTClient_isConnected(_client))
+        {
+            _intentionalDisconnect = true;
+            MQTTClient_disconnect(_client, 1000);
+        }
         markFailure(error.what());
         throw;
     }
@@ -79,12 +128,18 @@ void MqttClient::close() noexcept
     Poco::FastMutex::ScopedLock operationLock(_operationMutex);
     if (!_connected.exchange(false))
         return;
+    _intentionalDisconnect = true;
+    _ignoreLossUntilNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch() + std::chrono::seconds(1)).count();
     MQTTClient_disconnect(_client, 3000);
 }
 
 bool MqttClient::isOpen() const noexcept
 {
-    return _connected;
+    if (!_connected) return false;
+    if (MQTTClient_isConnected(_client)) return true;
+    _connected = false;
+    return false;
 }
 
 void MqttClient::publish(const std::string& topic,
@@ -108,6 +163,11 @@ void MqttClient::publish(const std::string& topic,
         if (qos != QoS::atMostOnce)
             requireSuccess(MQTTClient_waitForCompletion(_client, token, 5000), "wait for delivery");
         markSuccess();
+        {
+            Poco::FastMutex::ScopedLock lock(_mutex);
+            ++_diagnostics.sentMessages;
+            _diagnostics.sentBytes += payload.size();
+        }
         metric.success();
     }
     catch (const std::exception& error)
@@ -164,6 +224,10 @@ void MqttClient::setMessageHandler(MessageHandler handler)
 void MqttClient::onConnectionLost(void* context, char* cause)
 {
     auto* self = static_cast<MqttClient*>(context);
+    const auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (self->_intentionalDisconnect || now < self->_ignoreLossUntilNanoseconds)
+        return;
     self->_connected = false;
     self->markFailure(std::string("MQTT connection lost") +
                       (cause && *cause ? ": " + std::string(cause) : ""));
@@ -209,10 +273,6 @@ int MqttClient::onMessageArrived(void* context,
                 ++self->_diagnostics.handlerFailures;
             }
         }
-        {
-            Poco::FastMutex::ScopedLock lock(self->_mutex);
-            ++self->_diagnostics.receivedMessages;
-        }
         success = true;
     }
     catch (const std::exception& error)
@@ -222,8 +282,16 @@ int MqttClient::onMessageArrived(void* context,
 
     if (message) MQTTClient_freeMessage(&message);
     if (topicName) MQTTClient_free(topicName);
+    if (success)
+    {
+        Poco::FastMutex::ScopedLock lock(self->_mutex);
+        ++self->_diagnostics.successfulOperations;
+        ++self->_diagnostics.receivedMessages;
+        self->_diagnostics.receivedBytes += payloadSize;
+        self->_diagnostics.lastError.clear();
+    }
     PocoDDS::Protocols::ProtocolMetrics::emit(
-        {"mqtt", "receive", success ? "success" : "failure", 0, payloadSize});
+        {"mqtt", "receive", success ? "success" : "error", 0, payloadSize});
     return 1;
 }
 

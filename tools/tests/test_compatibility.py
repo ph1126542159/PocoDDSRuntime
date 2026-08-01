@@ -1,10 +1,12 @@
 import copy
 import importlib.util
+import sys
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.dont_write_bytecode = True
 SPEC = importlib.util.spec_from_file_location(
     "check_compatibility", ROOT / "tools/check_compatibility.py"
 )

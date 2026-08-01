@@ -1,6 +1,6 @@
 find_package(eclipse-paho-mqtt-c CONFIG QUIET)
-if(eclipse-paho-mqtt-c_FOUND)
-    message(STATUS "Using existing Eclipse Paho MQTT C")
+if(TARGET eclipse-paho-mqtt-c::paho-mqtt3cs-static OR TARGET paho-mqtt3cs-static)
+    message(STATUS "Using existing TLS-enabled Eclipse Paho MQTT C")
     return()
 endif()
 
@@ -24,7 +24,7 @@ ExternalProject_Add(paho_mqtt_c
         -DPAHO_BUILD_SHARED=OFF
         -DPAHO_BUILD_SAMPLES=OFF
         -DPAHO_ENABLE_TESTING=OFF
-        -DPAHO_WITH_SSL=OFF
+        -DPAHO_WITH_SSL=ON
         -DPAHO_HIGH_PERFORMANCE=ON)
 
 unset(_paho_source_args)

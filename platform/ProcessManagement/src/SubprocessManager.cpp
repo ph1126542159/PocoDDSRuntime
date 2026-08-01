@@ -62,6 +62,7 @@ class SubprocessManager::Impl final
         Poco::Process::Args arguments;
         std::string initialDirectory;
         std::string location{"local"};
+        bool required{true};
     };
 
     struct RunningProcess
@@ -142,8 +143,9 @@ class SubprocessManager::Impl final
                 if (location != "local" && location != "remote")
                     throw Poco::InvalidArgumentException(
                         "Subprocess location must be local or remote", location);
+                const bool required = configuration->getBool(prefix + "required", true);
                 _configured.push_back(
-                    {name, executable, arguments, initialDirectory, location});
+                    {name, executable, arguments, initialDirectory, location, required});
                 if (location == "local")
                     launch(_configured.back());
                 else
@@ -213,6 +215,7 @@ class SubprocessManager::Impl final
             info.name = configured.name;
             info.location = configured.location;
             info.manageable = configured.location == "local";
+            info.required = configured.required;
             const auto running = findRunning(configured.name);
             if (running != _running.end() && Poco::Process::isRunning(*running->handle))
             {

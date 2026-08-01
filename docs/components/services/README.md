@@ -12,6 +12,8 @@
 
 DeviceGateway 使用独立的 `pdr.device.*` Topic。
 
+ProtocolGateway 不创建业务 DDS Topic；它按配置托管 MQTT、ROS Bridge 和 UDP 客户端，将其注册为 `pdr.protocol.*` OSP 服务，并向 SystemMonitoring 提供统一生命周期与诊断。详见 [ProtocolGateway](protocol-gateway/README.md)。
+
 ## Bundle 实现模板
 
 ```text
@@ -28,7 +30,7 @@ BundleActivator::stop
 └─ unregisterService
 ```
 
-所有服务通过 `myiot_add_osp_bundle()` 构建，`.bndlspec` 声明 symbolic name、版本、activator 和 run level。服务顺序为 Units 200、Network 210、DeviceStatus 220、WebEvent 230、Mobile 240；DeviceGateway 为 100。
+所有服务通过 `myiot_add_osp_bundle()` 构建，`.bndlspec` 声明 symbolic name、版本、activator 和 run level。服务顺序为 Units 200、Network 210、DeviceStatus 220、WebEvent 230、Mobile 240；DeviceGateway 为 100，ProtocolGateway 为 110。
 
 公共配置是 `pdr.fastdds.domainId`。业务专用配置目前包括 `deviceStatus.messages.maxAge`、`mobile.backend` 和 `mobile.legato.cmPath`。
 

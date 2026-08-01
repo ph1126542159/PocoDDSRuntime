@@ -7,6 +7,7 @@ target_include_directories(PDRProtocolBtLE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 target_link_libraries(PDRProtocolBtLE INTERFACE Poco::Foundation)
+set_target_properties(PDRProtocolBtLE PROPERTIES EXPORT_NAME BtLE)
 
 if(BUILD_TESTING)
     add_executable(pdr-btle-smoke tests/BtLESmoke.cpp)
@@ -15,4 +16,5 @@ if(BUILD_TESTING)
     add_test(NAME btle-smoke COMMAND pdr-btle-smoke)
 endif()
 
+install(TARGETS PDRProtocolBtLE EXPORT PocoDDSRuntimeTargets)
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

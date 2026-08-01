@@ -4,6 +4,7 @@
 #include "Poco/Exception.h"
 #include "Poco/Util/MapConfiguration.h"
 
+#include <algorithm>
 #include <iostream>
 
 int main()
@@ -99,6 +100,20 @@ int main()
     multi.setString("pdr.xbee.0.transport", "loopback");
     multi.setString("pdr.xbee.0.sourceAddress", "0013A200405291AB");
     multi.setUInt("pdr.xbee.0.analogChannel", 7);
+    multi.setUInt("pdr.mqtt.count", 1);
+    multi.setString("pdr.mqtt.0.id", "mqtt-a");
+    multi.setString("pdr.mqtt.0.serverUri", "tcp://127.0.0.1:1883");
+    multi.setUInt("pdr.mqtt.0.reconnectDelayMilliseconds", 250);
+    multi.setUInt("pdr.mqtt.0.reconnectMaximumDelayMilliseconds", 1000);
+    multi.setUInt("pdr.ros.count", 1);
+    multi.setString("pdr.ros.0.id", "ros-a");
+    multi.setString("pdr.ros.0.uri", "ws://127.0.0.1:9090");
+    multi.setUInt("pdr.udp.count", 1);
+    multi.setString("pdr.udp.0.id", "udp-a");
+    multi.setString("pdr.udp.0.localHost", "127.0.0.1");
+    multi.setUInt("pdr.udp.0.localPort", 0);
+    multi.setString("pdr.udp.0.remoteHost", "127.0.0.1");
+    multi.setUInt("pdr.udp.0.remotePort", 9000);
     if (!validator.validate(multi).empty())
         return 9;
     multi.setString("pdr.serial.1.id", "sim-a");
@@ -129,5 +144,77 @@ int main()
     multi.setString("pdr.xbee.0.sourceAddress", "not-hex");
     if (validator.validate(multi).empty())
         return 16;
+    multi.setString("pdr.xbee.0.sourceAddress", "0013A200405291AB");
+    multi.setUInt("pdr.udp.0.remotePort", 0);
+    if (validator.validate(multi).empty())
+        return 17;
+    multi.setUInt("pdr.udp.0.remotePort", 9000);
+    multi.setUInt("pdr.mqtt.0.reconnectDelayMilliseconds", 2000);
+    multi.setUInt("pdr.mqtt.0.reconnectMaximumDelayMilliseconds", 1000);
+    if (validator.validate(multi).empty())
+        return 18;
+    multi.setUInt("pdr.mqtt.0.reconnectDelayMilliseconds", 250);
+    multi.setUInt("pdr.mqtt.0.reconnectMaximumDelayMilliseconds", 1000);
+    multi.setString("pdr.mqtt.0.serverUri", "ssl://broker.example:8883");
+    multi.setString("pdr.mqtt.0.trustStore", "certificates/ca.pem");
+    if (!validator.validate(multi).empty())
+        return 19;
+    multi.setString("pdr.mqtt.0.serverUri", "tcp://broker.example:1883");
+    if (validator.validate(multi).empty())
+        return 20;
+    multi.setString("pdr.mqtt.0.serverUri", "ssl://broker.example:8883");
+    multi.setString("pdr.mqtt.0.privateKeyPassword", "secret");
+    if (validator.validate(multi).empty())
+        return 21;
+    multi.setString("pdr.mqtt.0.privateKey", "certificates/client.key");
+    multi.setString("pdr.mqtt.0.keyStore", "certificates/client.crt");
+    multi.setString("security.profile", "production");
+    multi.setBool("pdr.mqtt.0.verifyHostname", false);
+    const auto productionIssues = validator.validate(multi);
+    if (std::none_of(productionIssues.begin(), productionIssues.end(), [](const auto& issue) {
+            return issue.key == "pdr.mqtt.0.verifyHostname";
+        }))
+        return 22;
+    multi.setString("security.profile", "development");
+    multi.setBool("pdr.mqtt.0.verifyHostname", true);
+    multi.setString("pdr.mqtt.0.passwordEnvironment", "NOT VALID");
+    const auto invalidEnvironmentIssues = validator.validate(multi);
+    if (std::none_of(invalidEnvironmentIssues.begin(), invalidEnvironmentIssues.end(),
+                     [](const auto& issue) {
+                         return issue.key == "pdr.mqtt.0.passwordEnvironment" &&
+                                issue.message.find("valid environment") != std::string::npos;
+                     }))
+        return 23;
+    multi.setString("pdr.mqtt.0.passwordEnvironment", "PDR_TEST_MQTT_PASSWORD");
+    multi.setString("pdr.mqtt.0.password", "inline-secret");
+    const auto conflictingSecretIssues = validator.validate(multi);
+    if (std::none_of(conflictingSecretIssues.begin(), conflictingSecretIssues.end(),
+                     [](const auto& issue) {
+                         return issue.key == "pdr.mqtt.0.passwordEnvironment" &&
+                                issue.message.find("mutually exclusive") != std::string::npos;
+                     }))
+        return 24;
+    multi.remove("pdr.mqtt.0.password");
+    multi.remove("pdr.mqtt.0.passwordEnvironment");
+    multi.setString("pdr.ros.0.uri", "wss://ros.example:9443/");
+    multi.setString("pdr.ros.0.trustStore", "certificates/ca.pem");
+    if (!validator.validate(multi).empty())
+        return 25;
+    multi.setString("pdr.ros.0.uri", "ws://ros.example:9090/");
+    if (validator.validate(multi).empty())
+        return 26;
+    multi.setString("pdr.ros.0.uri", "wss://ros.example:9443/");
+    multi.setString("pdr.ros.0.clientCertificate", "certificates/client.pem");
+    if (validator.validate(multi).empty())
+        return 27;
+    multi.setString("pdr.ros.0.privateKey", "certificates/client.key");
+    multi.setString("pdr.ros.0.authorizationEnvironment", "NOT VALID");
+    const auto invalidRosEnvironmentIssues = validator.validate(multi);
+    if (std::none_of(invalidRosEnvironmentIssues.begin(), invalidRosEnvironmentIssues.end(),
+                     [](const auto& issue) {
+                         return issue.key == "pdr.ros.0.authorizationEnvironment" &&
+                                issue.message.find("valid environment") != std::string::npos;
+                     }))
+        return 28;
     std::cout << "CONFIGURATION_SMOKE_PASS\n";
 }

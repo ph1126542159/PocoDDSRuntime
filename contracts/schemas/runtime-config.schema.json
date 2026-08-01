@@ -3,7 +3,11 @@
   "$id": "https://pocodds.local/schemas/runtime-config.schema.json",
   "title": "PocoDDSRuntime configuration",
   "type": "object",
-  "required": ["osp.web.server.host", "osp.web.server.port", "pdr.fastdds.domainId"],
+  "required": [
+    "osp.web.server.host",
+    "osp.web.server.port",
+    "pdr.fastdds.domainId"
+  ],
   "properties": {
     "security.profile": { "type": "string", "enum": ["development", "production"] },
     "osp.web.server.host": { "type": "string", "minLength": 1 },
@@ -12,8 +16,8 @@
     "auth.simple.enable": { "type": "boolean" },
     "osp.web.server.port": { "type": "integer", "minimum": 1, "maximum": 65535 },
     "pdr.fastdds.domainId": { "type": "integer", "minimum": 0, "maximum": 232 },
-    "pdr.subprocess.shutdownTimeoutMilliseconds": { "type": "integer", "minimum": 1 },
-    "observability.history.retentionDays": { "type": "integer", "minimum": 1 },
+    "pdr.subprocess.shutdownTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+    "observability.history.retentionDays": { "type": "integer", "minimum": 1, "maximum": 36500 },
     "observability.metrics.serviceName": { "type": "string", "minLength": 1 },
     "observability.metrics.serviceInstanceId": { "type": "string" },
     "observability.metrics.otlpHttpEndpoint": { "type": "string" },
@@ -22,16 +26,16 @@
     "observability.metrics.otlpClientKeyPath": { "type": "string" },
     "observability.metrics.otlpInsecureSkipVerify": { "type": "boolean" },
     "observability.metrics.offlineCachePath": { "type": "string", "minLength": 1 },
-    "observability.metrics.offlineCacheMaximumFiles": { "type": "integer", "minimum": 1 },
-    "observability.metrics.exportIntervalMilliseconds": { "type": "integer", "minimum": 100 },
-    "observability.metrics.exportTimeoutMilliseconds": { "type": "integer", "minimum": 100 },
-    "observability.metrics.maximumSeries": { "type": "integer", "minimum": 1 },
+    "observability.metrics.offlineCacheMaximumFiles": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+    "observability.metrics.exportIntervalMilliseconds": { "type": "integer", "minimum": 100, "maximum": 3600000 },
+    "observability.metrics.exportTimeoutMilliseconds": { "type": "integer", "minimum": 100, "maximum": 3600000 },
+    "observability.metrics.maximumSeries": { "type": "integer", "minimum": 1, "maximum": 1000000 },
     "pdr.modbus.port": { "type": "integer", "minimum": 1, "maximum": 65535 },
     "pdr.modbus.unitId": { "type": "integer", "minimum": 0, "maximum": 247 },
     "pdr.modbus.timeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 60000 },
     "pdr.modbus.readRetryAttempts": { "type": "integer", "minimum": 0, "maximum": 10 },
     "pdr.modbus.retryDelayMilliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 },
-    "pdr.serial.baudRate": { "type": "integer", "minimum": 1 },
+    "pdr.serial.baudRate": { "type": "integer", "minimum": 1, "maximum": 4000000 },
     "pdr.serial.transport": { "type": "string", "enum": ["port", "loopback"] },
     "pdr.serial.parameters": { "type": "string", "pattern": "^[5-8][NEO][12]$" },
     "pdr.serial.flowControl": { "type": "string", "enum": ["none", "rtscts"] },
@@ -49,7 +53,7 @@
     "pdr.can.reconnectDelayMilliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 },
     "pdr.can.receiveTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 60000 },
     "pdr.can.staleAfterMilliseconds": { "type": "integer", "minimum": 1, "maximum": 60000 },
-    "pdr.gnss.baudRate": { "type": "integer", "minimum": 1 },
+    "pdr.gnss.baudRate": { "type": "integer", "minimum": 1, "maximum": 4000000 },
     "pdr.gnss.transport": { "type": "string", "enum": ["port", "loopback"] },
     "pdr.gnss.reconnectEnabled": { "type": "boolean" },
     "pdr.gnss.reconnectDelayMilliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 },
@@ -67,6 +71,15 @@
       "type": "boolean"
     },
     "^pdr\\.(simulation|modbus|serial|gnss|gpio|xbee|can|led)\\.[0-9]+\\.required$": {
+      "type": "boolean"
+    },
+    "^pdr\\.(mqtt|ros|udp)\\.count$": {
+      "type": "integer", "minimum": 0, "maximum": 256
+    },
+    "^pdr\\.(mqtt|ros|udp)\\.[0-9]+\\.id$": {
+      "type": "string", "minLength": 1
+    },
+    "^pdr\\.(mqtt|ros|udp)\\.[0-9]+\\.(enabled|required)$": {
       "type": "boolean"
     },
     "^pdr\\.modbus\\.[0-9]+\\.port$": {
@@ -132,6 +145,12 @@
     "^pdr\\.xbee\\.[0-9]+\\.analogChannel$": {
       "type": "integer", "minimum": 0, "maximum": 15
     },
+    "^pdr\\.xbee\\.[0-9]+\\.sourceAddress$": {
+      "type": "string", "pattern": "^[0-9a-fA-F]{1,16}$"
+    },
+    "^pdr\\.xbee\\.[0-9]+\\.conversion$": {
+      "type": "string", "enum": ["raw", "millivolts", "temperature", "humidity"]
+    },
     "^pdr\\.xbee\\.[0-9]+\\.transport$": {
       "type": "string", "enum": ["port", "loopback"]
     },
@@ -164,6 +183,51 @@
     },
     "^pdr\\.can\\.[0-9]+\\.(receiveTimeoutMilliseconds|staleAfterMilliseconds)$": {
       "type": "integer", "minimum": 1, "maximum": 60000
+    },
+    "^pdr\\.(mqtt|ros|udp)\\.[0-9]+\\.(autoReconnect|verifyServerCertificate|verifyHostname)$": {
+      "type": "boolean"
+    },
+    "^pdr\\.(mqtt|ros|udp)\\.[0-9]+\\.reconnect(Delay|MaximumDelay)Milliseconds$": {
+      "type": "integer", "minimum": 100, "maximum": 3600000
+    },
+    "^pdr\\.mqtt\\.[0-9]+\\.serverUri$": {
+      "type": "string", "minLength": 1
+    },
+    "^pdr\\.mqtt\\.[0-9]+\\.(username|password|trustStore|keyStore|privateKey|privateKeyPassword|enabledCipherSuites)$": {
+      "type": "string"
+    },
+    "^pdr\\.mqtt\\.[0-9]+\\.(username|password|privateKeyPassword)Environment$": {
+      "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "^pdr\\.mqtt\\.[0-9]+\\.keepAliveSeconds$": {
+      "type": "integer", "minimum": 0, "maximum": 86400
+    },
+    "^pdr\\.mqtt\\.[0-9]+\\.connectTimeoutSeconds$": {
+      "type": "integer", "minimum": 1, "maximum": 3600
+    },
+    "^pdr\\.ros\\.[0-9]+\\.uri$": {
+      "type": "string", "pattern": "^wss?://", "minLength": 1
+    },
+    "^pdr\\.ros\\.[0-9]+\\.(authorization|trustStore|clientCertificate|privateKey)$": {
+      "type": "string"
+    },
+    "^pdr\\.ros\\.[0-9]+\\.authorizationEnvironment$": {
+      "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "^pdr\\.ros\\.[0-9]+\\.maximumMessageSize$": {
+      "type": "integer", "minimum": 1, "maximum": 2147483647
+    },
+    "^pdr\\.ros\\.[0-9]+\\.connectTimeoutSeconds$": {
+      "type": "integer", "minimum": 1, "maximum": 3600
+    },
+    "^pdr\\.udp\\.[0-9]+\\.(localHost|remoteHost)$": {
+      "type": "string", "minLength": 1
+    },
+    "^pdr\\.udp\\.[0-9]+\\.localPort$": {
+      "type": "integer", "minimum": 0, "maximum": 65535
+    },
+    "^pdr\\.udp\\.[0-9]+\\.remotePort$": {
+      "type": "integer", "minimum": 1, "maximum": 65535
     }
   },
   "additionalProperties": true

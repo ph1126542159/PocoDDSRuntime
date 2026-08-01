@@ -8,8 +8,8 @@ endforeach()
 set(root "${PDR_BINARY_DIR}/generated-device-consumer")
 set(module_root "${root}/source")
 set(module "${module_root}/ExampleDevice")
-set(build "${root}/build")
 set(install "${root}/install")
+set(report "${root}/verify-report.json")
 file(REMOVE_RECURSE "${root}")
 
 execute_process(
@@ -28,29 +28,21 @@ if(NOT install_result EQUAL 0)
     message(FATAL_ERROR "Framework install for generated device failed: ${install_result}")
 endif()
 
-set(configure_command "${PDR_CMAKE}"
-    -S "${module}" -B "${build}" -G "${PDR_GENERATOR}"
-    "-DCMAKE_PREFIX_PATH=${install};${PDR_DEPENDENCY_PREFIX}"
-    "-DPoco_DIR=${PDR_DEPENDENCY_PREFIX}/cmake")
+set(verify_command "${PDR_PYTHON}" "${PDR_SOURCE_DIR}/tools/pdr.py"
+    verify "${module}"
+    --cmake "${PDR_CMAKE}"
+    --ctest "${PDR_CTEST}"
+    --generator "${PDR_GENERATOR}"
+    --config "${PDR_CONFIG}"
+    --prefix "${install}"
+    --prefix "${PDR_DEPENDENCY_PREFIX}"
+    --report "${report}")
 if(PDR_GENERATOR_PLATFORM)
-    list(APPEND configure_command -A "${PDR_GENERATOR_PLATFORM}")
+    list(APPEND verify_command --platform "${PDR_GENERATOR_PLATFORM}")
 endif()
-execute_process(COMMAND ${configure_command} RESULT_VARIABLE configure_result)
-if(NOT configure_result EQUAL 0)
-    message(FATAL_ERROR "Generated device configure failed: ${configure_result}")
-endif()
-
 execute_process(
-    COMMAND "${PDR_CMAKE}" --build "${build}" --config "${PDR_CONFIG}"
-    RESULT_VARIABLE build_result)
-if(NOT build_result EQUAL 0)
-    message(FATAL_ERROR "Generated device build failed: ${build_result}")
-endif()
-
-execute_process(
-    COMMAND "${PDR_CTEST}" --test-dir "${build}"
-            -C "${PDR_CONFIG}" --output-on-failure
-    RESULT_VARIABLE test_result)
-if(NOT test_result EQUAL 0)
-    message(FATAL_ERROR "Generated device smoke failed: ${test_result}")
+    COMMAND ${verify_command}
+    RESULT_VARIABLE verify_result)
+if(NOT verify_result EQUAL 0)
+    message(FATAL_ERROR "Generated device verification failed: ${verify_result}; report=${report}")
 endif()

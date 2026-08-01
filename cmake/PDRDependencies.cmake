@@ -17,6 +17,15 @@ function(pdr_bootstrap_missing_dependencies)
         set(dependencies_missing TRUE)
     endif()
 
+    # Fast DDS can create only the legacy subset of protobuf imported targets.
+    # Load the complete config export first when observability is enabled so a
+    # clean configure cannot later collide with OpenTelemetry's full target set.
+    if(PDR_ENABLE_OBSERVABILITY)
+        find_package(absl CONFIG QUIET
+            PATHS "${PDR_INSTALL_PREFIX}" NO_DEFAULT_PATH)
+        find_package(Protobuf CONFIG QUIET
+            PATHS "${PDR_INSTALL_PREFIX}" NO_DEFAULT_PATH)
+    endif()
     find_package(fastdds 3 CONFIG QUIET
         PATHS "${PDR_INSTALL_PREFIX}" NO_DEFAULT_PATH)
     if(NOT fastdds_FOUND)
@@ -25,8 +34,8 @@ function(pdr_bootstrap_missing_dependencies)
 
     find_package(eclipse-paho-mqtt-c CONFIG QUIET
         PATHS "${PDR_INSTALL_PREFIX}" NO_DEFAULT_PATH)
-    if(NOT TARGET eclipse-paho-mqtt-c::paho-mqtt3a-static AND
-       NOT TARGET paho-mqtt3a-static)
+    if(NOT TARGET eclipse-paho-mqtt-c::paho-mqtt3cs-static AND
+       NOT TARGET paho-mqtt3cs-static)
         set(dependencies_missing TRUE)
     endif()
 

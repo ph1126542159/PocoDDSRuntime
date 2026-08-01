@@ -11,16 +11,42 @@ target_include_directories(PDRProtocolMQTT
 target_compile_definitions(PDRProtocolMQTT PRIVATE PAHO_MQTT_STATIC)
 target_link_libraries(PDRProtocolMQTT
     PUBLIC
-        eclipse-paho-mqtt-c::paho-mqtt3c-static
+        eclipse-paho-mqtt-c::paho-mqtt3cs-static
         Poco::Foundation)
 pdr_set_warnings(PDRProtocolMQTT)
+set_target_properties(PDRProtocolMQTT PROPERTIES EXPORT_NAME MQTT)
 
 if(BUILD_TESTING)
+    find_package(Python3 3.9 QUIET COMPONENTS Interpreter)
     add_executable(pdr-mqtt-smoke tests/MqttSmoke.cpp)
     target_link_libraries(pdr-mqtt-smoke PRIVATE PocoDDS::MQTT Poco::Net)
     pdr_set_warnings(pdr-mqtt-smoke)
     add_test(NAME mqtt-smoke COMMAND pdr-mqtt-smoke)
+
+    add_executable(pdr-mqtt-tls-probe tests/MqttTlsProbe.cpp)
+    target_link_libraries(pdr-mqtt-tls-probe PRIVATE PocoDDS::MQTT)
+    pdr_set_warnings(pdr-mqtt-tls-probe)
+    find_program(PDR_OPENSSL_EXECUTABLE openssl
+        HINTS "${OPENSSL_ROOT_DIR}/bin"
+              "${OPENSSL_INCLUDE_DIR}/../bin")
+    if(PDR_OPENSSL_EXECUTABLE AND Python3_EXECUTABLE)
+        add_test(NAME mqtt-tls-integration
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tools/mqtt_tls_integration.py"
+                --openssl "${PDR_OPENSSL_EXECUTABLE}"
+                --probe "$<TARGET_FILE:pdr-mqtt-tls-probe>"
+                --runtime-smoke "${CMAKE_SOURCE_DIR}/tools/runtime_smoke.py"
+                --runtime "$<TARGET_FILE:pdr-runtime>"
+                --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                --config "${CMAKE_SOURCE_DIR}/config/pdr-runtime.properties"
+                --install-bin "${PDR_INSTALL_PREFIX}/bin"
+                --report "${CMAKE_BINARY_DIR}/reports/runtime-mqtt-tls-integration.json")
+        set_tests_properties(mqtt-tls-integration PROPERTIES
+            LABELS "protocol;integration;security;runtime" TIMEOUT 45
+            RESOURCE_LOCK pdr_runtime_http)
+    endif()
 endif()
 
-install(TARGETS PDRProtocolMQTT ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+install(TARGETS PDRProtocolMQTT EXPORT PocoDDSRuntimeTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

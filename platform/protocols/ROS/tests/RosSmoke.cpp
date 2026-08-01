@@ -3,10 +3,12 @@
 #include <Poco/JSON/Parser.h>
 
 #include <iostream>
+#include <type_traits>
 
 int main()
 {
     using Client = PocoDDS::Protocols::ROS::BridgeClient;
+    static_assert(std::is_base_of_v<PocoDDS::Protocols::Protocol, Client>);
     Client::SubscribeOptions options;
     options.type = "sensor_msgs/NavSatFix";
     options.throttleRate = 100;
@@ -21,7 +23,9 @@ int main()
         Client::makeUnsubscribeRequest("/fix", "sub-1"))
         .extract<Poco::JSON::Object::Ptr>();
 
-    if (subscribe->getValue<std::string>("op") != "subscribe" ||
+    Client client(Poco::URI("ws://127.0.0.1:9090"));
+    if (client.name() != "rosbridge" || client.isOpen() ||
+        subscribe->getValue<std::string>("op") != "subscribe" ||
         subscribe->getValue<std::string>("topic") != "/fix" ||
         subscribe->getValue<int>("throttle_rate") != 100 ||
         unsubscribe->getValue<std::string>("op") != "unsubscribe")

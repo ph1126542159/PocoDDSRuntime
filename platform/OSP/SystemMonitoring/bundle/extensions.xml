@@ -18,6 +18,12 @@
              allowSpecialization="none"
              hidden="true"/>
   <extension point="osp.web.server.requesthandler"
+             path="/api/v1/protocols"
+             class="PocoDDS::SystemMonitoring::ProtocolsHandlerFactory"
+             library="pdr.platform.systemMonitoring"
+             allowSpecialization="none"
+             hidden="true"/>
+  <extension point="osp.web.server.requesthandler"
              path="/api/v1/process-logs"
              class="PocoDDS::SystemMonitoring::ProcessLogsHandlerFactory"
              library="pdr.platform.systemMonitoring"

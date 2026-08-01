@@ -10,6 +10,7 @@ add_library(Serial ${SRCS})
 add_library(Poco::Serial ALIAS Serial)
 set_target_properties(Serial
     PROPERTIES
+    EXPORT_NAME Serial
     VERSION "1" SOVERSION "1"
     OUTPUT_NAME PocoSerial
     DEFINE_SYMBOL Serial_EXPORTS
@@ -24,4 +25,8 @@ target_include_directories(Serial
 )
 
 POCO_INSTALL(Serial)
+install(TARGETS Serial EXPORT PocoDDSRuntimeTargets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 POCO_GENERATE_PACKAGE(Serial)

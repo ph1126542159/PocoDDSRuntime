@@ -20,12 +20,14 @@ public:
     std::vector<std::uint8_t> read(std::size_t size, Poco::Timespan) override
     {
         if (_fail.exchange(false)) throw std::runtime_error("GNSS link lost");
-        std::lock_guard<std::mutex> lock(_mutex);
         std::vector<std::uint8_t> result;
-        while (! _bytes.empty() && result.size() < size)
         {
-            result.push_back(_bytes.front());
-            _bytes.pop_front();
+            std::lock_guard<std::mutex> lock(_mutex);
+            while (!_bytes.empty() && result.size() < size)
+            {
+                result.push_back(_bytes.front());
+                _bytes.pop_front();
+            }
         }
         if (result.empty()) Poco::Thread::sleep(5);
         return result;

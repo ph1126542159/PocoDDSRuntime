@@ -12,6 +12,7 @@ target_include_directories(PDRProtocolSerial
 target_link_libraries(PDRProtocolSerial
     PUBLIC Poco::Serial Poco::Foundation)
 pdr_set_warnings(PDRProtocolSerial)
+set_target_properties(PDRProtocolSerial PROPERTIES EXPORT_NAME SerialProtocol)
 
 if(BUILD_TESTING)
     add_executable(pdr-serial-loopback-smoke tests/LoopbackSerialTest.cpp)
@@ -24,5 +25,6 @@ if(BUILD_TESTING)
         TIMEOUT 5)
 endif()
 
-install(TARGETS PDRProtocolSerial ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+install(TARGETS PDRProtocolSerial EXPORT PocoDDSRuntimeTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
