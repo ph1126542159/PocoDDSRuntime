@@ -1,6 +1,7 @@
 #include "PocoDDS/DDS/ServiceEndpoint.h"
 
 #if defined(PDR_ENABLE_OBSERVABILITY)
+#include "PocoDDS/Observability/Metrics.h"
 #include "PocoDDS/Observability/TraceSerialization.h"
 #endif
 
@@ -8,6 +9,7 @@
 #include <Poco/Timestamp.h>
 
 #include <atomic>
+#include <chrono>
 #include <stdexcept>
 #include <utility>
 
@@ -105,6 +107,11 @@ void ServiceEndpoint::enqueue(const Envelope& request)
         if (_stopping)
             return;
         _requests.push_back(request);
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        PocoDDS::Observability::Metrics::global().recordHistogram(
+            "pdr.dds.service.queue.depth", static_cast<double>(_requests.size()),
+            {{"topic", _requestTopic}}, "Pending DDS service requests", "{request}");
+#endif
     }
     _condition.notify_one();
 }
@@ -140,6 +147,11 @@ void ServiceEndpoint::run()
             {
                 request = std::move(_requests.front());
                 _requests.pop_front();
+#if defined(PDR_ENABLE_OBSERVABILITY)
+                PocoDDS::Observability::Metrics::global().recordHistogram(
+                    "pdr.dds.service.queue.depth", static_cast<double>(_requests.size()),
+                    {{"topic", _requestTopic}}, "Pending DDS service requests", "{request}");
+#endif
                 const auto found = _responses.find(request.correlationId);
                 if (!request.correlationId.empty() && found != _responses.end())
                 {
@@ -191,6 +203,11 @@ void ServiceEndpoint::run()
 
         if (hasCached)
         {
+#if defined(PDR_ENABLE_OBSERVABILITY)
+            PocoDDS::Observability::Metrics::global().addCounter(
+                "pdr.dds.service.cache.hits", 1, {{"topic", _requestTopic}},
+                "Idempotent DDS response cache hits", "{hit}");
+#endif
             try
             {
                 _runtime->publish(_responseTopic, cached);
@@ -202,6 +219,9 @@ void ServiceEndpoint::run()
         }
 
         Envelope response;
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        const auto requestStartedAt = std::chrono::steady_clock::now();
+#endif
         response.kind = "response";
         response.operation = request.operation;
         response.correlationId = request.correlationId;
@@ -282,9 +302,27 @@ void ServiceEndpoint::run()
         try
         {
             _runtime->publish(_responseTopic, response);
+#if defined(PDR_ENABLE_OBSERVABILITY)
+            auto& metrics = PocoDDS::Observability::Metrics::global();
+            const std::string result = response.status == 0 ? "success" : "error";
+            metrics.addCounter("pdr.dds.service.requests", 1,
+                               {{"operation", request.operation}, {"result", result},
+                                {"topic", _requestTopic}},
+                               "DDS service requests completed", "{request}");
+            metrics.recordHistogram(
+                "pdr.dds.service.duration", std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - requestStartedAt).count(),
+                {{"operation", request.operation}, {"topic", _requestTopic}},
+                "DDS service request duration", "ms");
+#endif
         }
         catch (...)
         {
+#if defined(PDR_ENABLE_OBSERVABILITY)
+            PocoDDS::Observability::Metrics::global().addCounter(
+                "pdr.dds.service.response.errors", 1, {{"topic", _responseTopic}},
+                "DDS service response publish failures", "{error}");
+#endif
         }
     }
 }

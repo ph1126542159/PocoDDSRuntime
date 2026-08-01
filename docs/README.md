@@ -9,8 +9,10 @@
 3. [设备网关服务](components/services/device-gateway/README.md)
 4. 按需阅读具体协议、设备或业务服务文档
 5. 需要追踪业务链路时阅读[业务追踪](BUSINESS_TRACING.md)
-6. 平台治理入口：[分层规则](architecture/layering-rules.md)、[部署 Profile](architecture/deployment-profiles.md)、[ADR](adr/README.md)
+6. 平台治理入口：[分层规则](architecture/layering-rules.md)、[部署 Profile](architecture/deployment-profiles.md)、[稳定性与设备验收矩阵](operations/acceptance-matrix.md)、[ADR](adr/README.md)
 7. 运维入口：[运行手册](operations/runbook.md)、[故障排查](operations/troubleshooting.md)、[恢复手册](operations/recovery.md)
+8. 基于框架开发新产品时阅读：[公共 SDK 与脚手架](development/sdk-and-scaffolding.md)
+9. 生产部署和发布前阅读：[安全基线](security/README.md)
 
 ## 项目目录结构
 

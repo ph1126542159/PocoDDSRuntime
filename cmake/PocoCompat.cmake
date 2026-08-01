@@ -129,6 +129,11 @@ function(myiot_copy_windows_runtime_dlls target_name)
                 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
             VERBATIM)
         file(GLOB runtime_dlls "${PDR_INSTALL_PREFIX}/bin/*.dll")
+        # These DLLs are produced by this build tree in the same output
+        # directory. Copying an older installed version over an active target
+        # output causes entry-point failures after public APIs are extended.
+        list(FILTER runtime_dlls EXCLUDE REGEX
+            "/(PDRObservability|PDRBundleManagement|PDRProcessManagement)\\.dll$")
         if(OPENSSL_INCLUDE_DIR)
             get_filename_component(openssl_root "${OPENSSL_INCLUDE_DIR}" DIRECTORY)
             file(GLOB openssl_runtime_dlls

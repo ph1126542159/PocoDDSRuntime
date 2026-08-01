@@ -1,5 +1,6 @@
 add_library(PDRHealth INTERFACE)
 add_library(PocoDDS::Health ALIAS PDRHealth)
+set_target_properties(PDRHealth PROPERTIES EXPORT_NAME Health)
 target_include_directories(PDRHealth INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)

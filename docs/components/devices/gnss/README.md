@@ -8,8 +8,13 @@
 
 ```properties
 pdr.gnss.enabled = true
+pdr.gnss.transport = port
 pdr.gnss.port = COM18
 pdr.gnss.baudRate = 9600
+pdr.gnss.reconnectEnabled = true
+pdr.gnss.reconnectDelayMilliseconds = 250
+pdr.gnss.readTimeoutMilliseconds = 250
+pdr.gnss.staleAfterMilliseconds = 5000
 ```
 
 Linux 将端口改为实际设备节点。验证应检查串口原始 NMEA、定位有效标志和网关发布的设备状态，室内无定位不等于串口故障。
@@ -32,6 +37,21 @@ auto fixed = gnss.execute("hasFix", "");
 auto position = gnss.execute("position", "");
 gnss.stop();
 ```
+
+## 状态、恢复与诊断
+
+- 串口打开后仍是 `offline`，只有校验通过且声明有效定位的 RMC/GGA 才进入 `ready`。
+- RMC `V` 或 GGA fix quality `0` 会清除定位有效性并进入 `offline`。
+- 串口读异常进入 `fault`；启用恢复后会关闭并重开串口，重连后保持 `offline`，直到收到新的有效 fix。
+- 有效定位超过 `staleAfterMilliseconds` 未刷新会进入 `offline`，诊断错误为 `GNSS fix stale`。
+- checksum 或字段格式错误会计入失败诊断，但单个坏句不会抹掉仍在新鲜窗口内的最后有效 fix。
+- 定位和快照回调的异常被隔离，不会终止采集线程。
+
+`/api/v1/devices` 会公开成功/失败次数、连续失败、重连次数和最近错误。设备默认 `required=true`，因此无 fix、陈旧或故障会使 `/health/ready` 返回 503；可选 GNSS 应显式配置 `required=false`。
+
+## Loopback 与真实验收边界
+
+开发和 CI 可使用 `transport=loopback` 验证 Bundle、API、诊断和 readiness 路径；生产安全门禁禁止 GNSS loopback。该路径不证明真实 GNSS 模块、电平、波特率、天线、卫星可见度、首次定位时间或长期漂移，仍需目标机 HIL 验收。
 
 测试也可使用只传 ID 的构造函数，然后调用 `ingestSentence()` 注入 NMEA，而不打开真串口。
 

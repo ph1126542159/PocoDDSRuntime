@@ -8,12 +8,21 @@
 #include <Poco/Thread.h>
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <string>
 
 namespace PocoDDS::Devices
 {
-class CanSignalSensor final : public Sensor
+struct CanRecoveryPolicy
+{
+    bool enabled{true};
+    std::chrono::milliseconds reconnectDelay{250};
+    std::chrono::milliseconds receiveTimeout{250};
+    std::chrono::milliseconds staleAfter{2000};
+};
+
+class CanSignalSensor final : public Sensor, public DiagnosticDevice
 {
 public:
     struct Options
@@ -21,6 +30,7 @@ public:
         std::string id;
         std::string interfaceName;
         std::uint32_t frameId{0};
+        bool extended{false};
         std::size_t bitOffset{0};
         std::size_t bitLength{1};
         PocoDDS::Protocols::CAN::BitOrder bitOrder{
@@ -32,7 +42,10 @@ public:
         std::string physicalUnit;
     };
 
-    explicit CanSignalSensor(Options options);
+    explicit CanSignalSensor(Options options, CanRecoveryPolicy recoveryPolicy = {});
+    CanSignalSensor(Options options,
+                    std::shared_ptr<PocoDDS::Protocols::CAN::CanEndpoint> endpoint,
+                    CanRecoveryPolicy recoveryPolicy = {});
     ~CanSignalSensor() override;
 
     const std::string& id() const noexcept override;
@@ -47,18 +60,27 @@ public:
     std::string physicalUnit() const override;
     void setValueHandler(ValueHandler handler) override;
     bool ingest(const PocoDDS::Protocols::CAN::CanFrame& frame);
+    DeviceDiagnostics diagnostics() const override;
 
 private:
     void run();
+    void markTransportFailure(const std::string& message);
+    void markConnected();
+    void checkStale();
+    void notify(const DeviceSnapshot& snapshot, bool notifyValue);
     Options _options;
+    CanRecoveryPolicy _recoveryPolicy;
     std::string _type{"sensor.can.signal"};
-    std::unique_ptr<PocoDDS::Protocols::CAN::SocketCanEndpoint> _endpoint;
+    std::shared_ptr<PocoDDS::Protocols::CAN::CanEndpoint> _endpoint;
     std::atomic_bool _running{false};
     mutable Poco::FastMutex _mutex;
     Poco::Thread _thread;
-    bool _ready{false};
+    DeviceState _state{DeviceState::offline};
     double _value{0};
     std::uint64_t _sequence{0};
+    std::string _lastPayload{"no-frame"};
+    std::chrono::steady_clock::time_point _lastFrame;
+    DeviceDiagnostics _diagnostics;
     SnapshotHandler _snapshotHandler;
     ValueHandler _valueHandler;
 };

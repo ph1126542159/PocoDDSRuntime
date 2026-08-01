@@ -8,11 +8,30 @@
 namespace PocoDDS::Devices
 {
 
-SerialPortDevice::SerialPortDevice(std::string id, std::string port, int baudRate)
-    : _id(std::move(id)),
-      _channel(std::make_unique<PocoDDS::Protocols::Serial::SerialChannel>(
-          std::move(port), baudRate))
+SerialPortDevice::SerialPortDevice(std::string id, std::string port, int baudRate,
+                                   SerialReconnectPolicy reconnectPolicy)
+    : SerialPortDevice(
+          std::move(id),
+          std::make_shared<PocoDDS::Protocols::Serial::SerialChannel>(
+              std::move(port), baudRate),
+          reconnectPolicy)
 {
+}
+
+SerialPortDevice::SerialPortDevice(
+    std::string id,
+    std::shared_ptr<PocoDDS::Protocols::Serial::ISerialChannel> channel,
+    SerialReconnectPolicy reconnectPolicy)
+    : _id(std::move(id)), _channel(std::move(channel)),
+      _reconnectPolicy(reconnectPolicy)
+{
+    if (_id.empty())
+        throw std::invalid_argument("serial device id must not be empty");
+    if (!_channel)
+        throw std::invalid_argument("serial channel is required");
+    if (_reconnectPolicy.delay.count() < 0 ||
+        _reconnectPolicy.readTimeout.count() <= 0)
+        throw std::invalid_argument("serial reconnect delay must be non-negative and read timeout positive");
 }
 
 SerialPortDevice::~SerialPortDevice()
@@ -30,11 +49,16 @@ void SerialPortDevice::start()
     try
     {
         _channel->open();
+        markReady();
         _thread.startFunc([this] { run(); });
+        notify(snapshot());
     }
     catch (...)
     {
         _running = false;
+        _channel->close();
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        _state = DeviceState::offline;
         throw;
     }
 }
@@ -45,13 +69,22 @@ void SerialPortDevice::stop() noexcept
         return;
     try { _thread.join(); } catch (...) {}
     _channel->close();
+    DeviceSnapshot current;
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        _state = DeviceState::offline;
+        ++_sequence;
+        current = {_id, _type, _state, _sequence,
+                   Poco::Timestamp().epochMicroseconds(), _lastPayload};
+    }
+    notify(current);
 }
 
 DeviceSnapshot SerialPortDevice::snapshot() const
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
-    return {_id, _type, _running ? DeviceState::ready : DeviceState::offline, _sequence,
-            Poco::Timestamp().epochMicroseconds(), _channel->name()};
+    return {_id, _type, _state, _sequence,
+            Poco::Timestamp().epochMicroseconds(), _lastPayload};
 }
 
 std::string SerialPortDevice::execute(const std::string& operation, const std::string& payload)
@@ -72,7 +105,39 @@ void SerialPortDevice::setSnapshotHandler(SnapshotHandler handler)
 
 std::size_t SerialPortDevice::write(const std::vector<std::uint8_t>& data)
 {
-    return _channel->write(data.data(), data.size());
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        if (!_running || _state != DeviceState::ready)
+            throw std::runtime_error("serial device is not ready");
+    }
+    try
+    {
+        const auto written = _channel->write(data.data(), data.size());
+        if (written != data.size())
+            throw std::runtime_error("partial serial write: " + std::to_string(written) +
+                                     "/" + std::to_string(data.size()));
+        DeviceSnapshot current;
+        {
+            Poco::FastMutex::ScopedLock lock(_mutex);
+            ++_sequence;
+            ++_diagnostics.successfulOperations;
+            _diagnostics.consecutiveFailures = 0;
+            _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
+            _diagnostics.lastError.clear();
+            _lastPayload = std::to_string(written) + " bytes written";
+            current = {_id, _type, _state, _sequence,
+                       Poco::Timestamp().epochMicroseconds(), _lastPayload};
+        }
+        notify(current);
+        return written;
+    }
+    catch (const std::exception& error)
+    {
+        _channel->close();
+        markFailure(error.what());
+        notify(snapshot());
+        throw;
+    }
 }
 
 void SerialPortDevice::setDataHandler(DataHandler handler)
@@ -85,25 +150,108 @@ void SerialPortDevice::run()
 {
     while (_running)
     {
-        const auto data = _channel->read(4096, Poco::Timespan(0, 250000));
-        if (data.empty())
-            continue;
-
-        DataHandler dataHandler;
-        SnapshotHandler snapshotHandler;
-        DeviceSnapshot current;
+        if (!_channel->isOpen())
         {
-            Poco::FastMutex::ScopedLock lock(_mutex);
-            ++_sequence;
-            dataHandler = _dataHandler;
-            snapshotHandler = _snapshotHandler;
-            current = {_id, _type, DeviceState::ready, _sequence,
-                       Poco::Timestamp().epochMicroseconds(),
-                       std::to_string(data.size()) + " bytes"};
+            if (!_reconnectPolicy.enabled)
+                break;
+            {
+                Poco::FastMutex::ScopedLock lock(_mutex);
+                ++_diagnostics.reconnectAttempts;
+            }
+            try
+            {
+                _channel->open();
+                markReady();
+                notify(snapshot());
+            }
+            catch (const std::exception& error)
+            {
+                markFailure(error.what());
+                notify(snapshot());
+                Poco::Thread::sleep(static_cast<long>(_reconnectPolicy.delay.count()));
+            }
+            continue;
         }
-        if (dataHandler) dataHandler(data);
-        if (snapshotHandler) snapshotHandler(current);
+
+        try
+        {
+            const auto timeoutMicroseconds =
+                static_cast<Poco::Timespan::TimeDiff>(_reconnectPolicy.readTimeout.count()) *
+                Poco::Timespan::MILLISECONDS;
+            const auto data = _channel->read(4096, Poco::Timespan(timeoutMicroseconds));
+            if (data.empty())
+                continue;
+            DeviceSnapshot current;
+            {
+                Poco::FastMutex::ScopedLock lock(_mutex);
+                ++_sequence;
+                _state = DeviceState::ready;
+                ++_diagnostics.successfulOperations;
+                _diagnostics.consecutiveFailures = 0;
+                _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
+                _diagnostics.lastError.clear();
+                _lastPayload = std::to_string(data.size()) + " bytes read";
+                current = {_id, _type, _state, _sequence,
+                           Poco::Timestamp().epochMicroseconds(), _lastPayload};
+            }
+            notify(current, &data);
+        }
+        catch (const std::exception& error)
+        {
+            _channel->close();
+            markFailure(error.what());
+            notify(snapshot());
+            if (_reconnectPolicy.enabled)
+                Poco::Thread::sleep(static_cast<long>(_reconnectPolicy.delay.count()));
+        }
     }
+}
+
+void SerialPortDevice::markReady()
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    _state = DeviceState::ready;
+    ++_sequence;
+    _diagnostics.consecutiveFailures = 0;
+    _diagnostics.lastError.clear();
+    _lastPayload = _channel->name();
+}
+
+void SerialPortDevice::markFailure(const std::string& message)
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    _state = DeviceState::fault;
+    ++_sequence;
+    ++_diagnostics.failedOperations;
+    ++_diagnostics.consecutiveFailures;
+    _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
+    _diagnostics.lastError = message;
+}
+
+void SerialPortDevice::notify(const DeviceSnapshot& current,
+                              const std::vector<std::uint8_t>* data)
+{
+    SnapshotHandler snapshotHandler;
+    DataHandler dataHandler;
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        snapshotHandler = _snapshotHandler;
+        dataHandler = _dataHandler;
+    }
+    if (data && dataHandler)
+    {
+        try { dataHandler(*data); } catch (...) {}
+    }
+    if (snapshotHandler)
+    {
+        try { snapshotHandler(current); } catch (...) {}
+    }
+}
+
+DeviceDiagnostics SerialPortDevice::diagnostics() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _diagnostics;
 }
 
 } // namespace PocoDDS::Devices

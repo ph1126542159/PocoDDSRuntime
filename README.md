@@ -70,6 +70,11 @@ The administration WebUI contains a **业务追踪** page that renders each trac
 a clickable flow graph. See [docs/BUSINESS_TRACING.md](docs/BUSINESS_TRACING.md)
 for the API, cross-process propagation and data-safety rules.
 
+The same observability module provides OpenTelemetry Metrics for Runtime, DDS,
+devices, workflows, protocols, HTTP and host resources. Metrics are available
+through `/api/v1/metrics`, summarized on the Home WebUI, and optionally exported
+to an OTLP/HTTP Collector. See [docs/METRICS.md](docs/METRICS.md).
+
 ## Third-party dependencies
 
 Third-party sources are not copied into the repository. The superbuild pins and
@@ -96,6 +101,36 @@ Offline or restricted-network builds can provide:
 
 Dependencies and PocoDDSRuntime are installed into one prefix per target
 architecture. On a normal Windows build that single prefix is `build/install`.
+
+## Public SDK and developer CLI
+
+Installed applications consume the stable foundation through one CMake target:
+
+```cmake
+find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED)
+target_link_libraries(my_application PRIVATE PocoDDS::SDK)
+```
+
+`PocoDDS::SDK` exposes Application, DeviceCore, typed configuration, reliability,
+health, persistence and SDK version APIs without requiring business code to include
+Fast DDS, Qt, OSP or OpenTelemetry implementation headers. The
+`sdk-external-consumer` test installs the framework and builds a separate CMake
+project against that installed package.
+
+Use the developer command to check the environment or create a standard module:
+
+```powershell
+./tools/pdr.ps1 doctor
+./tools/pdr.ps1 new service TemperatureService --output services
+./tools/pdr.ps1 new device CanTemperatureSensor --output platform/devices
+./tools/pdr.ps1 new workflow BoardPowerOnTest --output application/workflows
+```
+
+Generated modules contain a public header, implementation, CMake target, smoke
+test and integration README. Existing non-empty output directories are never
+overwritten unless `--force` is explicitly supplied.
+The device template implements the real `PocoDDS::Devices::Device` lifecycle,
+snapshot and command interfaces and includes indexed multi-instance configuration.
 
 ## Windows build
 

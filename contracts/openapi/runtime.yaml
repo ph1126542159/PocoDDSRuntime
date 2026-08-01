@@ -3,6 +3,17 @@ info:
   title: PocoDDSRuntime Management API
   version: 0.1.0
 paths:
+  /api/v1/devices:
+    get:
+      operationId: listDevices
+      summary: List active device adapters registered with the runtime
+      responses:
+        "200":
+          description: Active device inventory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceInventory"
   /api/v1/system-metrics:
     get:
       responses: { "200": { description: System metric history } }
@@ -48,3 +59,39 @@ paths:
       operationId: getHealthDetail
       responses:
         "200": { description: Aggregated component health }
+components:
+  schemas:
+    DeviceDescriptor:
+      type: object
+      required: [id, type, state, sequence, timestampMicroseconds, bundle, service, required]
+      properties:
+        id: { type: string, minLength: 1 }
+        type: { type: string, minLength: 1 }
+        state: { type: string, enum: [ready, offline, fault] }
+        sequence: { type: integer, minimum: 0 }
+        timestampMicroseconds: { type: integer }
+        bundle: { type: string }
+        service: { type: string, minLength: 1 }
+        required: { type: boolean }
+        diagnostics:
+          $ref: "#/components/schemas/DeviceDiagnostics"
+    DeviceDiagnostics:
+      type: object
+      required: [successfulOperations, failedOperations, reconnectAttempts, consecutiveFailures, lastSuccessMicroseconds, lastFailureMicroseconds, lastError]
+      properties:
+        successfulOperations: { type: integer, minimum: 0 }
+        failedOperations: { type: integer, minimum: 0 }
+        reconnectAttempts: { type: integer, minimum: 0 }
+        consecutiveFailures: { type: integer, minimum: 0 }
+        lastSuccessMicroseconds: { type: integer }
+        lastFailureMicroseconds: { type: integer }
+        lastError: { type: string }
+    DeviceInventory:
+      type: object
+      required: [schemaVersion, count, devices]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        count: { type: integer, minimum: 0 }
+        devices:
+          type: array
+          items: { $ref: "#/components/schemas/DeviceDescriptor" }

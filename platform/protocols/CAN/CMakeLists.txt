@@ -1,4 +1,5 @@
 add_library(PDRProtocolCAN
+    src/LoopbackCanEndpoint.cpp
     src/SignalCodec.cpp
     src/SocketCanEndpoint.cpp)
 add_library(PocoDDS::CAN ALIAS PDRProtocolCAN)

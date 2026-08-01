@@ -3,6 +3,7 @@ myiot_add_osp_bundle(PDR_DeviceGateway_Bundle "pdr.device.gateway"
     LINK_LIBS
         PocoDDS::FastDDS
         PocoDDS::Devices
+        PocoDDS::Configuration
         Poco::OSP
         Poco::Util
         Poco::Foundation

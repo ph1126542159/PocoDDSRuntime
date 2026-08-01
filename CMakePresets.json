@@ -4,7 +4,7 @@
     {
       "name": "base",
       "hidden": true,
-      "binaryDir": "${sourceDir}/build/${presetName}",
+      "binaryDir": "${sourceDir}/build/profiles/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install",
@@ -16,8 +16,12 @@
       "inherits": "base",
       "description": "Embedded/PetaLinux foundation profile",
       "cacheVariables": {
+        "PDR_PROFILE": "embedded",
         "PDR_ENABLE_OBSERVABILITY": "OFF",
-        "MYIOT_ENABLE_DATA_MODULES": "OFF"
+        "MYIOT_ENABLE_DATA_MODULES": "OFF",
+        "PDR_BUILD_WEBUI": "OFF",
+        "PDR_BUILD_LAUNCHER": "ON",
+        "PDR_BUILD_QT3D": "OFF"
       }
     },
     {
@@ -25,8 +29,12 @@
       "inherits": "base",
       "description": "Edge and test-station profile",
       "cacheVariables": {
+        "PDR_PROFILE": "edge-test",
         "PDR_ENABLE_OBSERVABILITY": "ON",
-        "MYIOT_ENABLE_DATA_MODULES": "OFF"
+        "MYIOT_ENABLE_DATA_MODULES": "OFF",
+        "PDR_BUILD_WEBUI": "ON",
+        "PDR_BUILD_LAUNCHER": "ON",
+        "PDR_BUILD_QT3D": "ON"
       }
     },
     {
@@ -34,8 +42,12 @@
       "inherits": "base",
       "description": "Server profile with data and observability modules",
       "cacheVariables": {
+        "PDR_PROFILE": "server",
         "PDR_ENABLE_OBSERVABILITY": "ON",
-        "MYIOT_ENABLE_DATA_MODULES": "ON"
+        "MYIOT_ENABLE_DATA_MODULES": "ON",
+        "PDR_BUILD_WEBUI": "ON",
+        "PDR_BUILD_LAUNCHER": "ON",
+        "PDR_BUILD_QT3D": "OFF"
       }
     },
     {
@@ -64,6 +76,13 @@
     {
       "name": "edge-test",
       "configurePreset": "edge-test",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "nightly-fault-injection",
+      "configurePreset": "edge-test",
+      "description": "Deterministic dependency outage, retry, duplicate, backpressure and shutdown tests",
+      "filter": { "include": { "label": "fault-injection" } },
       "output": { "outputOnFailure": true }
     }
   ]

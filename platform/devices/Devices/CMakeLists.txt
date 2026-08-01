@@ -1,5 +1,6 @@
 add_library(PDRDeviceCore src/Device.cpp)
 add_library(PocoDDS::DeviceCore ALIAS PDRDeviceCore)
+set_target_properties(PDRDeviceCore PROPERTIES EXPORT_NAME DeviceCore)
 
 target_include_directories(PDRDeviceCore
     PUBLIC
@@ -16,5 +17,6 @@ if(BUILD_TESTING)
     add_test(NAME device-interfaces-smoke COMMAND pdr-device-interfaces-smoke)
 endif()
 
-install(TARGETS PDRDeviceCore ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+install(TARGETS PDRDeviceCore EXPORT PocoDDSRuntimeTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

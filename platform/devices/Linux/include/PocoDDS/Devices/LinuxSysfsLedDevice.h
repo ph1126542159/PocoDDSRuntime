@@ -9,7 +9,7 @@
 
 namespace PocoDDS::Devices
 {
-class LinuxSysfsLedDevice final : public LED
+class LinuxSysfsLedDevice final : public LED, public DiagnosticDevice
 {
 public:
     LinuxSysfsLedDevice(std::string id, PocoDDS::Filesystem::path ledDirectory);
@@ -23,15 +23,21 @@ public:
     void setSnapshotHandler(SnapshotHandler handler) override;
     void setBrightness(double brightness) override;
     double brightness() const override;
+    DeviceDiagnostics diagnostics() const override;
 
 private:
+    void markSuccess(const std::string& payload) const;
+    void markFailure(const std::string& message) const;
+    void notify(const DeviceSnapshot& snapshot) const;
     std::string _id;
     std::string _type{"led.sysfs"};
     PocoDDS::Filesystem::path _directory;
     mutable Poco::FastMutex _mutex;
-    bool _started{false};
-    unsigned _maxBrightness{0};
-    std::uint64_t _sequence{0};
+    mutable DeviceState _state{DeviceState::offline};
+    mutable unsigned _maxBrightness{0};
+    mutable std::uint64_t _sequence{0};
+    mutable std::string _lastPayload{"stopped"};
+    mutable DeviceDiagnostics _diagnostics;
     SnapshotHandler _snapshotHandler;
 };
 } // namespace PocoDDS::Devices

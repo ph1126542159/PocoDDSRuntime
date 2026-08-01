@@ -8,11 +8,11 @@
 
 先在 Linux 配置并启用 `can0`，然后创建 `SocketCanEndpoint`。设备层通常通过 `CanSignalSensor` 使用本组件，并在 `pdr-runtime.properties` 中设置 `pdr.can.*`。
 
-Windows 构建可编译公共逻辑，但 SocketCAN 实际收发必须在 Linux 目标验证。
+Windows 构建可编译公共逻辑和 loopback 测试端点，但 SocketCAN 实际收发必须在 Linux 目标验证。
 
 ## 实现细节
 
-`CanFrame` 保存帧 ID、DLC 和最多 8 字节数据。`SocketCanEndpoint` 打开 PF_CAN RAW socket 并绑定接口。`SignalCodec` 的换算为：
+`CanFrame` 保存帧 ID、标准/扩展/远程/error 标志和最多 64 字节 CAN FD 数据。`SocketCanEndpoint` 打开 PF_CAN RAW socket 并绑定接口，启用 CAN FD，并订阅 controller、protocol、bus-off 和 restarted 错误帧。经典 CAN 帧使用 `CAN_MTU` 写入，超过 8 字节时才使用 `CANFD_MTU`，避免把经典帧错误地一律按 CAN FD 发送。`SignalCodec` 的换算为：
 
 ```text
 engineeringValue = decodedRaw × factor + offset

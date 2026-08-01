@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import {
-  Activity, AppWindow, ArrowLeft, Box, Boxes, ChevronDown, ChevronRight, CircleGauge, Clock3,
+  Activity, AppWindow, ArrowLeft, Box, Boxes, ChevronDown, ChevronRight, Clock3,
   Cpu, Download, FileText, HardDrive, Layers3, MemoryStick, Menu, Network, Play, RefreshCw, RotateCw, Search, Server,
   Settings2, SlidersHorizontal, Square, Terminal, Trash2, X, Zap, ShieldCheck,
   AlertTriangle, CheckCircle2, Database, GitBranch
@@ -15,14 +15,16 @@ const pageMeta = {
   overview: ["运行总览", "实时掌握运行时状态与资源"],
   processes: ["进程", "当前运行时挂载的进程"],
   services: ["服务", "OSP 服务注册中心"],
+  devices: ["设备", "当前运行时已装载的设备适配器"],
   modules: ["组件与模块", "Bundle 提供的运行时模块"],
   bundles: ["Bundles", "OSP Bundle 生命周期管理"],
-  logs: ["日志查询", "快速定位运行时问题"]
+  logs: ["日志查询", "快速定位运行时问题"],
+  metrics: ["指标中心", "按运行域查看 OpenTelemetry Counter 与 Histogram"]
 };
 
 const navItems = [
-  ["overview", CircleGauge], ["processes", AppWindow], ["services", Server],
-  ["modules", Layers3], ["bundles", Boxes], ["logs", FileText]
+  ["overview", Activity], ["processes", AppWindow], ["services", Server], ["devices", Cpu],
+  ["modules", Layers3], ["bundles", Boxes], ["metrics", Activity], ["logs", FileText]
 ];
 
 async function request(path, options = {}) {
@@ -44,8 +46,10 @@ async function request(path, options = {}) {
 }
 
 function Status({ state }) {
-  const running = ["active", "running", "started"].includes(String(state).toLowerCase());
-  return <span className={`status ${running ? "ok" : "idle"}`}><i />{state}</span>;
+  const normalized = String(state).toLowerCase();
+  const running = ["active", "running", "started", "ready"].includes(normalized);
+  const failed = ["fault", "failed", "error", "down"].includes(normalized);
+  return <span className={`status ${running ? "ok" : failed ? "bad" : "idle"}`}><i />{state}</span>;
 }
 
 function Metric({ icon: Icon, label, value, caption, tone, onClick }) {
@@ -72,13 +76,24 @@ function validateConfigValue(key, value) {
     "observability.history.retentionDays": [1, 36500],
     "pdr.modbus.port": [1, 65535],
     "pdr.modbus.unitId": [0, 247],
+    "pdr.modbus.timeoutMilliseconds": [1, 60000],
+    "pdr.modbus.readRetryAttempts": [0, 10],
+    "pdr.modbus.retryDelayMilliseconds": [0, 60000],
     "pdr.serial.baudRate": [1, 4000000],
+    "pdr.serial.reconnectDelayMilliseconds": [0, 60000],
+    "pdr.serial.readTimeoutMilliseconds": [1, 60000],
+    "pdr.can.bitOffset": [0, 511],
+    "pdr.can.bitLength": [1, 64],
+    "pdr.can.reconnectDelayMilliseconds": [0, 60000],
+    "pdr.can.receiveTimeoutMilliseconds": [1, 60000],
+    "pdr.can.staleAfterMilliseconds": [1, 60000],
     "pdr.gnss.baudRate": [1, 4000000]
   };
-  if (!ranges[key]) return "";
+  const rangeKey = key.replace(/^(pdr\.[^.]+)\.\d+\./, "$1.");
+  if (!ranges[rangeKey]) return "";
   if (!/^-?\d+$/.test(String(value).trim())) return "必须是整数";
   const number = Number(value);
-  const [minimum, maximum] = ranges[key];
+  const [minimum, maximum] = ranges[rangeKey];
   return number < minimum || number > maximum ? `有效范围 ${minimum}–${maximum}` : "";
 }
 
@@ -147,6 +162,97 @@ function ResourceCharts({ resources, history }) {
       <footer><span>最近 {Math.max(history.length, 1)} 次采样</span><b>{card.detail}</b></footer>
     </article>;
   })}</div>;
+}
+
+function BusinessMetrics({ data }) {
+  const points = data?.metrics || [];
+  const sum = (name, predicate = () => true) => points
+    .filter(point => point.name === name && predicate(point.attributes || {}))
+    .reduce((total, point) => total + numeric(point.value), 0);
+  const histogram = name => points.find(point => point.name === name);
+  const dds = sum("pdr.dds.messages.published") + sum("pdr.dds.messages.received");
+  const deviceOk = sum("pdr.device.commands", labels => labels.result === "success");
+  const deviceError = sum("pdr.device.commands", labels => labels.result === "error");
+  const workflowOk = sum("pdr.workflow.executions", labels => labels.result === "success");
+  const workflowFailed = sum("pdr.workflow.executions", labels => labels.result === "failed");
+  const latency = histogram("pdr.dds.service.duration");
+  return <section className="surface">
+    <div className="section-head"><div><h2>OpenTelemetry 业务指标</h2>
+      <p>来自 /api/v1/metrics 的 Counter 与 Histogram</p></div>
+      <span className="inventory-count">{points.length} 条序列</span></div>
+    <div className="metrics business-metrics-grid">
+      <Metric icon={Network} label="DDS 消息" value={dds} caption="发布与接收总量" tone="blue" />
+      <Metric icon={Zap} label="设备命令" value={deviceOk} caption={`${deviceError} 次失败`} tone="green" />
+      <Metric icon={GitBranch} label="Workflow" value={workflowOk} caption={`${workflowFailed} 次失败`} tone="violet" />
+      <Metric icon={Clock3} label="DDS 平均耗时"
+        value={latency?.count ? `${(numeric(latency.sum) / numeric(latency.count, 1)).toFixed(2)} ms` : "—"}
+        caption={latency?.count ? `${latency.count} 次采样` : "等待业务请求"} tone="orange" />
+    </div>
+  </section>;
+}
+
+const metricDomains = [
+  { id: "runtime", label: "Runtime", prefixes: ["pdr.runtime.", "process."] },
+  { id: "dds", label: "DDS", prefixes: ["pdr.dds."] },
+  { id: "device", label: "设备", prefixes: ["pdr.device."] },
+  { id: "workflow", label: "工作流", prefixes: ["pdr.workflow."] },
+  { id: "protocol", label: "协议汇总", prefixes: ["pdr.protocol."] },
+  { id: "btle", label: "Bluetooth LE", prefixes: ["pdr.btle.", "pdr.protocol."], protocol: "btle" },
+  { id: "webtunnel", label: "WebTunnel", prefixes: ["pdr.webtunnel.", "pdr.protocol."], protocol: "webtunnel" },
+  { id: "http", label: "HTTP", prefixes: ["http.server."] },
+  { id: "system", label: "系统", prefixes: ["system."] },
+  { id: "export", label: "导出与缓存", prefixes: ["pdr.metrics."] }
+];
+
+function MetricValue({ point }) {
+  if (point.kind === "histogram") {
+    const average = numeric(point.count) ? numeric(point.sum) / numeric(point.count, 1) : 0;
+    return <div className="metric-value-stack"><b>{numeric(point.value).toFixed(2)}</b>
+      <small>最新 · 平均 {average.toFixed(2)} · {numeric(point.count)} 样本</small></div>;
+  }
+  return <b>{numeric(point.value).toLocaleString()}</b>;
+}
+
+function MetricsCenter({ data }) {
+  const [domain, setDomain] = useState("runtime");
+  const [filter, setFilter] = useState("");
+  const selected = metricDomains.find(item => item.id === domain) || metricDomains[0];
+  const all = data?.metrics || [];
+  const points = all.filter(point => selected.prefixes.some(prefix => point.name.startsWith(prefix)))
+    .filter(point => !selected.protocol || point.attributes?.protocol === selected.protocol ||
+      point.name.startsWith(`pdr.${selected.protocol}.`))
+    .filter(point => !filter || point.name.toLowerCase().includes(filter.toLowerCase()) ||
+      JSON.stringify(point.attributes || {}).toLowerCase().includes(filter.toLowerCase()));
+  const counters = points.filter(point => point.kind === "counter");
+  const histograms = points.filter(point => point.kind === "histogram");
+  return <section className="metrics-center">
+    <div className="metrics-domain-tabs" role="tablist">{metricDomains.map(item =>
+      <button key={item.id} role="tab" aria-selected={domain === item.id}
+        className={domain === item.id ? "active" : ""} onClick={() => setDomain(item.id)}>{item.label}</button>)}</div>
+    <div className="surface metrics-page">
+      <div className="section-head"><div><h2>{selected.label} 指标</h2>
+        <p>{data?.serviceName || "pdr-runtime"} · {data?.serviceInstanceId || "本机实例"}</p></div>
+        <div className="metrics-page-tools"><span className="inventory-count">{points.length} 条序列</span>
+          <label className="search"><Search size={16} /><input value={filter} placeholder="筛选指标或标签"
+            onChange={event => setFilter(event.target.value)} /></label></div></div>
+      <div className="metrics metrics-domain-summary">
+        <Metric icon={Activity} label="Counter 序列" value={counters.length} caption="累计事件" tone="blue" />
+        <Metric icon={Clock3} label="Histogram 序列" value={histograms.length} caption="采样与耗时分布" tone="orange" />
+        <Metric icon={Database} label="样本总数" value={histograms.reduce((sum, point) => sum + numeric(point.count), 0)}
+          caption="直方图累计采样" tone="violet" />
+      </div>
+      <div className="table-scroll"><table className="metrics-table"><thead><tr>
+        <th>指标</th><th>类型</th><th>当前值</th><th>单位</th><th>标签</th></tr></thead>
+        <tbody>{points.map((point, index) => <tr key={`${point.name}-${index}`}>
+          <td><b>{point.name}</b><small>{point.description || "—"}</small></td>
+          <td><span className={`metric-kind ${point.kind}`}>{point.kind}</span></td>
+          <td><MetricValue point={point} /></td><td>{point.unit || "1"}</td>
+          <td><div className="metric-labels">{Object.entries(point.attributes || {}).map(([key, value]) =>
+            <span key={key}><i>{key}</i>={String(value)}</span>)}{!Object.keys(point.attributes || {}).length && "—"}</div></td>
+        </tr>)}</tbody></table>{!points.length && <div className="empty"><Activity size={26} />
+          <p>当前分类尚无指标样本</p></div>}</div>
+    </div>
+  </section>;
 }
 
 function RuntimeInventory({ processes, bundles, reportedMainProcess }) {
@@ -405,7 +511,7 @@ function BusinessExecutionList({ process }) {
     {detail && createPortal(<div className="business-modal-backdrop">
       <section className="business-modal">
         <nav className="flow-page-tabs">
-          <button onClick={() => setDetail(null)}><CircleGauge size={24} />运行总览</button>
+          <button onClick={() => setDetail(null)}><Activity size={24} />运行总览</button>
           <ChevronRight size={25} />
           <button className="active"><Activity size={24} />流程-{detail.item.businessName}</button>
           <span><i />当前：业务流程页面</span>
@@ -444,7 +550,7 @@ function BusinessExecutionList({ process }) {
     </div>, document.body)}
     {historyOpen && createPortal(<div className="business-history-page">
       <nav className="flow-page-tabs">
-        <button onClick={() => setHistoryOpen(false)}><CircleGauge size={24} />运行总览</button>
+        <button onClick={() => setHistoryOpen(false)}><Activity size={24} />运行总览</button>
         <ChevronRight size={25} />
         <button className="active"><Search size={24} />业务历史查询</button>
         <span><i />当前：业务历史查询页面</span>
@@ -877,6 +983,34 @@ function EntityTable({ items, onConfig, onLife, searchable = true }) {
   </section>;
 }
 
+function DeviceInventory({ inventory }) {
+  const [filter, setFilter] = useState("");
+  const devices = (inventory?.devices || []).filter(device =>
+    !filter || `${device.id} ${device.type} ${device.bundle}`.toLowerCase().includes(filter.toLowerCase()));
+  return <section className="surface">
+    <div className="section-head"><div><h2>设备适配器</h2>
+      <p>来自 /api/v1/devices 的实时状态与适配器诊断</p></div>
+      <span className="inventory-count">{inventory?.count || 0} 个</span></div>
+    <div className="table-tools"><span>设备 ID 在整个 Runtime 内全局唯一</span>
+      <label className="search"><Search size={16} /><input value={filter} placeholder="筛选 ID、类型或 Bundle"
+        onChange={event => setFilter(event.target.value)} /></label></div>
+    <div className="table-scroll"><table className="entity-table device-table"><thead><tr>
+      <th>设备</th><th>状态</th><th>类型</th><th>诊断</th><th>提供方</th></tr></thead>
+      <tbody>{devices.map(device => <tr key={device.id}>
+        <td><div className="entity-name"><span className="entity-glyph device"><Cpu size={17} /></span>
+          <div><b>{device.id}</b><small>{device.service} · {device.required === false ? "可选" : "必需"}</small></div></div></td>
+        <td><Status state={device.state} /></td><td><code>{device.type}</code></td>
+        <td>{device.diagnostics ? <div className="device-diagnostics">
+          <b>{numeric(device.diagnostics.successfulOperations)} 成功 / {numeric(device.diagnostics.failedOperations)} 失败</b>
+          <small>重连 {numeric(device.diagnostics.reconnectAttempts)} · 连续失败 {numeric(device.diagnostics.consecutiveFailures)}</small>
+          {device.diagnostics.lastError && <em title={device.diagnostics.lastError}>{device.diagnostics.lastError}</em>}
+        </div> : <span className="secondary-text">未提供</span>}</td>
+        <td className="secondary-text">{device.bundle || "—"}</td>
+      </tr>)}</tbody></table>
+      {!devices.length && <div className="empty"><Cpu size={26} /><p>没有匹配的活跃设备</p></div>}</div>
+  </section>;
+}
+
 function ConfigModal({ target, onClose, onDone }) {
   const [rows, setRows] = useState([]);
   const [restart, setRestart] = useState(true);
@@ -966,15 +1100,21 @@ function App() {
   const [topology, setTopology] = useState({ processes: [], services: [], modules: [], bundles: [] });
   const [resourceHistory, setResourceHistory] = useState([]);
   const [health, setHealth] = useState(null);
+  const [businessMetrics, setBusinessMetrics] = useState({ metrics: [] });
+  const [deviceInventory, setDeviceInventory] = useState({ count: 0, devices: [] });
   const [updated, setUpdated] = useState(null);
   const [configTarget, setConfigTarget] = useState(null);
   const [toast, setToast] = useState(null);
   const refresh = useCallback(async () => {
-    const [data, monitoring, healthDetail] = await Promise.all([
+    const [data, monitoring, healthDetail, metricData, devices] = await Promise.all([
       request("/api/v1/topology"),
       request("/api/v1/system-metrics").catch(() => ({ samples: [] })),
-      request("/health/detail").catch(() => null)
+      request("/health/detail").catch(() => null),
+      request("/api/v1/metrics").catch(() => ({ metrics: [] })),
+      request("/api/v1/devices").catch(() => ({ count: 0, devices: [] }))
     ]);
+    setDeviceInventory(devices);
+    setBusinessMetrics(metricData);
     if (healthDetail) setHealth(healthDetail);
     const samples = monitoring.samples || [];
     const monitoredResources = monitoring.current || {};
@@ -1042,10 +1182,13 @@ function App() {
       </header>
       <div className="content">
         {page === "overview" && <><HealthOverview health={health} />
+          <BusinessMetrics data={businessMetrics} />
           <ProcessWorkbench mainProcess={topology.mainProcess} onNotify={notify} /></>}
         {page === "processes" && <ProcessWorkspace items={processItems} />}
+        {page === "devices" && <DeviceInventory inventory={deviceInventory} />}
         {["services", "modules", "bundles"].includes(page) &&
           <EntityTable items={currentItems} onConfig={setConfigTarget} onLife={life} />}
+        {page === "metrics" && <MetricsCenter data={businessMetrics} />}
         {page === "logs" && <Logs />}
       </div>
     </main>

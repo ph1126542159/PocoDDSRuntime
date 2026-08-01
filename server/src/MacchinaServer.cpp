@@ -33,6 +33,8 @@
 #if defined(PDR_ENABLE_OBSERVABILITY)
 #include "PocoDDS/DDS/Runtime.h"
 #include "PocoDDS/Observability/BusinessTracer.h"
+#include "PocoDDS/Observability/Metrics.h"
+#include "PocoDDS/Protocols/ProtocolMetrics.h"
 #include "PocoDDS/Observability/TraceSerialization.h"
 #include "PocoDDS/Observability/TraceStore.h"
 #endif
@@ -187,6 +189,52 @@ class MacchinaServer final : public Poco::Util::ServerApplication
             Poco::ThreadPool::defaultPool().addCapacity(capacityDelta);
 
 #if defined(PDR_ENABLE_OBSERVABILITY)
+        PocoDDS::Observability::MetricsOptions metricsOptions;
+        metricsOptions.serviceName = config().getString("observability.metrics.serviceName", "pdr-runtime");
+        metricsOptions.serviceInstanceId = config().getString(
+            "observability.metrics.serviceInstanceId", Poco::Environment::nodeName());
+        if (metricsOptions.serviceInstanceId.empty())
+            metricsOptions.serviceInstanceId = Poco::Environment::nodeName();
+        metricsOptions.otlpHttpEndpoint = config().getString(
+            "observability.metrics.otlpHttpEndpoint", "");
+        metricsOptions.otlpCaCertificatePath = config().getString(
+            "observability.metrics.otlpCaCertificatePath", "");
+        metricsOptions.otlpClientCertificatePath = config().getString(
+            "observability.metrics.otlpClientCertificatePath", "");
+        metricsOptions.otlpClientKeyPath = config().getString(
+            "observability.metrics.otlpClientKeyPath", "");
+        metricsOptions.otlpInsecureSkipVerify = config().getBool(
+            "observability.metrics.otlpInsecureSkipVerify", false);
+        metricsOptions.offlineCachePath = config().getString(
+            "observability.metrics.offlineCachePath", "data/metrics/otlp-cache");
+        metricsOptions.offlineCacheMaximumFiles = static_cast<std::size_t>(config().getUInt(
+            "observability.metrics.offlineCacheMaximumFiles", 1000));
+        metricsOptions.exportInterval = std::chrono::milliseconds(config().getInt64(
+            "observability.metrics.exportIntervalMilliseconds", 10000));
+        metricsOptions.exportTimeout = std::chrono::milliseconds(config().getInt64(
+            "observability.metrics.exportTimeoutMilliseconds", 5000));
+        metricsOptions.maximumSeries = static_cast<std::size_t>(config().getUInt(
+            "observability.metrics.maximumSeries", 2000));
+        PocoDDS::Observability::Metrics::global().initialize(std::move(metricsOptions));
+        PocoDDS::Protocols::ProtocolMetrics::setSink([](const auto& event) {
+            auto& metrics = PocoDDS::Observability::Metrics::global();
+            const PocoDDS::Observability::MetricAttributes attributes{
+                {"protocol", event.protocol}, {"operation", event.operation},
+                {"result", event.result}};
+            metrics.addCounter("pdr.protocol.operations", 1, attributes,
+                               "Physical protocol operations", "{operation}");
+            metrics.recordHistogram("pdr.protocol.operation.duration",
+                                    event.durationMilliseconds, attributes,
+                                    "Physical protocol operation duration", "ms");
+            if (event.bytes)
+                metrics.addCounter("pdr.protocol.io", event.bytes,
+                                   {{"protocol", event.protocol},
+                                    {"operation", event.operation}},
+                                   "Physical protocol bytes transferred", "By");
+        });
+        PocoDDS::Observability::Metrics::global().addCounter(
+            "pdr.runtime.starts", 1, {{"host", Poco::Environment::nodeName()}},
+            "Runtime process starts", "{start}");
         _traceRuntime = std::make_unique<PocoDDS::FastDDS::Runtime>(
             static_cast<std::uint32_t>(config().getUInt("pdr.fastdds.domainId", 0)),
             "pdr-business-trace-collector");
@@ -308,6 +356,11 @@ class MacchinaServer final : public Poco::Util::ServerApplication
             _subprocessManager->startFromConfiguration(subprocessConfiguration, processRoot);
         logger().information("Started %z configured subprocess(es).", startedSubprocesses);
 #if defined(PDR_ENABLE_OBSERVABILITY)
+        PocoDDS::Observability::Metrics::global().recordHistogram(
+            "pdr.runtime.subprocesses", static_cast<double>(startedSubprocesses), {},
+            "Configured subprocesses started by the runtime", "{process}");
+#endif
+#if defined(PDR_ENABLE_OBSERVABILITY)
         _heartbeatStopping = false;
         _heartbeatThread = std::thread([this] { heartbeatLoop(); });
 #endif
@@ -326,6 +379,11 @@ class MacchinaServer final : public Poco::Util::ServerApplication
 #if defined(PDR_ENABLE_OBSERVABILITY)
         if (_traceRuntime)
             _traceRuntime->stop();
+        PocoDDS::Observability::Metrics::global().addCounter(
+            "pdr.runtime.shutdowns", 1, {}, "Runtime clean shutdowns", "{shutdown}");
+        PocoDDS::Observability::Metrics::global().forceFlush();
+        PocoDDS::Protocols::ProtocolMetrics::setSink({});
+        PocoDDS::Observability::Metrics::global().shutdown();
 #endif
         return Application::EXIT_OK;
     }

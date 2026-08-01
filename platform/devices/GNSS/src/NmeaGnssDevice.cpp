@@ -12,11 +12,29 @@
 namespace PocoDDS::Devices
 {
 
-NmeaGnssDevice::NmeaGnssDevice(std::string id, std::string port, int baudRate)
-    : _id(std::move(id)),
-      _channel(std::make_unique<PocoDDS::Protocols::Serial::SerialChannel>(
-          std::move(port), baudRate))
+NmeaGnssDevice::NmeaGnssDevice(std::string id, std::string port, int baudRate,
+                               GnssRecoveryPolicy recoveryPolicy)
+    : NmeaGnssDevice(
+          std::move(id),
+          std::make_shared<PocoDDS::Protocols::Serial::SerialChannel>(
+              std::move(port), baudRate),
+          recoveryPolicy)
 {
+}
+
+NmeaGnssDevice::NmeaGnssDevice(
+    std::string id,
+    std::shared_ptr<PocoDDS::Protocols::Serial::ISerialChannel> channel,
+    GnssRecoveryPolicy recoveryPolicy)
+    : _id(std::move(id)), _channel(std::move(channel)),
+      _recoveryPolicy(recoveryPolicy)
+{
+    if (_id.empty()) throw std::invalid_argument("GNSS device id must not be empty");
+    if (!_channel) throw std::invalid_argument("GNSS serial channel is required");
+    if (_recoveryPolicy.reconnectDelay.count() < 0 ||
+        _recoveryPolicy.readTimeout.count() <= 0 ||
+        _recoveryPolicy.staleAfter.count() <= 0)
+        throw std::invalid_argument("GNSS recovery timeouts are invalid");
 }
 
 NmeaGnssDevice::NmeaGnssDevice(std::string id): _id(std::move(id))
@@ -36,11 +54,14 @@ void NmeaGnssDevice::start()
     try
     {
         _channel->open();
+        markConnected();
         _thread.startFunc([this] { run(); });
+        notify(snapshot());
     }
     catch (...)
     {
         _running = false;
+        _channel->close();
         throw;
     }
 }
@@ -51,6 +72,13 @@ void NmeaGnssDevice::stop() noexcept
         return;
     try { _thread.join(); } catch (...) {}
     if (_channel) _channel->close();
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        _state = DeviceState::offline;
+        _hasFix = false;
+        ++_sequence;
+    }
+    notify(snapshot());
 }
 
 DeviceSnapshot NmeaGnssDevice::snapshot() const
@@ -62,7 +90,7 @@ DeviceSnapshot NmeaGnssDevice::snapshot() const
               << _position.altitude;
     else
         value << "no-fix";
-    return {_id, _type, _hasFix ? DeviceState::ready : DeviceState::offline, _sequence,
+    return {_id, _type, _state, _sequence,
             Poco::Timestamp().epochMicroseconds(), value.str()};
 }
 
@@ -129,13 +157,17 @@ double NmeaGnssDevice::coordinate(const std::string& value, const std::string& h
 bool NmeaGnssDevice::ingestSentence(const std::string& sentence)
 {
     if (!validChecksum(sentence))
+    {
+        DeviceState state;
+        {
+            Poco::FastMutex::ScopedLock lock(_mutex);
+            state = _state;
+        }
+        markFailure("invalid NMEA checksum", state);
         return false;
+    }
 
     const auto star = sentence.find('*');
-    Poco::StringTokenizer fields(
-        sentence.substr(1, star - 1), ",",
-        Poco::StringTokenizer::TOK_TRIM | Poco::StringTokenizer::TOK_IGNORE_EMPTY);
-
     // Empty NMEA fields are significant, so parse without dropping them.
     std::vector<std::string> values;
     std::size_t begin = 1;
@@ -152,12 +184,15 @@ bool NmeaGnssDevice::ingestSentence(const std::string& sentence)
 
     GeoPosition updated;
     bool positionUpdate = false;
+    bool recognized = false;
+    try
     {
         Poco::FastMutex::ScopedLock lock(_mutex);
         updated = _position;
         const auto& kind = values[0];
         if ((kind == "GPRMC" || kind == "GNRMC") && values.size() >= 10)
         {
+            recognized = true;
             _hasFix = values[2] == "A";
             if (_hasFix)
             {
@@ -170,6 +205,7 @@ bool NmeaGnssDevice::ingestSentence(const std::string& sentence)
         }
         else if ((kind == "GPGGA" || kind == "GNGGA") && values.size() >= 10)
         {
+            recognized = true;
             _hasFix = !values[6].empty() && values[6] != "0";
             if (_hasFix)
             {
@@ -179,46 +215,153 @@ bool NmeaGnssDevice::ingestSentence(const std::string& sentence)
                 positionUpdate = true;
             }
         }
-        else
-        {
-            return false;
-        }
+        else return false;
 
         updated.timestampMicroseconds = Poco::Timestamp().epochMicroseconds();
         _position = updated;
+        _state = _hasFix ? DeviceState::ready : DeviceState::offline;
+        if (_hasFix)
+        {
+            _lastFix = std::chrono::steady_clock::now();
+            ++_diagnostics.successfulOperations;
+            _diagnostics.consecutiveFailures = 0;
+            _diagnostics.lastSuccessMicroseconds = updated.timestampMicroseconds;
+            _diagnostics.lastError.clear();
+        }
+        else
+        {
+            ++_diagnostics.failedOperations;
+            ++_diagnostics.consecutiveFailures;
+            _diagnostics.lastFailureMicroseconds = updated.timestampMicroseconds;
+            _diagnostics.lastError = "GNSS fix invalid";
+        }
         ++_sequence;
     }
-
-    PositionHandler positionHandler;
-    SnapshotHandler snapshotHandler;
-    if (positionUpdate)
+    catch (const std::exception& error)
     {
-        Poco::FastMutex::ScopedLock lock(_mutex);
-        positionHandler = _positionHandler;
-        snapshotHandler = _snapshotHandler;
+        DeviceState state;
+        {
+            Poco::FastMutex::ScopedLock lock(_mutex);
+            state = _state;
+        }
+        markFailure(std::string("invalid NMEA fields: ") + error.what(), state);
+        return false;
     }
-    if (positionHandler) positionHandler(updated);
-    if (snapshotHandler) snapshotHandler(snapshot());
-    return true;
+
+    notify(snapshot(), positionUpdate ? &updated : nullptr);
+    return recognized;
 }
 
 void NmeaGnssDevice::run()
 {
     while (_running)
     {
-        const auto bytes = _channel->read(1024, Poco::Timespan(0, 250000));
-        if (bytes.empty())
-            continue;
-        _buffer.append(bytes.begin(), bytes.end());
-        std::size_t newline = 0;
-        while ((newline = _buffer.find_first_of("\r\n")) != std::string::npos)
+        if (!_channel->isOpen())
         {
-            const auto line = _buffer.substr(0, newline);
-            _buffer.erase(0, _buffer.find_first_not_of("\r\n", newline));
-            if (!line.empty())
-                ingestSentence(line);
+            if (!_recoveryPolicy.enabled) break;
+            {
+                Poco::FastMutex::ScopedLock lock(_mutex);
+                ++_diagnostics.reconnectAttempts;
+            }
+            try
+            {
+                _channel->open();
+                markConnected();
+                notify(snapshot());
+            }
+            catch (const std::exception& error)
+            {
+                markFailure(error.what(), DeviceState::fault);
+                notify(snapshot());
+                Poco::Thread::sleep(static_cast<long>(_recoveryPolicy.reconnectDelay.count()));
+            }
+            continue;
+        }
+        try
+        {
+            const auto timeout = static_cast<Poco::Timespan::TimeDiff>(
+                _recoveryPolicy.readTimeout.count()) * Poco::Timespan::MILLISECONDS;
+            const auto bytes = _channel->read(1024, Poco::Timespan(timeout));
+            if (bytes.empty())
+            {
+                checkStale();
+                continue;
+            }
+            _buffer.append(bytes.begin(), bytes.end());
+            std::size_t newline = 0;
+            while ((newline = _buffer.find_first_of("\r\n")) != std::string::npos)
+            {
+                const auto line = _buffer.substr(0, newline);
+                const auto next = _buffer.find_first_not_of("\r\n", newline);
+                _buffer.erase(0, next == std::string::npos ? _buffer.size() : next);
+                if (!line.empty()) ingestSentence(line);
+            }
+            checkStale();
+        }
+        catch (const std::exception& error)
+        {
+            _channel->close();
+            markFailure(error.what(), DeviceState::fault);
+            notify(snapshot());
+            if (_recoveryPolicy.enabled)
+                Poco::Thread::sleep(static_cast<long>(_recoveryPolicy.reconnectDelay.count()));
         }
     }
+}
+
+void NmeaGnssDevice::markConnected()
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    _state = DeviceState::offline;
+    _hasFix = false;
+    _buffer.clear();
+    ++_sequence;
+}
+
+void NmeaGnssDevice::markFailure(const std::string& message, DeviceState state)
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    _state = state;
+    if (state != DeviceState::ready) _hasFix = false;
+    ++_sequence;
+    ++_diagnostics.failedOperations;
+    ++_diagnostics.consecutiveFailures;
+    _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
+    _diagnostics.lastError = message;
+}
+
+void NmeaGnssDevice::checkStale()
+{
+    bool stale = false;
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        stale = _state == DeviceState::ready && _lastFix.time_since_epoch().count() != 0 &&
+            std::chrono::steady_clock::now() - _lastFix >= _recoveryPolicy.staleAfter;
+    }
+    if (stale)
+    {
+        markFailure("GNSS fix stale", DeviceState::offline);
+        notify(snapshot());
+    }
+}
+
+void NmeaGnssDevice::notify(const DeviceSnapshot& current, const GeoPosition* position)
+{
+    SnapshotHandler snapshotHandler;
+    PositionHandler positionHandler;
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        snapshotHandler = _snapshotHandler;
+        positionHandler = _positionHandler;
+    }
+    if (position && positionHandler) try { positionHandler(*position); } catch (...) {}
+    if (snapshotHandler) try { snapshotHandler(current); } catch (...) {}
+}
+
+DeviceDiagnostics NmeaGnssDevice::diagnostics() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _diagnostics;
 }
 
 } // namespace PocoDDS::Devices

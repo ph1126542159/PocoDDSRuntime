@@ -26,4 +26,4 @@ channel.close();
 
 ## 配置边界
 
-DeviceGateway 只读取 `pdr.serial.enabled`、`port` 和 `baudRate`。数据位、停止位、校验使用底层默认值；需要 7E1 等格式时必须先扩展配置和构造函数。端口也不能同时被其他程序独占打开。
+DeviceGateway 读取 `enabled`、`port`、`baudRate`、`parameters`、`flowControl`、`reconnectEnabled`、`reconnectDelayMilliseconds` 和 `readTimeoutMilliseconds`。`parameters` 支持例如 8N1、7E1 的格式，硬件流控使用 `flowControl=rtscts`。端口不能同时被其他程序独占打开。

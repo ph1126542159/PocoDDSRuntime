@@ -14,6 +14,13 @@ if(BUILD_TESTING)
     target_link_libraries(pdr-nmea-gnss-device-smoke PRIVATE PocoDDS::GNSSDevice)
     pdr_set_warnings(pdr-nmea-gnss-device-smoke)
     add_test(NAME nmea-gnss-device-smoke COMMAND pdr-nmea-gnss-device-smoke)
+
+    add_executable(pdr-nmea-gnss-device-recovery tests/NmeaGnssDeviceRecovery.cpp)
+    target_link_libraries(pdr-nmea-gnss-device-recovery PRIVATE PocoDDS::GNSSDevice)
+    pdr_set_warnings(pdr-nmea-gnss-device-recovery)
+    add_test(NAME nmea-gnss-device-recovery COMMAND pdr-nmea-gnss-device-recovery)
+    set_tests_properties(nmea-gnss-device-recovery PROPERTIES
+        LABELS "device;fault-injection;protocol;release")
 endif()
 
 install(TARGETS PDRDeviceGNSS ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")

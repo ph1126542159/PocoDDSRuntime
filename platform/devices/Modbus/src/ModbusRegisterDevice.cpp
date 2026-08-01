@@ -1,6 +1,7 @@
 #include "PocoDDS/Devices/ModbusRegisterDevice.h"
 
 #include "Poco/Timestamp.h"
+#include "Poco/Thread.h"
 
 #include <sstream>
 #include <stdexcept>
@@ -45,8 +46,10 @@ std::string join(const std::vector<std::uint16_t>& values)
 ModbusRegisterDevice::ModbusRegisterDevice(
     std::string id,
     std::shared_ptr<PocoDDS::Protocols::Modbus::ModbusTcpClient> client,
-    std::uint8_t unitId)
-    : _id(std::move(id)), _client(std::move(client)), _unitId(unitId)
+    std::uint8_t unitId,
+    ModbusReconnectPolicy reconnectPolicy)
+    : _id(std::move(id)), _client(std::move(client)), _unitId(unitId),
+      _reconnectPolicy(reconnectPolicy)
 {
     if (!_client)
         throw std::invalid_argument("Modbus client is required");
@@ -101,40 +104,99 @@ std::string ModbusRegisterDevice::execute(const std::string& operation,
                                           const std::string& payload)
 {
     const auto parameters = parseNumbers(payload, 2);
-    std::string result;
     if (operation == "readHolding")
     {
-        result = join(_client->readHoldingRegisters(
-            _unitId, parameters[0], parameters[1]));
+        return perform([&] {
+            return join(_client->readHoldingRegisters(
+                _unitId, parameters[0], parameters[1]));
+        }, true);
     }
-    else if (operation == "readInput")
+    if (operation == "readInput")
     {
-        result = join(
-            _client->readInputRegisters(_unitId, parameters[0], parameters[1]));
+        return perform([&] {
+            return join(_client->readInputRegisters(
+                _unitId, parameters[0], parameters[1]));
+        }, true);
     }
-    else if (operation == "writeRegister")
+    if (operation == "writeRegister")
     {
-        _client->writeSingleRegister(_unitId, parameters[0], parameters[1]);
-        result = "ok";
+        return perform([&] {
+            _client->writeSingleRegister(_unitId, parameters[0], parameters[1]);
+            return std::string("ok");
+        }, false);
     }
-    else
-    {
-        throw std::invalid_argument("unsupported Modbus operation: " + operation);
-    }
+    throw std::invalid_argument("unsupported Modbus operation: " + operation);
+}
 
+std::string ModbusRegisterDevice::perform(const std::function<std::string()>& operation,
+                                          bool replaySafe)
+{
+    const unsigned attempts = replaySafe ? _reconnectPolicy.readRetryAttempts + 1 : 1;
+    for (unsigned attempt = 0; attempt < attempts; ++attempt)
+    {
+        try
+        {
+            if (!_client->isOpen())
+            {
+                {
+                    Poco::FastMutex::ScopedLock lock(_mutex);
+                    ++_diagnostics.reconnectAttempts;
+                }
+                _client->open();
+            }
+            auto result = operation();
+            markSuccess(result);
+            notify();
+            return result;
+        }
+        catch (const std::exception& error)
+        {
+            markFailure(error.what());
+            _client->close();
+            notify();
+            if (attempt + 1 >= attempts)
+                throw;
+            Poco::Thread::sleep(static_cast<long>(_reconnectPolicy.retryDelay.count()));
+        }
+    }
+    throw std::logic_error("unreachable Modbus retry state");
+}
+
+void ModbusRegisterDevice::markSuccess(const std::string& result)
+{
     {
         Poco::FastMutex::ScopedLock lock(_mutex);
         ++_sequence;
         _lastPayload = result;
+        _state = DeviceState::ready;
+        ++_diagnostics.successfulOperations;
+        _diagnostics.consecutiveFailures = 0;
+        _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
+        _diagnostics.lastError.clear();
     }
-    notify();
-    return result;
+}
+
+void ModbusRegisterDevice::markFailure(const std::string& message)
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    ++_sequence;
+    _state = DeviceState::fault;
+    ++_diagnostics.failedOperations;
+    ++_diagnostics.consecutiveFailures;
+    _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
+    _diagnostics.lastError = message;
 }
 
 void ModbusRegisterDevice::setSnapshotHandler(SnapshotHandler handler)
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     _handler = std::move(handler);
+}
+
+DeviceDiagnostics ModbusRegisterDevice::diagnostics() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _diagnostics;
 }
 
 void ModbusRegisterDevice::notify()
@@ -145,6 +207,8 @@ void ModbusRegisterDevice::notify()
         handler = _handler;
     }
     if (handler)
-        handler(snapshot());
+    {
+        try { handler(snapshot()); } catch (...) {}
+    }
 }
 } // namespace PocoDDS::Devices

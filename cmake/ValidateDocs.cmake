@@ -9,6 +9,8 @@ set(required_docs
     "docs/development/new-device.md"
     "docs/development/new-protocol.md"
     "docs/development/new-subprocess.md"
+    "docs/development/sdk-and-scaffolding.md"
+    "docs/security/README.md"
     "docs/compatibility/README.md")
 foreach(relative_path IN LISTS required_docs)
     if(NOT EXISTS "${SOURCE_DIR}/${relative_path}")

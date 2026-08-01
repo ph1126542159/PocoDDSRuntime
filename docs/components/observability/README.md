@@ -2,7 +2,7 @@
 
 ## 职责
 
-`platform/observability` 记录业务、步骤、耗时、结果和经过清洗的字段，并通过 DDS 汇总追踪快照或导出 OTLP HTTP/JSON。
+`platform/observability` 记录业务追踪以及 Runtime、DDS、设备、协议、工作流和系统指标，并通过 DDS 汇总追踪快照或通过 OTLP HTTP/JSON 导出遥测数据。
 
 ## 实现过程
 
@@ -64,3 +64,5 @@ try {
 ```
 
 字段白名单、跨进程传播及 WebUI 查询接口以 [BUSINESS_TRACING.md](../../BUSINESS_TRACING.md) 为准。
+
+Metrics 的配置、指标目录、基数约束、查询接口和 Collector 验证见 [METRICS.md](../../METRICS.md)。

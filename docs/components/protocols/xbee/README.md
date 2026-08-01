@@ -2,7 +2,7 @@
 
 ## 实现过程
 
-`XBeeFrame` 负责 API 帧构造、转义和增量解析；`IoSample` 表示数字量/模拟量采样；`XBeePort` 通过串口发送和接收 XBee 帧。
+`XBeeFrame` 负责 API 帧构造、转义和增量解析；`IoSample` 表示数字量/模拟量采样；`XBeePort` 通过可注入串口通道发送和接收 XBee 帧。接收缓冲会跨超时保留分片，并能连续取出同一批字节中的多帧。
 
 ## 用法
 
@@ -16,7 +16,9 @@
 
 ```cpp
 using namespace PocoDDS::Protocols::XBee;
-XBeePort port("COM18", 9600, false);
+auto serial = std::make_shared<PocoDDS::Protocols::Serial::SerialChannel>(
+    "COM18", 9600);
+XBeePort port(serial, false);
 port.open();
 XBeeFrame frame;
 if (port.receive(frame, Poco::Timespan(2, 0))) {

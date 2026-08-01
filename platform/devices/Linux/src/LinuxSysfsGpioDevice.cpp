@@ -1,6 +1,7 @@
 #include "PocoDDS/Devices/LinuxSysfsGpioDevice.h"
 
 #include <Poco/Timestamp.h>
+#include <Poco/Thread.h>
 
 #include <fstream>
 #include <stdexcept>
@@ -14,10 +15,15 @@ LinuxSysfsGpioDevice::LinuxSysfsGpioDevice(
     unsigned pin,
     Direction direction,
     PocoDDS::Filesystem::path sysfsRoot,
-    bool manageExport)
+    bool manageExport,
+    std::chrono::milliseconds exportTimeout)
     : _id(std::move(id)), _pin(pin), _direction(direction),
-      _root(std::move(sysfsRoot)), _manageExport(manageExport)
+      _root(std::move(sysfsRoot)), _manageExport(manageExport),
+      _exportTimeout(exportTimeout)
 {
+    if (_id.empty()) throw std::invalid_argument("GPIO device id must not be empty");
+    if (_exportTimeout.count() < 0)
+        throw std::invalid_argument("GPIO export timeout must be non-negative");
 }
 
 LinuxSysfsGpioDevice::~LinuxSysfsGpioDevice() { stop(); }
@@ -38,63 +44,119 @@ void LinuxSysfsGpioDevice::writeControl(
 
 void LinuxSysfsGpioDevice::start()
 {
-    Poco::FastMutex::ScopedLock lock(_mutex);
-    if (_started)
-        return;
-    if (_manageExport)
-        writeControl(_root / "export", std::to_string(_pin));
     const auto gpio = _root / ("gpio" + std::to_string(_pin));
-    writeControl(gpio / "direction", _direction == Direction::output ? "out" : "in");
-    _started = true;
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        if (_state == DeviceState::ready) return;
+    }
+    try
+    {
+        if (_manageExport && !PocoDDS::Filesystem::exists(gpio))
+        {
+            writeControl(_root / "export", std::to_string(_pin));
+            Poco::FastMutex::ScopedLock lock(_mutex);
+            _exportedByUs = true;
+        }
+        const auto deadline = std::chrono::steady_clock::now() + _exportTimeout;
+        while (!PocoDDS::Filesystem::exists(gpio) &&
+               std::chrono::steady_clock::now() < deadline)
+            Poco::Thread::sleep(10);
+        if (!PocoDDS::Filesystem::exists(gpio))
+            throw std::runtime_error("GPIO sysfs node did not appear: " + gpio.string());
+        writeControl(gpio / "direction", _direction == Direction::output ? "out" : "in");
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        _state = DeviceState::ready;
+        _lastPayload = "configured";
+        ++_sequence;
+    }
+    catch (const std::exception& error)
+    {
+        markFailure(error.what());
+        throw;
+    }
 }
 
 void LinuxSysfsGpioDevice::stop() noexcept
 {
-    Poco::FastMutex::ScopedLock lock(_mutex);
-    if (!_started)
-        return;
-    if (_manageExport)
+    bool unexport = false;
     {
-        try { writeControl(_root / "unexport", std::to_string(_pin)); } catch (...) {}
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        if (_state == DeviceState::offline && !_exportedByUs) return;
+        unexport = _manageExport && _exportedByUs;
+        _exportedByUs = false;
+        _state = DeviceState::offline;
+        _lastPayload = "stopped";
+        ++_sequence;
     }
-    _started = false;
+    if (unexport)
+        try { writeControl(_root / "unexport", std::to_string(_pin)); } catch (...) {}
+    notify(snapshot());
 }
 
 std::uint32_t LinuxSysfsGpioDevice::read() const
 {
-    Poco::FastMutex::ScopedLock lock(_mutex);
-    std::ifstream stream(_root / ("gpio" + std::to_string(_pin)) / "value");
-    unsigned value = 0;
-    if (!(stream >> value))
-        throw std::runtime_error("cannot read GPIO value");
-    return value ? 1U : 0U;
+    try
+    {
+        {
+            Poco::FastMutex::ScopedLock lock(_mutex);
+            if (_state == DeviceState::offline)
+                throw std::logic_error("GPIO device is not started");
+        }
+        std::ifstream stream(_root / ("gpio" + std::to_string(_pin)) / "value");
+        unsigned value = 0;
+        if (!(stream >> value)) throw std::runtime_error("cannot read GPIO value");
+        const auto normalized = value ? 1U : 0U;
+        markSuccess(std::to_string(normalized));
+        return normalized;
+    }
+    catch (const std::exception& error)
+    {
+        markFailure(error.what());
+        throw;
+    }
 }
 
 void LinuxSysfsGpioDevice::write(std::uint32_t value)
 {
     if (_direction != Direction::output)
         throw std::logic_error("cannot write input GPIO");
-    ValueHandler valueHandler;
-    SnapshotHandler snapshotHandler;
+    const auto normalized = value ? 1U : 0U;
+    DeviceSnapshot current;
+    try
     {
-        Poco::FastMutex::ScopedLock lock(_mutex);
+        {
+            Poco::FastMutex::ScopedLock lock(_mutex);
+            if (_state == DeviceState::offline)
+                throw std::logic_error("GPIO device is not started");
+        }
         writeControl(
             _root / ("gpio" + std::to_string(_pin)) / "value",
-            value ? "1" : "0");
-        ++_sequence;
-        valueHandler = _valueHandler;
-        snapshotHandler = _snapshotHandler;
+            normalized ? "1" : "0");
+        markSuccess(std::to_string(normalized));
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        current = {_id, _type, _state, _sequence,
+                   Poco::Timestamp().epochMicroseconds(), _lastPayload};
     }
-    if (valueHandler) valueHandler(value ? 1U : 0U);
-    if (snapshotHandler) snapshotHandler(snapshot());
+    catch (const std::exception& error)
+    {
+        markFailure(error.what());
+        throw;
+    }
+    notify(current, &normalized);
 }
 
 DeviceSnapshot LinuxSysfsGpioDevice::snapshot() const
 {
-    const auto value = read();
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        if (_state == DeviceState::offline)
+            return {_id, _type, _state, _sequence,
+                    Poco::Timestamp().epochMicroseconds(), _lastPayload};
+    }
+    try { (void) read(); } catch (...) {}
     Poco::FastMutex::ScopedLock lock(_mutex);
-    return {_id, _type, _started ? DeviceState::ready : DeviceState::offline, _sequence,
-            Poco::Timestamp().epochMicroseconds(), std::to_string(value)};
+    return {_id, _type, _state, _sequence,
+            Poco::Timestamp().epochMicroseconds(), _lastPayload};
 }
 
 std::string LinuxSysfsGpioDevice::execute(
@@ -127,6 +189,50 @@ void LinuxSysfsGpioDevice::setValueHandler(ValueHandler handler)
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     _valueHandler = std::move(handler);
+}
+
+void LinuxSysfsGpioDevice::markSuccess(const std::string& payload) const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    _state = DeviceState::ready;
+    _lastPayload = payload;
+    ++_sequence;
+    ++_diagnostics.successfulOperations;
+    _diagnostics.consecutiveFailures = 0;
+    _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
+    _diagnostics.lastError.clear();
+}
+
+void LinuxSysfsGpioDevice::markFailure(const std::string& message) const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    _state = DeviceState::fault;
+    _lastPayload = message;
+    ++_sequence;
+    ++_diagnostics.failedOperations;
+    ++_diagnostics.consecutiveFailures;
+    _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
+    _diagnostics.lastError = message;
+}
+
+void LinuxSysfsGpioDevice::notify(const DeviceSnapshot& current,
+                                  const std::uint32_t* value) const
+{
+    SnapshotHandler snapshotHandler;
+    ValueHandler valueHandler;
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        snapshotHandler = _snapshotHandler;
+        valueHandler = _valueHandler;
+    }
+    if (value && valueHandler) try { valueHandler(*value); } catch (...) {}
+    if (snapshotHandler) try { snapshotHandler(current); } catch (...) {}
+}
+
+DeviceDiagnostics LinuxSysfsGpioDevice::diagnostics() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _diagnostics;
 }
 
 } // namespace PocoDDS::Devices

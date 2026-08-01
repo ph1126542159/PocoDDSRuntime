@@ -13,7 +13,7 @@
 | Simulation | 内存仿真 |
 | XBeeSensor | XBee IO Sample |
 
-具体后端只有在对应 `pdr.*.enabled=true` 时由设备网关启用；默认可移植配置只启用仿真设备。
+具体后端通过 `pdr.<type>.count` 和 `pdr.<type>.<index>.*` 创建；未声明 `count` 时仍兼容 `pdr.*.enabled=true` 单实例配置。默认可移植配置只启用一个仿真设备。
 
 ## 统一实现流程
 
@@ -31,7 +31,7 @@ DeviceSnapshot
 → pdr.device.state
 ```
 
-配置项集中在 `config/pdr-runtime.properties`。当前结构每种物理后端最多创建一个实例；多设备场景需要把配置扩展为 `pdr.<type>.count` 和编号项。
+配置项集中在 `config/pdr-runtime.properties`。每类最多配置 256 个实例，编号从零开始。所有启用实例的 `id` 必须在全部设备类型之间唯一，OSP 服务名和 DDS 路由均使用该 ID。
 
 ## 测试
 

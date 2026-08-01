@@ -115,3 +115,11 @@ install(TARGETS pdr-qt3d-subprocess
 install(FILES config/pdr-qt3d-subprocess.properties
               config/pdr-window-subprocesses.properties
     DESTINATION "${CMAKE_INSTALL_BINDIR}/processes/pdr-qt3d-subprocess")
+# windeployqt and pdr_configure_subprocess populate this directory with the
+# complete Qt/plugin/runtime closure. Installing only the executable produces
+# a package that appears healthy until the child is launched on a clean host.
+if(WIN32)
+    install(DIRECTORY
+        "${CMAKE_BINARY_DIR}/bin/processes/pdr-qt3d-subprocess/"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}/processes/pdr-qt3d-subprocess")
+endif()

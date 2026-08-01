@@ -3,5 +3,6 @@
     "cmake.configureOnOpen": true,
     "cmake.configureArgs": [],
     "cmake.configurePreset": "full",
-    "cmake.buildPreset": "full"
+    "cmake.buildPreset": "full",
+    "git.ignoreLimitWarning": true
 }

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "name": "@PDR_PROFILE@",
+  "version": "@PROJECT_VERSION@",
+  "features": {
+    "webui": @PDR_PROFILE_WEBUI@,
+    "launcher": @PDR_PROFILE_LAUNCHER@,
+    "qt3d": @PDR_PROFILE_QT3D@,
+    "observability": @PDR_PROFILE_OBSERVABILITY@,
+    "dataModules": @PDR_PROFILE_DATA_MODULES@
+  }
+}

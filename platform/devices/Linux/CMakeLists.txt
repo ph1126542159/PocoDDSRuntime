@@ -20,6 +20,13 @@ if(BUILD_TESTING)
     target_link_libraries(pdr-linux-sysfs-led-smoke PRIVATE PocoDDS::LinuxDevices)
     pdr_set_warnings(pdr-linux-sysfs-led-smoke)
     add_test(NAME linux-sysfs-led-smoke COMMAND pdr-linux-sysfs-led-smoke)
+
+    add_executable(pdr-linux-sysfs-recovery tests/LinuxSysfsRecovery.cpp)
+    target_link_libraries(pdr-linux-sysfs-recovery PRIVATE PocoDDS::LinuxDevices)
+    pdr_set_warnings(pdr-linux-sysfs-recovery)
+    add_test(NAME linux-sysfs-recovery COMMAND pdr-linux-sysfs-recovery)
+    set_tests_properties(linux-sysfs-recovery PROPERTIES
+        LABELS "device;fault-injection;release")
 endif()
 
 install(TARGETS PDRDeviceLinux ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")

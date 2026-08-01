@@ -1,4 +1,5 @@
 #include "PocoDDS/Protocols/Serial/SerialChannel.h"
+#include "PocoDDS/Protocols/ProtocolMetrics.h"
 
 #include <stdexcept>
 #include <utility>
@@ -26,15 +27,17 @@ std::string SerialChannel::name() const
 
 void SerialChannel::open()
 {
-    if (_open)
+    if (_open.load())
         return;
+    PocoDDS::Protocols::ProtocolMetricTimer metric("serial", "open");
     _port.open(_device, _baudRate, _parameters, _flowControl);
     _open = true;
+    metric.success();
 }
 
 void SerialChannel::close() noexcept
 {
-    if (!_open)
+    if (!_open.exchange(false))
         return;
     try
     {
@@ -43,30 +46,50 @@ void SerialChannel::close() noexcept
     catch (...)
     {
     }
-    _open = false;
 }
 
 bool SerialChannel::isOpen() const noexcept
 {
-    return _open;
+    return _open.load();
 }
 
 std::size_t SerialChannel::write(const std::uint8_t* data, std::size_t size)
 {
-    if (!_open)
+    PocoDDS::Protocols::ProtocolMetricTimer metric("serial", "write", size);
+    if (!_open.load())
         throw std::logic_error("serial channel is not open");
-    return _port.write(reinterpret_cast<const char*>(data), size);
+    try
+    {
+        const auto written = _port.write(reinterpret_cast<const char*>(data), size);
+        metric.success();
+        return written;
+    }
+    catch (...)
+    {
+        close();
+        throw;
+    }
 }
 
 std::vector<std::uint8_t> SerialChannel::read(std::size_t size, Poco::Timespan timeout)
 {
-    if (!_open)
+    PocoDDS::Protocols::ProtocolMetricTimer metric("serial", "read");
+    if (!_open.load())
         throw std::logic_error("serial channel is not open");
-    std::vector<std::uint8_t> bytes(size);
-    const auto read =
-        _port.read(reinterpret_cast<char*>(bytes.data()), bytes.size(), timeout);
-    bytes.resize(read);
-    return bytes;
+    try
+    {
+        std::vector<std::uint8_t> bytes(size);
+        const auto read =
+            _port.read(reinterpret_cast<char*>(bytes.data()), bytes.size(), timeout);
+        bytes.resize(read);
+        if (read == 0) metric.timeout(); else metric.success();
+        return bytes;
+    }
+    catch (...)
+    {
+        close();
+        throw;
+    }
 }
 
 Poco::Serial::SerialPort& SerialChannel::port() noexcept

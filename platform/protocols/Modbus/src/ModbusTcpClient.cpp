@@ -1,4 +1,5 @@
 #include "PocoDDS/Protocols/Modbus/ModbusTcpClient.h"
+#include "PocoDDS/Protocols/ProtocolMetrics.h"
 
 #include "Poco/Net/Socket.h"
 
@@ -34,9 +35,11 @@ void ModbusTcpClient::open()
     Poco::FastMutex::ScopedLock lock(_mutex);
     if (_open)
         return;
+    PocoDDS::Protocols::ProtocolMetricTimer metric("modbus-tcp", "connect");
     _socket.connect(_server, _timeout);
     _socket.setNoDelay(true);
     _open = true;
+    metric.success();
 }
 
 void ModbusTcpClient::close() noexcept
@@ -65,6 +68,7 @@ std::vector<std::uint16_t> ModbusTcpClient::readHoldingRegisters(
     std::uint16_t address,
     std::uint16_t count)
 {
+    PocoDDS::Protocols::ProtocolMetricTimer metric("modbus-tcp", "read-holding-registers");
     Poco::FastMutex::ScopedLock lock(_mutex);
     const auto transaction = _nextTransaction++;
     const auto response = transact(ModbusTcpCodec::readRegisters(
@@ -79,6 +83,7 @@ std::vector<std::uint16_t> ModbusTcpClient::readHoldingRegisters(
     values.reserve(count);
     for (std::size_t i = 1; i < response.data.size(); i += 2)
         values.push_back(read16(response.data.data() + i));
+    metric.success();
     return values;
 }
 
@@ -87,6 +92,7 @@ std::vector<std::uint16_t> ModbusTcpClient::readInputRegisters(
     std::uint16_t address,
     std::uint16_t count)
 {
+    PocoDDS::Protocols::ProtocolMetricTimer metric("modbus-tcp", "read-input-registers");
     Poco::FastMutex::ScopedLock lock(_mutex);
     const auto transaction = _nextTransaction++;
     const auto response = transact(ModbusTcpCodec::readRegisters(
@@ -101,6 +107,7 @@ std::vector<std::uint16_t> ModbusTcpClient::readInputRegisters(
     values.reserve(count);
     for (std::size_t i = 1; i < response.data.size(); i += 2)
         values.push_back(read16(response.data.data() + i));
+    metric.success();
     return values;
 }
 
@@ -108,6 +115,7 @@ void ModbusTcpClient::writeSingleRegister(std::uint8_t unitId,
                                           std::uint16_t address,
                                           std::uint16_t value)
 {
+    PocoDDS::Protocols::ProtocolMetricTimer metric("modbus-tcp", "write-single-register");
     Poco::FastMutex::ScopedLock lock(_mutex);
     const auto transaction = _nextTransaction++;
     const auto response =
@@ -117,22 +125,41 @@ void ModbusTcpClient::writeSingleRegister(std::uint8_t unitId,
     if (response.function != FunctionCode::writeSingleRegister || response.data.size() != 4 ||
         read16(response.data.data()) != address || read16(response.data.data() + 2) != value)
         throw std::runtime_error("invalid Modbus write-single-register response");
+    metric.success();
 }
 
 Response ModbusTcpClient::transact(const std::vector<std::uint8_t>& request)
 {
     if (!_open)
         throw std::logic_error("Modbus TCP client is not open");
-    sendAll(request.data(), request.size());
+    try
+    {
+        sendAll(request.data(), request.size());
 
-    std::vector<std::uint8_t> response(6);
-    receiveAll(response.data(), response.size());
-    const auto remaining = read16(response.data() + 4);
-    if (remaining < 3 || remaining > 254)
-        throw std::runtime_error("invalid Modbus TCP response length");
-    response.resize(6 + remaining);
-    receiveAll(response.data() + 6, remaining);
-    return ModbusTcpCodec::decodeResponse(response.data(), response.size());
+        std::vector<std::uint8_t> response(6);
+        receiveAll(response.data(), response.size());
+        const auto remaining = read16(response.data() + 4);
+        if (remaining < 3 || remaining > 254)
+            throw std::runtime_error("invalid Modbus TCP response length");
+        response.resize(6 + remaining);
+        receiveAll(response.data() + 6, remaining);
+        return ModbusTcpCodec::decodeResponse(response.data(), response.size());
+    }
+    catch (...)
+    {
+        // A stream cannot be considered reusable after a partial request,
+        // timeout, reset or malformed frame. Publish the real state so callers
+        // can apply their retry policy and reconnect with open().
+        try
+        {
+            _socket.close();
+        }
+        catch (...)
+        {
+        }
+        _open = false;
+        throw;
+    }
 }
 
 void ModbusTcpClient::sendAll(const std::uint8_t* data, std::size_t size)

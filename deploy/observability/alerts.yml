@@ -1,0 +1,27 @@
+groups:
+  - name: poco-dds-runtime
+    rules:
+      - alert: PocoDDSRuntimeDown
+        expr: absent(pdr_runtime_starts_total)
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "PocoDDSRuntime metrics are absent"}
+      - alert: PocoDDSMetricSeriesDropped
+        expr: increase(pdr_metrics_series_dropped_total[5m]) > 0
+        labels: {severity: warning}
+        annotations: {summary: "Metric cardinality limit rejected new series"}
+      - alert: PocoDDSDeviceCommandErrors
+        expr: sum(rate(pdr_device_commands_total{result="error"}[5m])) > 0.1
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Device command error rate is elevated"}
+      - alert: PocoDDSWorkflowFailures
+        expr: sum(rate(pdr_workflow_executions_total{result="failed"}[5m])) > 0.05
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Workflow failures are elevated"}
+      - alert: PocoDDSHttpLatencyP95
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_milliseconds_bucket[5m]))) > 500
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "HTTP p95 latency is above 500 ms"}

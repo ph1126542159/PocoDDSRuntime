@@ -5,13 +5,14 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace PocoDDS::Protocols::XBee
 {
 class XBeePort final : public PocoDDS::Protocols::Protocol
 {
 public:
-    explicit XBeePort(std::shared_ptr<PocoDDS::Protocols::Serial::SerialChannel> serial,
+    explicit XBeePort(std::shared_ptr<PocoDDS::Protocols::Serial::ISerialChannel> serial,
                       bool escapedApiMode = false);
 
     std::string name() const override;
@@ -23,7 +24,8 @@ public:
     bool receive(XBeeFrame& frame, Poco::Timespan timeout);
 
 private:
-    std::shared_ptr<PocoDDS::Protocols::Serial::SerialChannel> _serial;
+    std::shared_ptr<PocoDDS::Protocols::Serial::ISerialChannel> _serial;
     bool _escapedApiMode;
+    std::vector<std::uint8_t> _receiveBuffer;
 };
 } // namespace PocoDDS::Protocols::XBee

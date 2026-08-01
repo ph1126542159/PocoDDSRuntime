@@ -14,6 +14,10 @@ target_include_directories(OSPWeb
         $<INSTALL_INTERFACE:include>)
 target_link_libraries(OSPWeb
     PUBLIC Poco::OSP Poco::Net Poco::Util Poco::XML Poco::Foundation)
+if(PDR_ENABLE_OBSERVABILITY)
+    target_link_libraries(OSPWeb PUBLIC PocoDDS::Observability)
+    target_compile_definitions(OSPWeb PUBLIC PDR_ENABLE_OBSERVABILITY=1)
+endif()
 pdr_set_warnings(OSPWeb)
 
 myiot_add_osp_bundle(OSP_Web_Bundle "osp.web"

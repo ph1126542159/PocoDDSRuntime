@@ -12,6 +12,23 @@ bool requiresEscape(std::uint8_t byte)
 {
     return byte == 0x7E || byte == 0x7D || byte == 0x11 || byte == 0x13;
 }
+
+std::size_t rawPrefixForDecoded(const std::uint8_t* bytes,
+                                std::size_t size,
+                                std::size_t decodedCount)
+{
+    std::size_t raw = 0;
+    std::size_t decoded = 0;
+    while (raw < size && decoded < decodedCount)
+    {
+        if (raw > 0 && bytes[raw] == 0x7D && raw + 1 < size)
+            raw += 2;
+        else
+            ++raw;
+        ++decoded;
+    }
+    return raw;
+}
 } // namespace
 
 XBeeFrame::XBeeFrame() = default;
@@ -76,6 +93,8 @@ ParseStatus XBeeFrame::parse(XBeeFrame& frame,
     consumed = 0;
     if (!bytes || size == 0)
         return ParseStatus::notEnoughData;
+    const auto* rawBytes = bytes;
+    const auto rawSize = size;
     std::vector<std::uint8_t> decoded;
     if (escaped)
     {
@@ -87,27 +106,43 @@ ParseStatus XBeeFrame::parse(XBeeFrame& frame,
     const auto start = std::find(bytes, bytes + size, StartDelimiter);
     if (start == bytes + size)
     {
-        consumed = size;
+        consumed = rawSize;
         return ParseStatus::notFound;
     }
     const std::size_t offset = static_cast<std::size_t>(start - bytes);
     if (size - offset < 4)
+    {
+        if (offset > 0)
+            consumed = escaped
+                ? rawPrefixForDecoded(rawBytes, rawSize, offset)
+                : offset;
         return ParseStatus::notEnoughData;
+    }
     const std::size_t length =
         (static_cast<std::size_t>(start[1]) << 8) | start[2];
     if (length == 0 || length + 4 > MaxFrameLength)
     {
-        consumed = offset + 1;
+        consumed = escaped
+            ? rawPrefixForDecoded(rawBytes, rawSize, offset + 1)
+            : offset + 1;
         return ParseStatus::notFound;
     }
     const std::size_t total = 3 + length + 1;
     if (size - offset < total)
+    {
+        if (offset > 0)
+            consumed = escaped
+                ? rawPrefixForDecoded(rawBytes, rawSize, offset)
+                : offset;
         return ParseStatus::notEnoughData;
+    }
 
     std::uint32_t sum = 0;
     for (std::size_t i = 3; i < total; ++i)
         sum += start[i];
-    consumed = offset + total;
+    consumed = escaped
+        ? rawPrefixForDecoded(rawBytes, rawSize, offset + total)
+        : offset + total;
     if ((sum & 0xFF) != 0xFF)
         return ParseStatus::badChecksum;
 

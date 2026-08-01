@@ -1,14 +1,18 @@
 #include "PocoDDS/Devices/Device.h"
+#include "PocoDDS/Devices/DeviceService.h"
 #include "PocoDDS/Devices/CanSignalSensor.h"
+#include "PocoDDS/Protocols/CAN/LoopbackCanEndpoint.h"
 #include "PocoDDS/Devices/LinuxSysfsGpioDevice.h"
 #include "PocoDDS/Devices/LinuxSysfsLedDevice.h"
 #include "PocoDDS/Devices/ModbusRegisterDevice.h"
 #include "PocoDDS/Devices/NmeaGnssDevice.h"
 #include "PocoDDS/Devices/SerialPortDevice.h"
+#include "PocoDDS/Protocols/Serial/LoopbackSerialChannel.h"
 #include "PocoDDS/Devices/SimulatedDevice.h"
 #include "PocoDDS/Devices/XBeeAnalogSensor.h"
 #include "PocoDDS/DDS/DeviceBridge.h"
 #include "PocoDDS/DDS/Runtime.h"
+#include "PocoDDS/Configuration/IndexedConfiguration.h"
 
 #include "Poco/ClassLibrary.h"
 #include "Poco/Exception.h"
@@ -24,49 +28,57 @@
 #include "Poco/OSP/ServiceRegistry.h"
 
 #include <memory>
+#include <chrono>
 #include <string>
-#include <typeinfo>
+#include <unordered_set>
 #include <vector>
 
 namespace PocoDDS::Services
 {
-class DeviceService final : public Poco::OSP::Service
-{
-public:
-    explicit DeviceService(PocoDDS::Devices::Device& device) : _device(device) {}
-
-    PocoDDS::Devices::Device& device() noexcept { return _device; }
-
-    const std::type_info& type() const override { return typeid(DeviceService); }
-
-    bool isA(const std::type_info& other) const override
-    {
-        return std::string(other.name()) == typeid(DeviceService).name() ||
-               Poco::OSP::Service::isA(other);
-    }
-
-private:
-    PocoDDS::Devices::Device& _device;
-};
-
 class DeviceGatewayActivator final : public Poco::OSP::BundleActivator
 {
 public:
     void addDevice(Poco::OSP::BundleContext::Ptr context,
-                   std::unique_ptr<PocoDDS::Devices::Device> device)
+                   std::unique_ptr<PocoDDS::Devices::Device> device,
+                   bool required = true)
     {
+        if (!_deviceIds.insert(device->id()).second)
+            throw Poco::InvalidArgumentException("Duplicate device id", device->id());
+        auto bridge =
+            std::make_unique<PocoDDS::FastDDS::DeviceBridge>(*_runtime, *device);
+        try
+        {
+            bridge->start();
+        }
+        catch (...)
+        {
+            _deviceIds.erase(device->id());
+            throw;
+        }
         Poco::OSP::Properties properties;
         properties.set("pdr.device", device->id());
         properties.set("pdr.deviceType", device->type());
+        properties.set("pdr.deviceState", "ready");
+        properties.set("pdr.deviceRequired", required ? "true" : "false");
         properties.set("pdr.bundle", context->thisBundle()->symbolicName());
-        _services.push_back(context->registry().registerService(
-            "pdr.device." + device->id(), new DeviceService(*device), properties));
-
-        auto bridge =
-            std::make_unique<PocoDDS::FastDDS::DeviceBridge>(*_runtime, *device);
-        bridge->start();
+        Poco::OSP::ServiceRef::Ptr service;
+        try
+        {
+            service = context->registry().registerService(
+                "pdr.device." + device->id(),
+                new PocoDDS::Devices::DeviceService(*device), properties);
+        }
+        catch (...)
+        {
+            if (service)
+                context->registry().unregisterService(service);
+            bridge->stop();
+            _deviceIds.erase(device->id());
+            throw;
+        }
         _devices.push_back(std::move(device));
         _bridges.push_back(std::move(bridge));
+        _services.push_back(std::move(service));
     }
 
     void start(Poco::OSP::BundleContext::Ptr context) override
@@ -79,86 +91,181 @@ public:
         _runtime =
             std::make_unique<PocoDDS::FastDDS::Runtime>(domainId, "pdr-device-gateway");
         _runtime->start();
-        addDevice(context,
-                  std::make_unique<PocoDDS::Devices::SimulatedDevice>("simulation-1"));
+        const auto instances = [&](const std::string& base,
+                                   bool legacyEnabled,
+                                   std::size_t defaultCount,
+                                   const std::string& idPrefix) {
+            return PocoDDS::Configuration::indexedInstances(
+                *configuration, base, legacyEnabled, defaultCount, idPrefix);
+        };
+        const auto key = [](const auto& instance, const char* name) {
+            return instance.prefix + "." + name;
+        };
+        const auto addConfiguredDevice = [&](const auto& instance, auto device) {
+            addDevice(context, std::move(device),
+                      configuration->getBool(key(instance, "required"), true));
+        };
 
-        if (configuration->getBool("pdr.modbus.enabled", false))
+        for (const auto& instance : instances("pdr.simulation", true, 1, "simulation"))
+            if (instance.enabled)
+                addConfiguredDevice(instance,
+                          std::make_unique<PocoDDS::Devices::SimulatedDevice>(instance.id));
+
+        for (const auto& instance : instances("pdr.modbus", false, 0, "modbus"))
         {
-            const auto host = configuration->getString("pdr.modbus.host", "127.0.0.1");
+            if (!instance.enabled)
+                continue;
+            const auto host = configuration->getString(key(instance, "host"), "127.0.0.1");
             const auto port =
-                static_cast<Poco::UInt16>(configuration->getUInt("pdr.modbus.port", 502));
+                static_cast<Poco::UInt16>(configuration->getUInt(key(instance, "port"), 502));
             const auto unit =
-                static_cast<std::uint8_t>(configuration->getUInt("pdr.modbus.unitId", 1));
+                static_cast<std::uint8_t>(configuration->getUInt(key(instance, "unitId"), 1));
+            const auto timeoutMilliseconds =
+                configuration->getUInt(key(instance, "timeoutMilliseconds"), 2000);
+            PocoDDS::Devices::ModbusReconnectPolicy reconnectPolicy;
+            reconnectPolicy.readRetryAttempts =
+                configuration->getUInt(key(instance, "readRetryAttempts"), 1);
+            reconnectPolicy.retryDelay = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "retryDelayMilliseconds"), 50));
             auto client =
                 std::make_shared<PocoDDS::Protocols::Modbus::ModbusTcpClient>(
-                    Poco::Net::SocketAddress(host, port));
-            addDevice(context,
+                    Poco::Net::SocketAddress(host, port),
+                    Poco::Timespan(static_cast<Poco::Timespan::TimeDiff>(
+                        timeoutMilliseconds) * Poco::Timespan::MILLISECONDS));
+            addConfiguredDevice(instance,
                       std::make_unique<PocoDDS::Devices::ModbusRegisterDevice>(
-                          "modbus-1", std::move(client), unit));
+                          instance.id, std::move(client), unit, reconnectPolicy));
         }
 
-        if (configuration->getBool("pdr.serial.enabled", false))
+        for (const auto& instance : instances("pdr.serial", false, 0, "serial"))
         {
-            const auto port =
-                configuration->getString("pdr.serial.port");
-            const auto baudRate =
-                configuration->getInt("pdr.serial.baudRate", 115200);
-            addDevice(context,
+            if (!instance.enabled)
+                continue;
+            const auto transport =
+                configuration->getString(key(instance, "transport"), "port");
+            if (transport != "port" && transport != "loopback")
+                throw Poco::InvalidArgumentException(
+                    "Unsupported " + key(instance, "transport"), transport);
+            const auto port = configuration->getString(
+                key(instance, "port"), transport == "loopback" ? instance.id : "");
+            const auto baudRate = configuration->getInt(key(instance, "baudRate"), 115200);
+            const auto parameters = configuration->getString(key(instance, "parameters"), "8N1");
+            const auto flowControlName =
+                configuration->getString(key(instance, "flowControl"), "none");
+            if (flowControlName != "none" && flowControlName != "rtscts")
+                throw Poco::InvalidArgumentException(
+                    "Unsupported " + key(instance, "flowControl"), flowControlName);
+            const auto flowControl = flowControlName == "rtscts"
+                ? Poco::Serial::SerialPort::FLOW_RTSCTS
+                : Poco::Serial::SerialPort::FLOW_NONE;
+            PocoDDS::Devices::SerialReconnectPolicy reconnectPolicy;
+            reconnectPolicy.enabled =
+                configuration->getBool(key(instance, "reconnectEnabled"), true);
+            reconnectPolicy.delay = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "reconnectDelayMilliseconds"), 250));
+            reconnectPolicy.readTimeout = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "readTimeoutMilliseconds"), 250));
+            std::shared_ptr<PocoDDS::Protocols::Serial::ISerialChannel> channel;
+            if (transport == "loopback")
+                channel = std::make_shared<
+                    PocoDDS::Protocols::Serial::LoopbackSerialChannel>(instance.id);
+            else
+                channel = std::make_shared<PocoDDS::Protocols::Serial::SerialChannel>(
+                    port, baudRate, parameters, flowControl);
+            addConfiguredDevice(instance,
                       std::make_unique<PocoDDS::Devices::SerialPortDevice>(
-                          "serial-1", port, baudRate));
+                          instance.id, std::move(channel), reconnectPolicy));
         }
 
-        if (configuration->getBool("pdr.gnss.enabled", false))
+        for (const auto& instance : instances("pdr.gnss", false, 0, "gnss"))
         {
-            const auto port =
-                configuration->getString("pdr.gnss.port");
-            const auto baudRate =
-                configuration->getInt("pdr.gnss.baudRate", 9600);
-            addDevice(context,
+            if (!instance.enabled)
+                continue;
+            const auto transport =
+                configuration->getString(key(instance, "transport"), "port");
+            if (transport != "port" && transport != "loopback")
+                throw Poco::InvalidArgumentException(
+                    "Unsupported " + key(instance, "transport"), transport);
+            const auto port = configuration->getString(
+                key(instance, "port"), transport == "loopback" ? instance.id : "");
+            const auto baudRate = configuration->getInt(key(instance, "baudRate"), 9600);
+            PocoDDS::Devices::GnssRecoveryPolicy recoveryPolicy;
+            recoveryPolicy.enabled =
+                configuration->getBool(key(instance, "reconnectEnabled"), true);
+            recoveryPolicy.reconnectDelay = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "reconnectDelayMilliseconds"), 250));
+            recoveryPolicy.readTimeout = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "readTimeoutMilliseconds"), 250));
+            recoveryPolicy.staleAfter = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "staleAfterMilliseconds"), 5000));
+            std::shared_ptr<PocoDDS::Protocols::Serial::ISerialChannel> channel;
+            if (transport == "loopback")
+                channel = std::make_shared<
+                    PocoDDS::Protocols::Serial::LoopbackSerialChannel>(instance.id);
+            else
+                channel = std::make_shared<PocoDDS::Protocols::Serial::SerialChannel>(
+                    port, baudRate);
+            addConfiguredDevice(instance,
                       std::make_unique<PocoDDS::Devices::NmeaGnssDevice>(
-                          "gnss-1", port, baudRate));
+                          instance.id, std::move(channel), recoveryPolicy));
         }
 
-        if (configuration->getBool("pdr.gpio.enabled", false))
+        for (const auto& instance : instances("pdr.gpio", false, 0, "gpio"))
         {
+            if (!instance.enabled)
+                continue;
             const auto pin =
-                static_cast<unsigned>(configuration->getUInt("pdr.gpio.pin"));
+                static_cast<unsigned>(configuration->getUInt(key(instance, "pin")));
             const auto direction =
-                configuration->getString("pdr.gpio.direction", "in");
+                configuration->getString(key(instance, "direction"), "in");
             if (direction != "in" && direction != "out")
                 throw Poco::InvalidArgumentException(
-                    "pdr.gpio.direction must be 'in' or 'out'");
-            addDevice(context,
+                    key(instance, "direction") + " must be 'in' or 'out'");
+            const auto id = instance.legacy &&
+                    !configuration->hasProperty(key(instance, "id"))
+                ? "gpio-" + std::to_string(pin)
+                : instance.id;
+            addConfiguredDevice(instance,
                       std::make_unique<PocoDDS::Devices::LinuxSysfsGpioDevice>(
-                          "gpio-" + std::to_string(pin),
+                          id,
                           pin,
                           direction == "out"
                               ? PocoDDS::Devices::LinuxSysfsGpioDevice::Direction::output
                               : PocoDDS::Devices::LinuxSysfsGpioDevice::Direction::input,
-                          configuration->getString(
-                              "pdr.gpio.sysfsRoot", "/sys/class/gpio"),
-                          configuration->getBool("pdr.gpio.manageExport", true)));
+                          configuration->getString(key(instance, "sysfsRoot"),
+                                                   "/sys/class/gpio"),
+                          configuration->getBool(key(instance, "manageExport"), true),
+                          std::chrono::milliseconds(configuration->getUInt(
+                              key(instance, "exportTimeoutMilliseconds"), 1000))));
         }
 
-        if (configuration->getBool("pdr.xbee.enabled", false))
+        for (const auto& instance : instances("pdr.xbee", false, 0, "xbee-sensor"))
         {
+            if (!instance.enabled)
+                continue;
+            const auto transport =
+                configuration->getString(key(instance, "transport"), "port");
+            if (transport != "port" && transport != "loopback")
+                throw Poco::InvalidArgumentException(
+                    "Unsupported " + key(instance, "transport"), transport);
             PocoDDS::Devices::XBeeAnalogSensor::Options options;
-            options.id = configuration->getString("pdr.xbee.id", "xbee-sensor-1");
-            options.serialPort = configuration->getString("pdr.xbee.port");
-            options.baudRate = configuration->getInt("pdr.xbee.baudRate", 9600);
+            options.id = instance.id;
+            options.serialPort = configuration->getString(
+                key(instance, "port"), transport == "loopback" ? instance.id : "");
+            options.baudRate = configuration->getInt(key(instance, "baudRate"), 9600);
             options.escapedApiMode =
-                configuration->getBool("pdr.xbee.escapedApiMode", false);
+                configuration->getBool(key(instance, "escapedApiMode"), false);
             options.sourceAddress = std::stoull(
-                configuration->getString("pdr.xbee.sourceAddress"), nullptr, 16);
+                configuration->getString(key(instance, "sourceAddress")), nullptr, 16);
             options.analogChannel =
-                static_cast<unsigned>(configuration->getUInt("pdr.xbee.analogChannel", 0));
+                static_cast<unsigned>(configuration->getUInt(key(instance, "analogChannel"), 0));
             options.physicalQuantity =
-                configuration->getString("pdr.xbee.physicalQuantity", "raw");
+                configuration->getString(key(instance, "physicalQuantity"), "raw");
             options.physicalUnit =
-                configuration->getString("pdr.xbee.physicalUnit", "count");
+                configuration->getString(key(instance, "physicalUnit"), "count");
 
             const auto conversion =
-                configuration->getString("pdr.xbee.conversion", "raw");
+                configuration->getString(key(instance, "conversion"), "raw");
             if (conversion == "raw")
                 options.conversion =
                     PocoDDS::Devices::XBeeAnalogSensor::Conversion::raw;
@@ -173,48 +280,101 @@ public:
                     PocoDDS::Devices::XBeeAnalogSensor::Conversion::relativeHumidity;
             else
                 throw Poco::InvalidArgumentException(
-                    "Unsupported pdr.xbee.conversion", conversion);
+                    "Unsupported " + key(instance, "conversion"), conversion);
 
-            addDevice(context,
-                      std::make_unique<PocoDDS::Devices::XBeeAnalogSensor>(
-                          std::move(options)));
+            PocoDDS::Devices::XBeeRecoveryPolicy recoveryPolicy;
+            recoveryPolicy.enabled =
+                configuration->getBool(key(instance, "reconnectEnabled"), true);
+            recoveryPolicy.reconnectDelay = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "reconnectDelayMilliseconds"), 250));
+            recoveryPolicy.receiveTimeout = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "receiveTimeoutMilliseconds"), 250));
+            recoveryPolicy.staleAfter = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "staleAfterMilliseconds"), 5000));
+            std::shared_ptr<PocoDDS::Protocols::Serial::ISerialChannel> channel;
+            if (transport == "loopback")
+                channel = std::make_shared<
+                    PocoDDS::Protocols::Serial::LoopbackSerialChannel>(instance.id);
+            else
+                channel = std::make_shared<PocoDDS::Protocols::Serial::SerialChannel>(
+                    options.serialPort, options.baudRate);
+            addConfiguredDevice(instance,
+                std::make_unique<PocoDDS::Devices::XBeeAnalogSensor>(
+                    std::move(options), std::move(channel), recoveryPolicy));
         }
 
-        if (configuration->getBool("pdr.can.enabled", false))
+        for (const auto& instance : instances("pdr.can", false, 0, "can-sensor"))
         {
+            if (!instance.enabled)
+                continue;
             PocoDDS::Devices::CanSignalSensor::Options options;
-            options.id = configuration->getString("pdr.can.id", "can-sensor-1");
+            options.id = instance.id;
+            const auto transport =
+                configuration->getString(key(instance, "transport"), "socketcan");
+            if (transport != "socketcan" && transport != "loopback")
+                throw Poco::InvalidArgumentException(
+                    "Unsupported " + key(instance, "transport"), transport);
             options.interfaceName =
-                configuration->getString("pdr.can.interface", "can0");
-            options.frameId = static_cast<std::uint32_t>(std::stoul(
-                configuration->getString("pdr.can.frameId", "0"), nullptr, 0));
+                configuration->getString(key(instance, "interface"), "can0");
+            const auto frameId = std::stoull(
+                configuration->getString(key(instance, "frameId"), "0"), nullptr, 0);
+            if (frameId > 0x1FFFFFFFULL)
+                throw Poco::InvalidArgumentException(
+                    key(instance, "frameId") + " exceeds 29-bit CAN identifier");
+            options.frameId = static_cast<std::uint32_t>(frameId);
+            options.extended =
+                configuration->getBool(key(instance, "extended"), false);
+            if (!options.extended && frameId > 0x7FFULL)
+                throw Poco::InvalidArgumentException(
+                    key(instance, "frameId") + " exceeds 11-bit standard CAN identifier");
             options.bitOffset =
-                static_cast<std::size_t>(configuration->getUInt("pdr.can.bitOffset", 0));
+                static_cast<std::size_t>(configuration->getUInt(key(instance, "bitOffset"), 0));
             options.bitLength =
-                static_cast<std::size_t>(configuration->getUInt("pdr.can.bitLength", 1));
+                static_cast<std::size_t>(configuration->getUInt(key(instance, "bitLength"), 1));
             options.bitOrder =
-                configuration->getString("pdr.can.bitOrder", "little") == "big"
+                configuration->getString(key(instance, "bitOrder"), "little") == "big"
                     ? PocoDDS::Protocols::CAN::BitOrder::bigEndian
                     : PocoDDS::Protocols::CAN::BitOrder::littleEndian;
             options.signedValue =
-                configuration->getBool("pdr.can.signed", false);
-            options.factor = configuration->getDouble("pdr.can.factor", 1);
-            options.offset = configuration->getDouble("pdr.can.offset", 0);
+                configuration->getBool(key(instance, "signed"), false);
+            options.factor = configuration->getDouble(key(instance, "factor"), 1);
+            options.offset = configuration->getDouble(key(instance, "offset"), 0);
             options.physicalQuantity =
-                configuration->getString("pdr.can.physicalQuantity", "raw");
+                configuration->getString(key(instance, "physicalQuantity"), "raw");
             options.physicalUnit =
-                configuration->getString("pdr.can.physicalUnit", "count");
-            addDevice(context,
+                configuration->getString(key(instance, "physicalUnit"), "count");
+            PocoDDS::Devices::CanRecoveryPolicy recoveryPolicy;
+            recoveryPolicy.enabled =
+                configuration->getBool(key(instance, "reconnectEnabled"), true);
+            recoveryPolicy.reconnectDelay = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "reconnectDelayMilliseconds"), 250));
+            recoveryPolicy.receiveTimeout = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "receiveTimeoutMilliseconds"), 250));
+            recoveryPolicy.staleAfter = std::chrono::milliseconds(
+                configuration->getUInt(key(instance, "staleAfterMilliseconds"), 2000));
+            std::shared_ptr<PocoDDS::Protocols::CAN::CanEndpoint> endpoint;
+            if (transport == "loopback")
+                endpoint = std::make_shared<
+                    PocoDDS::Protocols::CAN::LoopbackCanEndpoint>(instance.id);
+            else
+                endpoint = std::make_shared<PocoDDS::Protocols::CAN::SocketCanEndpoint>(
+                    options.interfaceName);
+            addConfiguredDevice(instance,
                       std::make_unique<PocoDDS::Devices::CanSignalSensor>(
-                          std::move(options)));
+                          std::move(options), std::move(endpoint), recoveryPolicy));
         }
 
-        if (configuration->getBool("pdr.led.enabled", false))
+        for (const auto& instance : instances("pdr.led", false, 0, "led"))
         {
-            addDevice(context,
+            if (!instance.enabled)
+                continue;
+            addConfiguredDevice(instance,
                       std::make_unique<PocoDDS::Devices::LinuxSysfsLedDevice>(
-                          configuration->getString("pdr.led.id", "status-led"),
-                          configuration->getString("pdr.led.path")));
+                          instance.legacy &&
+                                  !configuration->hasProperty(key(instance, "id"))
+                              ? "status-led"
+                              : instance.id,
+                          configuration->getString(key(instance, "path"))));
         }
 
         _context = context;
@@ -232,6 +392,7 @@ public:
         _services.clear();
         _bridges.clear();
         _devices.clear();
+        _deviceIds.clear();
         if (_runtime)
             _runtime->stop();
         _runtime.reset();
@@ -243,6 +404,7 @@ private:
     std::vector<Poco::OSP::ServiceRef::Ptr> _services;
     std::unique_ptr<PocoDDS::FastDDS::Runtime> _runtime;
     std::vector<std::unique_ptr<PocoDDS::Devices::Device>> _devices;
+    std::unordered_set<std::string> _deviceIds;
     std::vector<std::unique_ptr<PocoDDS::FastDDS::DeviceBridge>> _bridges;
 };
 } // namespace PocoDDS::Services

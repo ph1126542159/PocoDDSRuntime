@@ -12,10 +12,20 @@ jobs:
       - uses: lukka/get-cmake@latest
       - name: Validate contracts
         run: cmake -DSOURCE_DIR=${{ github.workspace }} -P cmake/ValidateContracts.cmake
+      - name: Reject unversioned breaking changes
+        run: python3 tools/check_compatibility.py
+      - name: Validate default security boundary
+        run: python3 tools/security_gate.py config/pdr-runtime.properties
+      - name: Validate dependency inventory
+        run: python3 tools/check_dependency_lock.py
+      - name: Validate release compatibility matrix
+        run: python3 tools/check_release_matrix.py
       - name: Validate governance documentation
         run: cmake -DSOURCE_DIR=${{ github.workspace }} -P cmake/ValidateDocs.cmake
       - name: Validate CMake profiles
         run: cmake --list-presets
+      - name: Validate profile feature declarations
+        run: cmake -DSOURCE_DIR=${{ github.workspace }} -P cmake/ValidateProfiles.cmake
       - name: Check formatting
         shell: bash
         run: |
@@ -54,3 +64,11 @@ jobs:
         run: ctest --test-dir build/full -C Release --output-on-failure
       - name: Install reusable SDK
         run: cmake --install build/full --prefix ${{ github.workspace }}/build/sdk
+      - name: Generate release hashes and SPDX SBOM
+        run: >-
+          python3 tools/release_manifest.py generate
+          --artifacts build/sdk --output build/release --version 0.1.0 --require-clean
+      - name: Verify release artifacts
+        run: >-
+          python3 tools/release_manifest.py verify
+          --manifest build/release/SHA256SUMS.json --artifacts build/sdk

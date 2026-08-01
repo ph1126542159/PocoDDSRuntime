@@ -22,6 +22,9 @@
 #include "Poco/Net/HTTPServerRequest.h"
 #include "Poco/Net/HTTPServerResponse.h"
 #include "Poco/Net/HTTPRequestHandler.h"
+#if defined(PDR_ENABLE_OBSERVABILITY)
+#include "PocoDDS/Observability/Metrics.h"
+#endif
 #include "Poco/Net/HTTPServerParams.h"
 #include "Poco/Net/HTTPBasicCredentials.h"
 #include "Poco/Delegate.h"
@@ -51,6 +54,7 @@
 #include <deque>
 #include <sstream>
 #include <cctype>
+#include <chrono>
 
 #if defined(POCO_OS_FAMILY_WINDOWS)
 #include <Windows.h>
@@ -294,6 +298,47 @@ void WebServerDispatcher::removeFilter(const std::string& mediaType)
 void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, Poco::Net::HTTPServerResponse& response, bool secure)
 {
 	std::string username;
+	std::string metricRoute(request.getURI());
+	const auto metricQuery = metricRoute.find('?');
+	if (metricQuery != std::string::npos) metricRoute.resize(metricQuery);
+	if (metricRoute.rfind("/api/v1/", 0) != 0 && metricRoute.rfind("/health", 0) != 0)
+		metricRoute = "other";
+#if defined(PDR_ENABLE_OBSERVABILITY)
+	class RequestMetricScope
+	{
+	public:
+		RequestMetricScope(const std::string& method, const std::string& route,
+			HTTPResponse& response): _method(method), _route(route), _response(response),
+			_started(std::chrono::steady_clock::now())
+		{
+			PocoDDS::Observability::Metrics::global().addCounter(
+				"http.server.request.count", 1,
+				{{"http.request.method", _method}, {"http.route", _route}},
+				"HTTP server requests", "{request}", false);
+		}
+		~RequestMetricScope()
+		{
+			const auto elapsed = std::chrono::duration<double, std::milli>(
+				std::chrono::steady_clock::now() - _started).count();
+			const auto status = std::to_string(_response.getStatus() / 100) + "xx";
+			PocoDDS::Observability::Metrics::global().addCounter(
+				"http.server.response.count", 1,
+				{{"http.request.method", _method}, {"http.route", _route},
+				 {"http.response.status_class", status}},
+				"HTTP server responses", "{response}", false);
+			PocoDDS::Observability::Metrics::global().recordHistogram(
+				"http.server.request.duration", elapsed,
+				{{"http.request.method", _method}, {"http.route", _route},
+				 {"http.response.status_class", status}},
+				"HTTP server request duration", "ms", false);
+		}
+	private:
+		std::string _method;
+		std::string _route;
+		HTTPResponse& _response;
+		std::chrono::steady_clock::time_point _started;
+	} requestMetricScope(request.getMethod(), metricRoute, response);
+#endif
 	try
 	{
 		addCustomResponseHeaders(response);

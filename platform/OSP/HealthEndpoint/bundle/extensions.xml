@@ -1,0 +1,8 @@
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/health"
+             class="PocoDDS::HealthEndpoint::HealthHandlerFactory"
+             library="pdr.platform.health"
+             allowSpecialization="all"
+             hidden="true"/>
+</extensions>

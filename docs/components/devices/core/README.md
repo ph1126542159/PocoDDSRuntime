@@ -4,6 +4,8 @@
 
 `platform/devices/Devices` 定义 `Device`、`DeviceState`、`DeviceSnapshot`，并派生 Sensor、DigitalIO、LED、Switch、SerialDevice、GNSSSensor、运动传感器和媒体设备等接口。
 
+需要运行诊断的适配器可以额外实现 `DiagnosticDevice`，返回 `DeviceDiagnostics`。这是独立的可选接口，不改变现有第三方 `Device` 实现的虚表；Runtime 通过 `DeviceService` 在 OSP Bundle 之间安全读取设备快照和诊断能力。
+
 ## 用法
 
 新增设备时继承最接近的抽象，保证 `id()` 稳定，并实现状态读取/控制及快照。设备实现不应直接耦合 WebUI；由 `DeviceGateway` 注册到 OSP，再由 DDS 桥接。

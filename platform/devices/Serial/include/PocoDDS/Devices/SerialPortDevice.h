@@ -7,16 +7,29 @@
 #include <Poco/Thread.h>
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <string>
 
 namespace PocoDDS::Devices
 {
 
-class SerialPortDevice final : public SerialDevice
+struct SerialReconnectPolicy
+{
+    bool enabled{true};
+    std::chrono::milliseconds delay{250};
+    std::chrono::milliseconds readTimeout{250};
+};
+
+class SerialPortDevice final : public SerialDevice, public DiagnosticDevice
 {
 public:
-    SerialPortDevice(std::string id, std::string port, int baudRate);
+    SerialPortDevice(std::string id, std::string port, int baudRate,
+                     SerialReconnectPolicy reconnectPolicy = {});
+    SerialPortDevice(
+        std::string id,
+        std::shared_ptr<PocoDDS::Protocols::Serial::ISerialChannel> channel,
+        SerialReconnectPolicy reconnectPolicy = {});
     ~SerialPortDevice() override;
 
     const std::string& id() const noexcept override;
@@ -29,17 +42,25 @@ public:
 
     std::size_t write(const std::vector<std::uint8_t>& data) override;
     void setDataHandler(DataHandler handler) override;
+    DeviceDiagnostics diagnostics() const override;
 
 private:
     void run();
+    void markReady();
+    void markFailure(const std::string& message);
+    void notify(const DeviceSnapshot& snapshot, const std::vector<std::uint8_t>* data = nullptr);
 
     std::string _id;
     std::string _type{"serial"};
-    std::unique_ptr<PocoDDS::Protocols::Serial::SerialChannel> _channel;
+    std::shared_ptr<PocoDDS::Protocols::Serial::ISerialChannel> _channel;
+    SerialReconnectPolicy _reconnectPolicy;
     std::atomic_bool _running{false};
     mutable Poco::FastMutex _mutex;
     Poco::Thread _thread;
     std::uint64_t _sequence{0};
+    DeviceState _state{DeviceState::offline};
+    std::string _lastPayload;
+    DeviceDiagnostics _diagnostics;
     SnapshotHandler _snapshotHandler;
     DataHandler _dataHandler;
 };

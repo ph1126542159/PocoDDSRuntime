@@ -9,6 +9,10 @@
 #include <utility>
 #include <vector>
 
+#if defined(PDR_ENABLE_OBSERVABILITY)
+#include "PocoDDS/Observability/Metrics.h"
+#endif
+
 namespace PocoDDS::Application
 {
 struct Error
@@ -110,6 +114,13 @@ public:
 
     Result<WorkflowState> start(const CommandContext& context) override
     {
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        PocoDDS::Observability::ScopedMetricTimer workflowTimer(
+            "pdr.workflow.duration", {}, "Workflow execution duration", "ms");
+        PocoDDS::Observability::Metrics::global().addCounter(
+            "pdr.workflow.executions", 1, {{"result", "started"}},
+            "Workflow executions by result", "{execution}");
+#endif
         _state = WorkflowState::running;
         _completed = 0;
         for (const auto& step : _steps)
@@ -123,6 +134,11 @@ public:
             ++_completed;
         }
         _state = WorkflowState::succeeded;
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        auto& metrics = PocoDDS::Observability::Metrics::global();
+        metrics.addCounter("pdr.workflow.executions", 1, {{"result", "success"}},
+                           "Workflow executions by result", "{execution}");
+#endif
         return Result<WorkflowState>::success(_state);
     }
 
@@ -135,6 +151,11 @@ public:
     {
         compensate(context);
         _state = WorkflowState::cancelled;
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        PocoDDS::Observability::Metrics::global().addCounter(
+            "pdr.workflow.executions", 1, {{"result", "cancelled"}},
+            "Workflow executions by result", "{execution}");
+#endif
         return Result<WorkflowState>::success(_state);
     }
 
@@ -146,6 +167,12 @@ private:
     {
         compensate(context);
         _state = WorkflowState::failed;
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        PocoDDS::Observability::Metrics::global().addCounter(
+            "pdr.workflow.executions", 1,
+            {{"result", "failed"}, {"error.type", error.code}},
+            "Workflow executions by result", "{execution}");
+#endif
         return Result<WorkflowState>::failure(std::move(error));
     }
 
@@ -155,7 +182,14 @@ private:
         {
             --_completed;
             if (_steps[_completed].compensate)
+            {
                 _steps[_completed].compensate(context);
+#if defined(PDR_ENABLE_OBSERVABILITY)
+                PocoDDS::Observability::Metrics::global().addCounter(
+                    "pdr.workflow.compensations", 1, {{"step", _steps[_completed].id}},
+                    "Workflow compensation steps", "{compensation}");
+#endif
+            }
         }
     }
 

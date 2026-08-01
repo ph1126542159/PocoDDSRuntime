@@ -6,13 +6,22 @@
 #include "Poco/Timespan.h"
 
 #include <cstddef>
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 namespace PocoDDS::Protocols::Serial
 {
-class SerialChannel final : public PocoDDS::Protocols::Protocol
+class ISerialChannel : public PocoDDS::Protocols::Protocol
+{
+public:
+    ~ISerialChannel() override = default;
+    virtual std::size_t write(const std::uint8_t* data, std::size_t size) = 0;
+    virtual std::vector<std::uint8_t> read(std::size_t size, Poco::Timespan timeout) = 0;
+};
+
+class SerialChannel final : public ISerialChannel
 {
 public:
     SerialChannel(std::string device,
@@ -27,8 +36,8 @@ public:
     void close() noexcept override;
     bool isOpen() const noexcept override;
 
-    std::size_t write(const std::uint8_t* data, std::size_t size);
-    std::vector<std::uint8_t> read(std::size_t size, Poco::Timespan timeout);
+    std::size_t write(const std::uint8_t* data, std::size_t size) override;
+    std::vector<std::uint8_t> read(std::size_t size, Poco::Timespan timeout) override;
     Poco::Serial::SerialPort& port() noexcept;
 
 private:
@@ -37,6 +46,6 @@ private:
     std::string _parameters;
     Poco::Serial::SerialPort::FlowControl _flowControl;
     Poco::Serial::SerialPort _port;
-    bool _open{false};
+    std::atomic_bool _open{false};
 };
 } // namespace PocoDDS::Protocols::Serial

@@ -1,13 +1,19 @@
 <extensions>
   <extension point="osp.web.server.requesthandler"
-             path="/health"
-             class="PocoDDS::SystemMonitoring::HealthHandlerFactory"
-             library="pdr.platform.systemMonitoring"
-             allowSpecialization="all"
-             hidden="true"/>
-  <extension point="osp.web.server.requesthandler"
              path="/api/v1/system-metrics"
              class="PocoDDS::SystemMonitoring::MetricsHandlerFactory"
+             library="pdr.platform.systemMonitoring"
+             allowSpecialization="none"
+             hidden="true"/>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/metrics"
+             class="PocoDDS::SystemMonitoring::OpenTelemetryMetricsHandlerFactory"
+             library="pdr.platform.systemMonitoring"
+             allowSpecialization="none"
+             hidden="true"/>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/devices"
+             class="PocoDDS::SystemMonitoring::DevicesHandlerFactory"
              library="pdr.platform.systemMonitoring"
              allowSpecialization="none"
              hidden="true"/>

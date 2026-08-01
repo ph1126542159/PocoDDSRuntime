@@ -31,8 +31,11 @@
 #include "Poco/Util/Application.h"
 #include "Poco/Util/PropertyFileConfiguration.h"
 #include "PocoDDS/Observability/TraceStore.h"
+#include "PocoDDS/Observability/Metrics.h"
 #include "PocoDDS/Health/Health.h"
 #include "PocoDDS/ProcessManagement/SubprocessManager.h"
+#include "PocoDDS/Devices/Device.h"
+#include "PocoDDS/Devices/DeviceService.h"
 
 #include <algorithm>
 #include <atomic>
@@ -136,6 +139,21 @@ public:
         while (!_stopping)
         {
             const Sample sample = collect();
+            auto& metrics = PocoDDS::Observability::Metrics::global();
+            metrics.recordHistogram("system.cpu.utilization", sample.cpuPercent / 100.0, {},
+                             "Host CPU utilization", "1");
+            metrics.recordHistogram("system.memory.utilization", sample.memoryPercent / 100.0, {},
+                             "Host memory utilization", "1");
+            metrics.recordHistogram("system.memory.usage", static_cast<double>(sample.memoryUsedMb), {},
+                             "Host physical memory used", "MiBy");
+            metrics.recordHistogram("system.filesystem.utilization", sample.diskPercent / 100.0,
+                             {{"mountpoint", "."}}, "Runtime filesystem utilization", "1");
+            metrics.recordHistogram("system.network.io", sample.networkReceiveKbps,
+                             {{"direction", "receive"}}, "Host network throughput", "KiBy/s");
+            metrics.recordHistogram("system.network.io", sample.networkSendKbps,
+                             {{"direction", "transmit"}}, "Host network throughput", "KiBy/s");
+            metrics.recordHistogram("process.thread.count", static_cast<double>(sample.threadCount), {},
+                             "Runtime process thread count", "{thread}");
             {
                 Poco::FastMutex::ScopedLock lock(_mutex);
                 _history.push_back(sample);
@@ -427,6 +445,104 @@ public:
             root.set("current", sampleJson(history.back()));
         response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
         response.setContentType("application/json");
+        root.stringify(response.send());
+    }
+
+private:
+    Poco::OSP::BundleContext::Ptr _context;
+};
+
+class OpenTelemetryMetricsHandler final : public Poco::Net::HTTPRequestHandler
+{
+public:
+    void handleRequest(Poco::Net::HTTPServerRequest&,
+                       Poco::Net::HTTPServerResponse& response) override
+    {
+        response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
+        response.setContentType("application/json; charset=utf-8");
+        response.set("Cache-Control", "no-store");
+        response.send() << PocoDDS::Observability::Metrics::global().snapshotJson();
+    }
+};
+
+class DevicesHandler final : public Poco::Net::HTTPRequestHandler
+{
+public:
+    explicit DevicesHandler(Poco::OSP::BundleContext::Ptr context) : _context(context) {}
+
+    void handleRequest(Poco::Net::HTTPServerRequest&,
+                       Poco::Net::HTTPServerResponse& response) override
+    {
+        Poco::JSON::Array::Ptr devices = new Poco::JSON::Array;
+        auto services = _context->registry().find("pdr.device");
+        std::sort(services.begin(), services.end(), [](const auto& left, const auto& right) {
+            return left->properties().get("pdr.device", left->name()) <
+                right->properties().get("pdr.device", right->name());
+        });
+        for (const auto& service : services)
+        {
+            const auto& properties = service->properties();
+            auto provider = service->castedInstance<PocoDDS::Devices::DeviceService>();
+            PocoDDS::Devices::DeviceSnapshot snapshot;
+            PocoDDS::Devices::DeviceDiagnostics details;
+            bool hasDiagnostics = false;
+            try
+            {
+                snapshot = provider->device().snapshot();
+            }
+            catch (const std::exception& error)
+            {
+                snapshot.id = properties.get("pdr.device", service->name());
+                snapshot.type = properties.get("pdr.deviceType", "unknown");
+                snapshot.state = PocoDDS::Devices::DeviceState::fault;
+                details.lastError = error.what();
+                hasDiagnostics = true;
+            }
+            try
+            {
+                if (const auto* diagnostic = dynamic_cast<const PocoDDS::Devices::DiagnosticDevice*>(
+                        &provider->device()))
+                {
+                    details = diagnostic->diagnostics();
+                    hasDiagnostics = true;
+                }
+            }
+            catch (const std::exception& error)
+            {
+                snapshot.state = PocoDDS::Devices::DeviceState::fault;
+                details.lastError = error.what();
+                hasDiagnostics = true;
+            }
+            Poco::JSON::Object::Ptr device = new Poco::JSON::Object;
+            device->set("id", snapshot.id);
+            device->set("type", snapshot.type);
+            device->set("state", PocoDDS::Devices::toString(snapshot.state));
+            device->set("sequence", snapshot.sequence);
+            device->set("timestampMicroseconds", snapshot.timestampMicroseconds);
+            device->set("bundle", properties.get("pdr.bundle", ""));
+            device->set("service", service->name());
+            device->set("required", properties.getBool("pdr.deviceRequired", true));
+            if (hasDiagnostics)
+            {
+                Poco::JSON::Object::Ptr diagnostics = new Poco::JSON::Object;
+                diagnostics->set("successfulOperations", details.successfulOperations);
+                diagnostics->set("failedOperations", details.failedOperations);
+                diagnostics->set("reconnectAttempts", details.reconnectAttempts);
+                diagnostics->set("consecutiveFailures", details.consecutiveFailures);
+                diagnostics->set("lastSuccessMicroseconds", details.lastSuccessMicroseconds);
+                diagnostics->set("lastFailureMicroseconds", details.lastFailureMicroseconds);
+                diagnostics->set("lastError", details.lastError);
+                device->set("diagnostics", diagnostics);
+            }
+            devices->add(device);
+        }
+        Poco::JSON::Object root;
+        root.set("schemaVersion", 1);
+        root.set("count", devices->size());
+        root.set("devices", devices);
+        response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
+        response.setContentType("application/json; charset=utf-8");
+        response.set("Cache-Control", "no-store");
         root.stringify(response.send());
     }
 
@@ -1419,6 +1535,26 @@ public:
     }
 };
 
+class OpenTelemetryMetricsHandlerFactory final : public Poco::OSP::Web::WebRequestHandlerFactory
+{
+public:
+    Poco::Net::HTTPRequestHandler* createRequestHandler(
+        const Poco::Net::HTTPServerRequest&) override
+    {
+        return new OpenTelemetryMetricsHandler;
+    }
+};
+
+class DevicesHandlerFactory final : public Poco::OSP::Web::WebRequestHandlerFactory
+{
+public:
+    Poco::Net::HTTPRequestHandler* createRequestHandler(
+        const Poco::Net::HTTPServerRequest&) override
+    {
+        return new DevicesHandler(context());
+    }
+};
+
 class ProcessLogsHandlerFactory final : public Poco::OSP::Web::WebRequestHandlerFactory
 {
 public:
@@ -1535,8 +1671,9 @@ POCO_BEGIN_MANIFEST(Poco::OSP::BundleActivator)
 POCO_END_MANIFEST
 
 POCO_BEGIN_NAMED_MANIFEST(WebServer, Poco::OSP::Web::WebRequestHandlerFactory)
-    POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::HealthHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::MetricsHandlerFactory)
+    POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::OpenTelemetryMetricsHandlerFactory)
+    POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::DevicesHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessLogsHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessDetailHandlerFactory)
     POCO_EXPORT_CLASS(PocoDDS::SystemMonitoring::ProcessLifecycleHandlerFactory)

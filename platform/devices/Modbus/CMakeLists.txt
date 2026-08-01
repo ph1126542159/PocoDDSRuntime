@@ -15,6 +15,14 @@ if(BUILD_TESTING)
         PRIVATE PocoDDS::ModbusDevice Poco::Net)
     pdr_set_warnings(pdr-modbus-device-smoke)
     add_test(NAME modbus-device-smoke COMMAND pdr-modbus-device-smoke)
+    add_executable(pdr-modbus-device-recovery tests/ModbusRecoveryTest.cpp)
+    target_link_libraries(pdr-modbus-device-recovery
+        PRIVATE PocoDDS::ModbusDevice Poco::Net)
+    pdr_set_warnings(pdr-modbus-device-recovery)
+    add_test(NAME modbus-device-recovery COMMAND pdr-modbus-device-recovery)
+    set_tests_properties(modbus-device-recovery PROPERTIES
+        LABELS "device;fault-injection;protocol;release"
+        TIMEOUT 10)
 endif()
 
 install(TARGETS PDRDeviceModbus ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")

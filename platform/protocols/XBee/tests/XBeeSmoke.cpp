@@ -1,5 +1,7 @@
 #include "PocoDDS/Protocols/XBee/XBeeFrame.h"
 #include "PocoDDS/Protocols/XBee/IoSample.h"
+#include "PocoDDS/Protocols/XBee/XBeePort.h"
+#include "PocoDDS/Protocols/Serial/LoopbackSerialChannel.h"
 
 #include <cstdint>
 #include <iostream>
@@ -37,6 +39,29 @@ int main()
         return 3;
     }
 
+    auto loopback = std::make_shared<
+        PocoDDS::Protocols::Serial::LoopbackSerialChannel>("xbee-test");
+    XBeePort port(loopback, true);
+    port.open();
+    const auto firstWire = frame.encode(true);
+    const XBeeFrame second(FrameType::atCommandResponse, {0x7E, 0x11, 0x42});
+    const auto secondWire = second.encode(true);
+    const auto split = firstWire.size() / 2;
+    loopback->write(firstWire.data(), split);
+    XBeeFrame received;
+    if (port.receive(received, Poco::Timespan(1000)))
+        return 4;
+    loopback->write(firstWire.data() + split, firstWire.size() - split);
+    loopback->write(secondWire.data(), secondWire.size());
+    if (!port.receive(received, Poco::Timespan(10000)) ||
+        received.type() != FrameType::atCommand || received.data() != payload)
+        return 5;
+    if (!port.receive(received, Poco::Timespan(10000)) ||
+        received.type() != FrameType::atCommandResponse ||
+        received.data() != second.data())
+        return 6;
+    port.close();
+
     const XBeeFrame ioFrame(
         FrameType::zigbeeIoSample,
         {0x00, 0x13, 0xA2, 0x00, 0x40, 0x52, 0x91, 0xAB,
@@ -46,7 +71,7 @@ int main()
     if (sample.addressString() != "0013A200405291AB" ||
         !sample.digital(0) || sample.digital(1) ||
         sample.analog(0) != 0x0200 || sample.analog(2) != 0x03FF)
-        return 5;
+        return 7;
 
     std::cout << "XBEE_SMOKE_PASS address=" << sample.addressString() << '\n';
     return 0;

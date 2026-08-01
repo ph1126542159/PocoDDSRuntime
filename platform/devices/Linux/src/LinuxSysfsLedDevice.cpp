@@ -15,6 +15,7 @@ LinuxSysfsLedDevice::LinuxSysfsLedDevice(
     std::string id, PocoDDS::Filesystem::path ledDirectory)
     : _id(std::move(id)), _directory(std::move(ledDirectory))
 {
+    if (_id.empty()) throw std::invalid_argument("LED device id must not be empty");
 }
 
 LinuxSysfsLedDevice::~LinuxSysfsLedDevice() { stop(); }
@@ -23,59 +24,111 @@ const std::string& LinuxSysfsLedDevice::type() const noexcept { return _type; }
 
 void LinuxSysfsLedDevice::start()
 {
-    Poco::FastMutex::ScopedLock lock(_mutex);
-    if (_started) return;
-    std::ifstream stream(_directory / "max_brightness");
-    if (!(stream >> _maxBrightness) || _maxBrightness == 0)
-        throw std::runtime_error("invalid LED max_brightness: " + _directory.string());
-    _started = true;
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        if (_state == DeviceState::ready) return;
+    }
+    try
+    {
+        unsigned maximum = 0;
+        std::ifstream stream(_directory / "max_brightness");
+        if (!(stream >> maximum) || maximum == 0)
+            throw std::runtime_error("invalid LED max_brightness: " + _directory.string());
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        _maxBrightness = maximum;
+        _state = DeviceState::ready;
+        _lastPayload = "configured";
+        ++_sequence;
+    }
+    catch (const std::exception& error)
+    {
+        markFailure(error.what());
+        throw;
+    }
 }
 
 void LinuxSysfsLedDevice::stop() noexcept
 {
-    Poco::FastMutex::ScopedLock lock(_mutex);
-    _started = false;
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        if (_state == DeviceState::offline) return;
+        _state = DeviceState::offline;
+        _maxBrightness = 0;
+        _lastPayload = "stopped";
+        ++_sequence;
+    }
+    notify(snapshot());
 }
 
 double LinuxSysfsLedDevice::brightness() const
 {
-    Poco::FastMutex::ScopedLock lock(_mutex);
-    if (_maxBrightness == 0)
-        throw std::logic_error("LED device is not started");
-    unsigned raw = 0;
-    std::ifstream stream(_directory / "brightness");
-    if (!(stream >> raw))
-        throw std::runtime_error("cannot read LED brightness");
-    return static_cast<double>(raw) / _maxBrightness;
+    try
+    {
+        unsigned maximum = 0;
+        {
+            Poco::FastMutex::ScopedLock lock(_mutex);
+            maximum = _maxBrightness;
+            if (_state == DeviceState::offline || maximum == 0)
+                throw std::logic_error("LED device is not started");
+        }
+        unsigned raw = 0;
+        std::ifstream stream(_directory / "brightness");
+        if (!(stream >> raw)) throw std::runtime_error("cannot read LED brightness");
+        const auto result = static_cast<double>(raw) / maximum;
+        markSuccess(Poco::NumberFormatter::format(result, 3));
+        return result;
+    }
+    catch (const std::exception& error)
+    {
+        markFailure(error.what());
+        throw;
+    }
 }
 
 void LinuxSysfsLedDevice::setBrightness(double value)
 {
     value = std::clamp(value, 0.0, 1.0);
-    SnapshotHandler handler;
+    DeviceSnapshot current;
+    try
     {
-        Poco::FastMutex::ScopedLock lock(_mutex);
-        if (!_started || _maxBrightness == 0)
-            throw std::logic_error("LED device is not started");
+        unsigned maximum = 0;
+        {
+            Poco::FastMutex::ScopedLock lock(_mutex);
+            maximum = _maxBrightness;
+            if (_state == DeviceState::offline || maximum == 0)
+                throw std::logic_error("LED device is not started");
+        }
         std::ofstream stream(_directory / "brightness", std::ios::trunc);
         if (!stream)
             throw std::runtime_error("cannot open LED brightness");
-        stream << static_cast<unsigned>(std::lround(value * _maxBrightness));
+        stream << static_cast<unsigned>(std::lround(value * maximum));
         if (!stream)
             throw std::runtime_error("cannot write LED brightness");
-        ++_sequence;
-        handler = _snapshotHandler;
+        markSuccess(Poco::NumberFormatter::format(value, 3));
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        current = {_id, _type, _state, _sequence,
+                   Poco::Timestamp().epochMicroseconds(), _lastPayload};
     }
-    if (handler) handler(snapshot());
+    catch (const std::exception& error)
+    {
+        markFailure(error.what());
+        throw;
+    }
+    notify(current);
 }
 
 DeviceSnapshot LinuxSysfsLedDevice::snapshot() const
 {
-    const auto value = brightness();
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        if (_state == DeviceState::offline)
+            return {_id, _type, _state, _sequence,
+                    Poco::Timestamp().epochMicroseconds(), _lastPayload};
+    }
+    try { (void) brightness(); } catch (...) {}
     Poco::FastMutex::ScopedLock lock(_mutex);
-    return {_id, _type, _started ? DeviceState::ready : DeviceState::offline,
-            _sequence, Poco::Timestamp().epochMicroseconds(),
-            Poco::NumberFormatter::format(value, 3)};
+    return {_id, _type, _state, _sequence,
+            Poco::Timestamp().epochMicroseconds(), _lastPayload};
 }
 
 std::string LinuxSysfsLedDevice::execute(
@@ -93,5 +146,45 @@ void LinuxSysfsLedDevice::setSnapshotHandler(SnapshotHandler handler)
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     _snapshotHandler = std::move(handler);
+}
+
+void LinuxSysfsLedDevice::markSuccess(const std::string& payload) const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    _state = DeviceState::ready;
+    _lastPayload = payload;
+    ++_sequence;
+    ++_diagnostics.successfulOperations;
+    _diagnostics.consecutiveFailures = 0;
+    _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
+    _diagnostics.lastError.clear();
+}
+
+void LinuxSysfsLedDevice::markFailure(const std::string& message) const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    _state = DeviceState::fault;
+    _lastPayload = message;
+    ++_sequence;
+    ++_diagnostics.failedOperations;
+    ++_diagnostics.consecutiveFailures;
+    _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
+    _diagnostics.lastError = message;
+}
+
+void LinuxSysfsLedDevice::notify(const DeviceSnapshot& current) const
+{
+    SnapshotHandler handler;
+    {
+        Poco::FastMutex::ScopedLock lock(_mutex);
+        handler = _snapshotHandler;
+    }
+    if (handler) try { handler(current); } catch (...) {}
+}
+
+DeviceDiagnostics LinuxSysfsLedDevice::diagnostics() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _diagnostics;
 }
 } // namespace PocoDDS::Devices

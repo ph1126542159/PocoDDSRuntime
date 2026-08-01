@@ -1,4 +1,5 @@
 #include "PocoDDS/Protocols/ROS/BridgeClient.h"
+#include "PocoDDS/Protocols/ProtocolMetrics.h"
 
 #include <Poco/JSON/Parser.h>
 #include <Poco/Net/HTTPClientSession.h>
@@ -44,6 +45,7 @@ void BridgeClient::connect()
     std::lock_guard lock(_mutex);
     if (_socket)
         return;
+    PocoDDS::Protocols::ProtocolMetricTimer metric("rosbridge", "connect");
 
     Poco::Net::HTTPClientSession session(_uri.getHost(), _uri.getPort());
     Poco::Net::HTTPRequest request(
@@ -52,6 +54,7 @@ void BridgeClient::connect()
         Poco::Net::HTTPMessage::HTTP_1_1);
     Poco::Net::HTTPResponse response;
     _socket = std::make_unique<Poco::Net::WebSocket>(session, request, response);
+    metric.success();
 }
 
 void BridgeClient::disconnect()
@@ -82,6 +85,7 @@ std::string BridgeClient::subscribe(const std::string& topic)
 
 std::string BridgeClient::subscribe(const std::string& topic, const SubscribeOptions& options)
 {
+    PocoDDS::Protocols::ProtocolMetricTimer metric("rosbridge", "subscribe");
     const auto id = Poco::UUIDGenerator::defaultGenerator().createOne().toString();
     const auto request = makeSubscribeRequest(topic, id, options);
     std::lock_guard lock(_mutex);
@@ -89,6 +93,7 @@ std::string BridgeClient::subscribe(const std::string& topic, const SubscribeOpt
         throw Poco::IllegalStateException("ROS bridge is not connected");
     sendText(request);
     _subscriptions.emplace(id, topic);
+    metric.success();
     return id;
 }
 
@@ -115,6 +120,7 @@ void BridgeClient::unsubscribeAll()
 
 Poco::JSON::Object::Ptr BridgeClient::receiveMessage(const Poco::Timespan& timeout)
 {
+    PocoDDS::Protocols::ProtocolMetricTimer metric("rosbridge", "receive");
     MessageHandler handler;
     Poco::JSON::Object::Ptr object;
     {
@@ -122,13 +128,19 @@ Poco::JSON::Object::Ptr BridgeClient::receiveMessage(const Poco::Timespan& timeo
         if (!_socket)
             throw Poco::IllegalStateException("ROS bridge is not connected");
         if (!_socket->poll(timeout, Poco::Net::Socket::SELECT_READ))
+        {
+            metric.timeout();
             return {};
+        }
 
         std::vector<char> buffer(64 * 1024);
         int flags = 0;
         const int count = _socket->receiveFrame(buffer.data(), static_cast<int>(buffer.size()), flags);
         if (count <= 0)
+        {
+            metric.failure();
             return {};
+        }
         Poco::JSON::Parser parser;
         object = parser.parse(std::string(buffer.data(), static_cast<std::size_t>(count)))
                      .extract<Poco::JSON::Object::Ptr>();
@@ -136,6 +148,7 @@ Poco::JSON::Object::Ptr BridgeClient::receiveMessage(const Poco::Timespan& timeo
     }
     if (handler)
         handler(object);
+    metric.success();
     return object;
 }
 
@@ -173,10 +186,12 @@ std::string BridgeClient::makeUnsubscribeRequest(const std::string& topic, const
 
 void BridgeClient::sendText(const std::string& payload)
 {
+    PocoDDS::Protocols::ProtocolMetricTimer metric("rosbridge", "send", payload.size());
     _socket->sendFrame(
         payload.data(),
         static_cast<int>(payload.size()),
         Poco::Net::WebSocket::FRAME_TEXT);
+    metric.success();
 }
 
 } // namespace PocoDDS::Protocols::ROS

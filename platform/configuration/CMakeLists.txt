@@ -1,5 +1,8 @@
-add_library(PDRConfiguration src/ConfigurationValidator.cpp)
+add_library(PDRConfiguration
+    src/ConfigurationValidator.cpp
+    src/IndexedConfiguration.cpp)
 add_library(PocoDDS::Configuration ALIAS PDRConfiguration)
+set_target_properties(PDRConfiguration PROPERTIES EXPORT_NAME Configuration)
 target_include_directories(PDRConfiguration PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
@@ -13,6 +16,6 @@ if(BUILD_TESTING)
     add_test(NAME configuration-smoke COMMAND pdr-configuration-smoke)
 endif()
 
-install(TARGETS PDRConfiguration
+install(TARGETS PDRConfiguration EXPORT PocoDDSRuntimeTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

@@ -5,15 +5,166 @@
   "type": "object",
   "required": ["osp.web.server.host", "osp.web.server.port", "pdr.fastdds.domainId"],
   "properties": {
+    "security.profile": { "type": "string", "enum": ["development", "production"] },
     "osp.web.server.host": { "type": "string", "minLength": 1 },
+    "osp.web.server.securePort": { "type": "integer", "minimum": 0, "maximum": 65535 },
+    "osp.web.authServiceName": { "type": "string" },
+    "auth.simple.enable": { "type": "boolean" },
     "osp.web.server.port": { "type": "integer", "minimum": 1, "maximum": 65535 },
     "pdr.fastdds.domainId": { "type": "integer", "minimum": 0, "maximum": 232 },
     "pdr.subprocess.shutdownTimeoutMilliseconds": { "type": "integer", "minimum": 1 },
     "observability.history.retentionDays": { "type": "integer", "minimum": 1 },
+    "observability.metrics.serviceName": { "type": "string", "minLength": 1 },
+    "observability.metrics.serviceInstanceId": { "type": "string" },
+    "observability.metrics.otlpHttpEndpoint": { "type": "string" },
+    "observability.metrics.otlpCaCertificatePath": { "type": "string" },
+    "observability.metrics.otlpClientCertificatePath": { "type": "string" },
+    "observability.metrics.otlpClientKeyPath": { "type": "string" },
+    "observability.metrics.otlpInsecureSkipVerify": { "type": "boolean" },
+    "observability.metrics.offlineCachePath": { "type": "string", "minLength": 1 },
+    "observability.metrics.offlineCacheMaximumFiles": { "type": "integer", "minimum": 1 },
+    "observability.metrics.exportIntervalMilliseconds": { "type": "integer", "minimum": 100 },
+    "observability.metrics.exportTimeoutMilliseconds": { "type": "integer", "minimum": 100 },
+    "observability.metrics.maximumSeries": { "type": "integer", "minimum": 1 },
     "pdr.modbus.port": { "type": "integer", "minimum": 1, "maximum": 65535 },
     "pdr.modbus.unitId": { "type": "integer", "minimum": 0, "maximum": 247 },
+    "pdr.modbus.timeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 60000 },
+    "pdr.modbus.readRetryAttempts": { "type": "integer", "minimum": 0, "maximum": 10 },
+    "pdr.modbus.retryDelayMilliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 },
     "pdr.serial.baudRate": { "type": "integer", "minimum": 1 },
-    "pdr.gnss.baudRate": { "type": "integer", "minimum": 1 }
+    "pdr.serial.transport": { "type": "string", "enum": ["port", "loopback"] },
+    "pdr.serial.parameters": { "type": "string", "pattern": "^[5-8][NEO][12]$" },
+    "pdr.serial.flowControl": { "type": "string", "enum": ["none", "rtscts"] },
+    "pdr.serial.reconnectEnabled": { "type": "boolean" },
+    "pdr.serial.reconnectDelayMilliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 },
+    "pdr.serial.readTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 60000 },
+    "pdr.can.transport": { "type": "string", "enum": ["socketcan", "loopback"] },
+    "pdr.can.interface": { "type": "string", "minLength": 1 },
+    "pdr.can.frameId": { "type": "string", "pattern": "^(0[xX][0-9a-fA-F]+|[0-9]+)$" },
+    "pdr.can.extended": { "type": "boolean" },
+    "pdr.can.bitOffset": { "type": "integer", "minimum": 0, "maximum": 511 },
+    "pdr.can.bitLength": { "type": "integer", "minimum": 1, "maximum": 64 },
+    "pdr.can.bitOrder": { "type": "string", "enum": ["little", "big"] },
+    "pdr.can.reconnectEnabled": { "type": "boolean" },
+    "pdr.can.reconnectDelayMilliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 },
+    "pdr.can.receiveTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 60000 },
+    "pdr.can.staleAfterMilliseconds": { "type": "integer", "minimum": 1, "maximum": 60000 },
+    "pdr.gnss.baudRate": { "type": "integer", "minimum": 1 },
+    "pdr.gnss.transport": { "type": "string", "enum": ["port", "loopback"] },
+    "pdr.gnss.reconnectEnabled": { "type": "boolean" },
+    "pdr.gnss.reconnectDelayMilliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 },
+    "pdr.gnss.readTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 60000 },
+    "pdr.gnss.staleAfterMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 }
+  },
+  "patternProperties": {
+    "^pdr\\.(simulation|modbus|serial|gnss|gpio|xbee|can|led)\\.count$": {
+      "type": "integer", "minimum": 0, "maximum": 256
+    },
+    "^pdr\\.(simulation|modbus|serial|gnss|gpio|xbee|can|led)\\.[0-9]+\\.id$": {
+      "type": "string", "minLength": 1
+    },
+    "^pdr\\.(simulation|modbus|serial|gnss|gpio|xbee|can|led)\\.[0-9]+\\.enabled$": {
+      "type": "boolean"
+    },
+    "^pdr\\.(simulation|modbus|serial|gnss|gpio|xbee|can|led)\\.[0-9]+\\.required$": {
+      "type": "boolean"
+    },
+    "^pdr\\.modbus\\.[0-9]+\\.port$": {
+      "type": "integer", "minimum": 1, "maximum": 65535
+    },
+    "^pdr\\.modbus\\.[0-9]+\\.unitId$": {
+      "type": "integer", "minimum": 0, "maximum": 247
+    },
+    "^pdr\\.modbus\\.[0-9]+\\.timeoutMilliseconds$": {
+      "type": "integer", "minimum": 1, "maximum": 60000
+    },
+    "^pdr\\.modbus\\.[0-9]+\\.retryDelayMilliseconds$": {
+      "type": "integer", "minimum": 0, "maximum": 60000
+    },
+    "^pdr\\.modbus\\.[0-9]+\\.readRetryAttempts$": {
+      "type": "integer", "minimum": 0, "maximum": 10
+    },
+    "^pdr\\.(serial|gnss|xbee)\\.[0-9]+\\.baudRate$": {
+      "type": "integer", "minimum": 1, "maximum": 4000000
+    },
+    "^pdr\\.gnss\\.[0-9]+\\.transport$": {
+      "type": "string", "enum": ["port", "loopback"]
+    },
+    "^pdr\\.gnss\\.[0-9]+\\.reconnectEnabled$": {
+      "type": "boolean"
+    },
+    "^pdr\\.gnss\\.[0-9]+\\.reconnectDelayMilliseconds$": {
+      "type": "integer", "minimum": 0, "maximum": 60000
+    },
+    "^pdr\\.gnss\\.[0-9]+\\.(readTimeoutMilliseconds|staleAfterMilliseconds)$": {
+      "type": "integer", "minimum": 1, "maximum": 3600000
+    },
+    "^pdr\\.serial\\.[0-9]+\\.parameters$": {
+      "type": "string", "pattern": "^[5-8][NEO][12]$"
+    },
+    "^pdr\\.serial\\.[0-9]+\\.transport$": {
+      "type": "string", "enum": ["port", "loopback"]
+    },
+    "^pdr\\.serial\\.[0-9]+\\.flowControl$": {
+      "type": "string", "enum": ["none", "rtscts"]
+    },
+    "^pdr\\.serial\\.[0-9]+\\.reconnectEnabled$": {
+      "type": "boolean"
+    },
+    "^pdr\\.serial\\.[0-9]+\\.reconnectDelayMilliseconds$": {
+      "type": "integer", "minimum": 0, "maximum": 60000
+    },
+    "^pdr\\.serial\\.[0-9]+\\.readTimeoutMilliseconds$": {
+      "type": "integer", "minimum": 1, "maximum": 60000
+    },
+    "^pdr\\.gpio\\.[0-9]+\\.pin$": {
+      "type": "integer", "minimum": 0
+    },
+    "^pdr\\.gpio\\.[0-9]+\\.direction$": {
+      "type": "string", "enum": ["in", "out"]
+    },
+    "^pdr\\.gpio\\.[0-9]+\\.manageExport$": {
+      "type": "boolean"
+    },
+    "^pdr\\.gpio\\.[0-9]+\\.exportTimeoutMilliseconds$": {
+      "type": "integer", "minimum": 0, "maximum": 60000
+    },
+    "^pdr\\.xbee\\.[0-9]+\\.analogChannel$": {
+      "type": "integer", "minimum": 0, "maximum": 15
+    },
+    "^pdr\\.xbee\\.[0-9]+\\.transport$": {
+      "type": "string", "enum": ["port", "loopback"]
+    },
+    "^pdr\\.xbee\\.[0-9]+\\.reconnectEnabled$": {
+      "type": "boolean"
+    },
+    "^pdr\\.xbee\\.[0-9]+\\.reconnectDelayMilliseconds$": {
+      "type": "integer", "minimum": 0, "maximum": 60000
+    },
+    "^pdr\\.xbee\\.[0-9]+\\.(receiveTimeoutMilliseconds|staleAfterMilliseconds)$": {
+      "type": "integer", "minimum": 1, "maximum": 3600000
+    },
+    "^pdr\\.can\\.[0-9]+\\.bitOffset$": {
+      "type": "integer", "minimum": 0, "maximum": 511
+    },
+    "^pdr\\.can\\.[0-9]+\\.bitLength$": {
+      "type": "integer", "minimum": 1, "maximum": 64
+    },
+    "^pdr\\.can\\.[0-9]+\\.transport$": {
+      "type": "string", "enum": ["socketcan", "loopback"]
+    },
+    "^pdr\\.can\\.[0-9]+\\.frameId$": {
+      "type": "string", "pattern": "^(0[xX][0-9a-fA-F]+|[0-9]+)$"
+    },
+    "^pdr\\.can\\.[0-9]+\\.(extended|reconnectEnabled)$": {
+      "type": "boolean"
+    },
+    "^pdr\\.can\\.[0-9]+\\.reconnectDelayMilliseconds$": {
+      "type": "integer", "minimum": 0, "maximum": 60000
+    },
+    "^pdr\\.can\\.[0-9]+\\.(receiveTimeoutMilliseconds|staleAfterMilliseconds)$": {
+      "type": "integer", "minimum": 1, "maximum": 60000
+    }
   },
   "additionalProperties": true
 }

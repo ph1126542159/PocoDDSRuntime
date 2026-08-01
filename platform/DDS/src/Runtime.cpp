@@ -2,6 +2,10 @@
 
 #include "PocoDDS/DDS/EnvelopeTopicDataType.h"
 
+#if defined(PDR_ENABLE_OBSERVABILITY)
+#include "PocoDDS/Observability/Metrics.h"
+#endif
+
 #include <fastdds/dds/core/ReturnCode.hpp>
 #include <fastdds/dds/core/status/StatusMask.hpp>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
@@ -18,6 +22,7 @@
 #include <fastdds/rtps/transport/UDPv4TransportDescriptor.hpp>
 
 #include <map>
+#include <chrono>
 #include <mutex>
 #include <stdexcept>
 #include <utility>
@@ -33,7 +38,8 @@ public:
     class ReaderListener final : public DataReaderListener
     {
     public:
-        explicit ReaderListener(Handler handler) : _handler(std::move(handler)) {}
+        ReaderListener(std::string topicName, Handler handler)
+            : _topicName(std::move(topicName)), _handler(std::move(handler)) {}
 
         void on_data_available(DataReader* reader) override
         {
@@ -43,12 +49,22 @@ public:
             {
                 if (info.valid_data)
                 {
+#if defined(PDR_ENABLE_OBSERVABILITY)
+                    PocoDDS::Observability::Metrics::global().addCounter(
+                        "pdr.dds.messages.received", 1, {{"topic", _topicName}},
+                        "Fast DDS samples received", "{message}");
+#endif
                     try
                     {
                         _handler(envelope);
                     }
                     catch (...)
                     {
+#if defined(PDR_ENABLE_OBSERVABILITY)
+                        PocoDDS::Observability::Metrics::global().addCounter(
+                            "pdr.dds.handler.errors", 1, {{"topic", _topicName}},
+                            "Exceptions rejected at the DDS listener boundary", "{error}");
+#endif
                         // Exceptions must never escape into a Fast DDS listener thread.
                         // The caller may report a protocol-level error on a later request.
                     }
@@ -57,6 +73,7 @@ public:
         }
 
     private:
+        std::string _topicName;
         Handler _handler;
     };
 
@@ -99,6 +116,11 @@ public:
             stopUnlocked();
             throw std::runtime_error("Fast DDS failed to create publisher/subscriber");
         }
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        PocoDDS::Observability::Metrics::global().addCounter(
+            "pdr.dds.runtime.starts", 1, {{"participant", participantName}},
+            "Fast DDS runtime starts", "{start}");
+#endif
     }
 
     void stop() noexcept
@@ -128,6 +150,9 @@ public:
 
     void publish(const std::string& topicName, const Envelope& envelope)
     {
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        const auto startedAt = std::chrono::steady_clock::now();
+#endif
         preparePublisher(topicName);
         DataWriter* writer = nullptr;
         {
@@ -140,7 +165,23 @@ public:
         // their response immediately on another topic.
         Envelope copy = envelope;
         if (writer->write(&copy) != RETCODE_OK)
+        {
+#if defined(PDR_ENABLE_OBSERVABILITY)
+            PocoDDS::Observability::Metrics::global().addCounter(
+                "pdr.dds.publish.errors", 1, {{"topic", topicName}},
+                "Fast DDS write failures", "{error}");
+#endif
             throw std::runtime_error("Fast DDS failed to write topic: " + topicName);
+        }
+#if defined(PDR_ENABLE_OBSERVABILITY)
+        auto& metrics = PocoDDS::Observability::Metrics::global();
+        metrics.addCounter("pdr.dds.messages.published", 1, {{"topic", topicName}},
+                           "Fast DDS samples published", "{message}");
+        metrics.recordHistogram(
+            "pdr.dds.publish.duration", std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - startedAt).count(),
+            {{"topic", topicName}}, "Synchronous Fast DDS publish duration", "ms");
+#endif
     }
 
     void preparePublisher(const std::string& topicName)
@@ -160,7 +201,7 @@ public:
     {
         std::lock_guard<std::mutex> lock(mutex);
         requireStarted();
-        auto listener = std::make_unique<ReaderListener>(std::move(handler));
+        auto listener = std::make_unique<ReaderListener>(topicName, std::move(handler));
         DataReader* reader = subscriber->create_datareader(
             topic(topicName), DATAREADER_QOS_DEFAULT, listener.get(), StatusMask::data_available());
         if (!reader)

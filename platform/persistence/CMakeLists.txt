@@ -1,5 +1,6 @@
 add_library(PDRPersistence INTERFACE)
 add_library(PocoDDS::Persistence ALIAS PDRPersistence)
+set_target_properties(PDRPersistence PROPERTIES EXPORT_NAME Persistence)
 target_include_directories(PDRPersistence INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)

@@ -31,9 +31,9 @@ function(pdr_bootstrap_missing_dependencies)
     endif()
 
     if(PDR_ENABLE_OBSERVABILITY)
-        find_package(opentelemetry-cpp CONFIG QUIET
+        find_package(opentelemetry-cpp CONFIG QUIET COMPONENTS exporters_otlp_http
             PATHS "${PDR_INSTALL_PREFIX}" NO_DEFAULT_PATH)
-        if(NOT opentelemetry-cpp_FOUND)
+        if(NOT opentelemetry-cpp_FOUND OR NOT TARGET opentelemetry-cpp::otlp_http_metric_exporter)
             set(dependencies_missing TRUE)
         endif()
     endif()

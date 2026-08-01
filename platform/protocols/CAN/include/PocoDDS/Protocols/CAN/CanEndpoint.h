@@ -15,6 +15,7 @@ struct CanFrame
     std::uint32_t id{0};
     bool extended{false};
     bool remoteRequest{false};
+    bool error{false};
     std::uint8_t length{0};
     std::array<std::uint8_t, 64> data{};
 };

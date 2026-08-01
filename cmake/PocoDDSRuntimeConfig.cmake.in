@@ -1,17 +1,7 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-
-if(@PDR_ENABLE_FASTDDS@)
-    find_dependency(fastcdr 2.3.6 CONFIG)
-    find_dependency(fastdds 3 CONFIG)
-endif()
-if(@PDR_ENABLE_OPENTELEMETRY@)
-    find_dependency(opentelemetry-cpp CONFIG)
-endif()
-if(@PDR_ENABLE_ADMIN@ OR @PDR_ENABLE_OTLP_HTTP@)
-    find_dependency(Poco 1.15.3 CONFIG COMPONENTS Foundation Net JSON)
-endif()
+find_dependency(Poco 1.15.3 CONFIG COMPONENTS Foundation Util)
 
 include("${CMAKE_CURRENT_LIST_DIR}/PocoDDSRuntimeTargets.cmake")
 check_required_components(PocoDDSRuntime)

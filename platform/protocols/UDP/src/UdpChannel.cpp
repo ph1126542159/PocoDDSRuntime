@@ -1,4 +1,5 @@
 #include "PocoDDS/Protocols/UDP/UdpChannel.h"
+#include "PocoDDS/Protocols/ProtocolMetrics.h"
 
 #include <stdexcept>
 
@@ -18,9 +19,11 @@ void UdpChannel::open()
 {
     if (_open)
         return;
+    PocoDDS::Protocols::ProtocolMetricTimer metric("udp", "open");
     _socket = Poco::Net::DatagramSocket(_local.family());
     _socket.bind(_local);
     _open = true;
+    metric.success();
 }
 
 void UdpChannel::close() noexcept
@@ -44,24 +47,32 @@ bool UdpChannel::isOpen() const noexcept
 
 std::size_t UdpChannel::send(const std::uint8_t* data, std::size_t size)
 {
+    PocoDDS::Protocols::ProtocolMetricTimer metric("udp", "send", size);
     if (!_open)
         throw std::logic_error("UDP channel is not open");
-    return static_cast<std::size_t>(
+    const auto sent = static_cast<std::size_t>(
         _socket.sendTo(data, static_cast<int>(size), _remote));
+    metric.success();
+    return sent;
 }
 
 std::vector<std::uint8_t> UdpChannel::receive(std::size_t capacity, Poco::Timespan timeout)
 {
+    PocoDDS::Protocols::ProtocolMetricTimer metric("udp", "receive");
     if (!_open)
         throw std::logic_error("UDP channel is not open");
     if (!_socket.poll(timeout, Poco::Net::Socket::SELECT_READ))
+    {
+        metric.timeout();
         return {};
+    }
 
     std::vector<std::uint8_t> bytes(capacity);
     Poco::Net::SocketAddress sender;
     const int received =
         _socket.receiveFrom(bytes.data(), static_cast<int>(bytes.size()), sender);
     bytes.resize(static_cast<std::size_t>(received));
+    metric.success();
     return bytes;
 }
 

@@ -106,6 +106,14 @@ option(PDR_ENABLE_OBSERVABILITY
     "Build the OpenTelemetry business observability module" ON)
 option(PDR_AUTO_BOOTSTRAP_DEPENDENCIES
     "Build missing third-party dependencies during project configuration" ON)
+set(PDR_PROFILE "custom" CACHE STRING "Deployment profile: embedded, edge-test, server or custom")
+set_property(CACHE PDR_PROFILE PROPERTY STRINGS embedded edge-test server custom)
+option(PDR_BUILD_WEBUI "Build and package administration WebUI page bundles" ON)
+option(PDR_BUILD_LAUNCHER "Build the independent runtime watchdog launcher" ON)
+option(PDR_BUILD_QT3D "Build the Qt3D demonstration subprocess" ON)
+if(NOT PDR_PROFILE MATCHES "^(embedded|edge-test|server|custom)$")
+    message(FATAL_ERROR "Unsupported PDR_PROFILE: ${PDR_PROFILE}")
+endif()
 set(SHARED_LIBRARY_VERSION 1 CACHE STRING "Compatibility version for migrated platform libraries")
 
 include(PDRWarnings)
@@ -151,7 +159,7 @@ set(MYIOT_OSP_BUNDLE_OSNAME "${MYIOT_PLATFORM_OSNAME}")
 set(MYIOT_OSP_BUNDLE_OSARCH "${MYIOT_PLATFORM_OSARCH}")
 
 set(CMAKE_FOLDER "Platform")
-add_subdirectory(application)
+add_subdirectory(sdk)
 add_subdirectory(platform/configuration)
 add_subdirectory(platform/reliability)
 add_subdirectory(platform/health)
@@ -160,6 +168,10 @@ add_subdirectory(platform/CodeGeneration)
 add_subdirectory(platform/Geo)
 add_subdirectory(platform/Serial)
 add_subdirectory(platform/WebTunnel)
+if(PDR_ENABLE_OBSERVABILITY)
+    set(CMAKE_FOLDER "Observability")
+    add_subdirectory(platform/observability)
+endif()
 add_subdirectory(platform/OSP)
 add_subdirectory(platform/BundleManagement)
 add_subdirectory(platform/ProcessManagement)
@@ -170,10 +182,8 @@ add_subdirectory(platform/protocols)
 set(CMAKE_FOLDER "Devices")
 add_subdirectory(platform/devices)
 
-if(PDR_ENABLE_OBSERVABILITY)
-    set(CMAKE_FOLDER "Observability")
-    add_subdirectory(platform/observability)
-endif()
+set(CMAKE_FOLDER "Application")
+add_subdirectory(application)
 
 set(CMAKE_FOLDER "Communication")
 add_subdirectory(platform/DDS)
@@ -182,13 +192,18 @@ set(CMAKE_FOLDER "Services")
 add_subdirectory(services)
 
 set(CMAKE_FOLDER "Applications")
-add_subdirectory(SubSystem)
-add_subdirectory(webui)
+if(PDR_BUILD_LAUNCHER OR PDR_BUILD_QT3D)
+    add_subdirectory(SubSystem)
+endif()
+if(PDR_BUILD_WEBUI)
+    add_subdirectory(webui)
+endif()
 add_subdirectory(server)
 
 unset(CMAKE_FOLDER)
 pdr_configure_test_output_tree("${CMAKE_CURRENT_SOURCE_DIR}")
 if(BUILD_TESTING)
+    find_package(Python3 3.9 QUIET COMPONENTS Interpreter)
     add_test(NAME contract-files
         COMMAND "${CMAKE_COMMAND}"
             -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
@@ -197,6 +212,306 @@ if(BUILD_TESTING)
         COMMAND "${CMAKE_COMMAND}"
             -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ValidateDocs.cmake")
+    add_test(NAME deployment-profiles
+        COMMAND "${CMAKE_COMMAND}"
+            -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ValidateProfiles.cmake")
+    add_test(NAME sdk-external-consumer
+        COMMAND "${CMAKE_COMMAND}"
+            -DPDR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
+            -DPDR_CONFIG=$<CONFIG>
+            -DPDR_GENERATOR=${CMAKE_GENERATOR}
+            -DPDR_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+            -DPDR_DEPENDENCY_PREFIX=${PDR_INSTALL_PREFIX}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunSDKConsumerTest.cmake")
+    if(Python3_Interpreter_FOUND)
+      add_test(NAME generated-device-consumer
+        COMMAND "${CMAKE_COMMAND}"
+            -DPDR_CMAKE=${CMAKE_COMMAND}
+            -DPDR_CTEST=${CMAKE_CTEST_COMMAND}
+            -DPDR_PYTHON=${Python3_EXECUTABLE}
+            -DPDR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
+            -DPDR_CONFIG=$<CONFIG>
+            -DPDR_GENERATOR=${CMAKE_GENERATOR}
+            -DPDR_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+            -DPDR_DEPENDENCY_PREFIX=${PDR_INSTALL_PREFIX}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunGeneratedDeviceTest.cmake")
+      set_tests_properties(generated-device-consumer PROPERTIES
+          LABELS "sdk;device" TIMEOUT 90)
+    endif()
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME developer-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_pdr.py")
+        add_test(NAME compatibility-baseline
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_compatibility.py"
+                --root "${CMAKE_CURRENT_SOURCE_DIR}")
+        add_test(NAME compatibility-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_compatibility.py")
+        add_test(NAME soak-runner-smoke
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/soak_runner.py"
+                --duration 0.5
+                --interval 0.1
+                --warmup 0.3
+                --output "${CMAKE_BINARY_DIR}/reports/soak-smoke.json"
+                --max-rss-growth-mib 16
+                --max-handle-growth 8
+                -- "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/soak_target.py")
+        set_tests_properties(soak-runner-smoke PROPERTIES LABELS "soak;nightly" TIMEOUT 10)
+        add_test(NAME soak-health-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_soak_health.py")
+        set_tests_properties(soak-health-policy PROPERTIES LABELS "soak;nightly" TIMEOUT 15)
+        add_test(NAME device-acceptance-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_device_acceptance.py")
+        set_tests_properties(device-acceptance-policy PROPERTIES
+            LABELS "device;release"
+            TIMEOUT 10)
+        add_test(NAME security-config
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/security_gate.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties")
+        add_test(NAME security-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_security_gate.py")
+        add_test(NAME release-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_release_manifest.py")
+        add_test(NAME dependency-lock
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_dependency_lock.py")
+        add_test(NAME release-matrix
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_release_matrix.py")
+        add_test(NAME release-artifacts
+            COMMAND "${CMAKE_COMMAND}"
+                -DPDR_PYTHON=${Python3_EXECUTABLE}
+                -DPDR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
+                -DPDR_VERSION=${PROJECT_VERSION}
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunReleaseValidation.cmake")
+        add_test(NAME upgrade-rollback
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_upgrade_manager.py")
+        if(NOT CMAKE_CROSSCOMPILING)
+            add_test(NAME runtime-package-smoke
+                COMMAND "${CMAKE_COMMAND}"
+                    -DPDR_CMAKE=${CMAKE_COMMAND}
+                    -DPDR_PYTHON=${Python3_EXECUTABLE}
+                    -DPDR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
+                    -DPDR_CONFIG=$<CONFIG>
+                    -DPDR_RUNTIME_FILE_NAME=$<TARGET_FILE_NAME:pdr-runtime>
+                    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunRuntimePackageSmoke.cmake")
+            set_tests_properties(runtime-package-smoke PROPERTIES
+                LABELS "runtime;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 60)
+            add_test(NAME runtime-multi-device-smoke
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --timeout 20
+                    --stability-window 2
+                    --clear-code-cache
+                    --path "${PDR_INSTALL_PREFIX}/bin"
+                    --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --endpoint "/health/detail"
+                    --endpoint "/api/v1/devices"
+                    --set "pdr.simulation.count=3"
+                    --set "pdr.simulation.0.id=simulation-primary"
+                    --set "pdr.simulation.1.id=simulation-backup"
+                    --set "pdr.simulation.2.id=simulation-diagnostics"
+                    --require-log "started with 3 device\\(s\\)"
+                    --require-body "\\\"count\\\":3"
+                    --require-body "simulation-primary"
+                    --require-body "simulation-backup"
+                    --require-body "simulation-diagnostics"
+                    --require-body "\"sequence\":"
+                    --require-body "\"timestampMicroseconds\":"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-multi-device-smoke.json")
+            set_tests_properties(runtime-multi-device-smoke PROPERTIES
+                LABELS "runtime;device"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
+            add_test(NAME runtime-modbus-reference-smoke
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/modbus_runtime_smoke.py"
+                    --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --path "${PDR_INSTALL_PREFIX}/bin"
+                    --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-modbus-reference-smoke.json")
+            set_tests_properties(runtime-modbus-reference-smoke PROPERTIES
+                LABELS "runtime;device;protocol;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
+            add_test(NAME runtime-serial-reference-smoke
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --timeout 20
+                    --stability-window 2
+                    --clear-code-cache
+                    --path "${PDR_INSTALL_PREFIX}/bin"
+                    --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --endpoint "/api/v1/devices"
+                    --set "pdr.serial.count=1"
+                    --set "pdr.serial.0.id=serial-reference"
+                    --set "pdr.serial.0.transport=loopback"
+                    --require-log "started with 2 device"
+                    --require-body "serial-reference"
+                    --require-body "\"type\":\"serial\""
+                    --require-body "\"diagnostics\":"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-serial-reference-smoke.json")
+            set_tests_properties(runtime-serial-reference-smoke PROPERTIES
+                LABELS "runtime;device;protocol;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
+            add_test(NAME runtime-gnss-reference-smoke
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --timeout 20
+                    --stability-window 2
+                    --clear-code-cache
+                    --path "${PDR_INSTALL_PREFIX}/bin"
+                    --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --endpoint "/api/v1/devices"
+                    --set "pdr.gnss.count=1"
+                    --set "pdr.gnss.0.id=gnss-reference"
+                    --set "pdr.gnss.0.transport=loopback"
+                    --set "pdr.gnss.0.required=false"
+                    --require-log "started with 2 device"
+                    --require-body "gnss-reference"
+                    --require-body "\"type\":\"gnss.nmea0183\""
+                    --require-body "\"state\":\"offline\""
+                    --require-body "\"diagnostics\":"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-gnss-reference-smoke.json")
+            set_tests_properties(runtime-gnss-reference-smoke PROPERTIES
+                LABELS "runtime;device;protocol;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
+            add_test(NAME runtime-xbee-reference-smoke
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --timeout 20
+                    --stability-window 2
+                    --clear-code-cache
+                    --path "${PDR_INSTALL_PREFIX}/bin"
+                    --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --endpoint "/api/v1/devices"
+                    --set "pdr.xbee.count=1"
+                    --set "pdr.xbee.0.id=xbee-reference"
+                    --set "pdr.xbee.0.transport=loopback"
+                    --set "pdr.xbee.0.required=false"
+                    --set "pdr.xbee.0.sourceAddress=0013A200405291AB"
+                    --set "pdr.xbee.0.analogChannel=0"
+                    --require-log "started with 2 device"
+                    --require-body "xbee-reference"
+                    --require-body "\"type\":\"sensor.xbee.analog\""
+                    --require-body "\"state\":\"offline\""
+                    --require-body "\"diagnostics\":"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-xbee-reference-smoke.json")
+            set_tests_properties(runtime-xbee-reference-smoke PROPERTIES
+                LABELS "runtime;device;protocol;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
+            add_test(NAME runtime-can-reference-smoke
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --timeout 20
+                    --stability-window 2
+                    --clear-code-cache
+                    --path "${PDR_INSTALL_PREFIX}/bin"
+                    --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --endpoint "/api/v1/devices"
+                    --set "pdr.can.count=1"
+                    --set "pdr.can.0.id=can-reference"
+                    --set "pdr.can.0.transport=loopback"
+                    --set "pdr.can.0.required=false"
+                    --set "pdr.can.0.frameId=0x123"
+                    --set "pdr.can.0.bitOffset=0"
+                    --set "pdr.can.0.bitLength=16"
+                    --require-log "started with 2 device"
+                    --require-body "can-reference"
+                    --require-body "\"type\":\"sensor.can.signal\""
+                    --require-body "\"state\":\"offline\""
+                    --require-body "\"diagnostics\":"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-can-reference-smoke.json")
+            set_tests_properties(runtime-can-reference-smoke PROPERTIES
+                LABELS "runtime;device;protocol;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
+            add_test(NAME runtime-required-device-readiness
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --timeout 20
+                    --stability-window 2
+                    --clear-code-cache
+                    --path "${PDR_INSTALL_PREFIX}/bin"
+                    --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --endpoint "/health/detail"
+                    --endpoint "/api/v1/devices"
+                    --expect-status "/health/ready=503"
+                    --set "pdr.can.count=1"
+                    --set "pdr.can.0.id=required-can"
+                    --set "pdr.can.0.transport=loopback"
+                    --set "pdr.can.0.frameId=0x123"
+                    --set "pdr.can.0.bitOffset=0"
+                    --set "pdr.can.0.bitLength=16"
+                    --require-body "required-can"
+                    --require-body "\"status\":\"DEGRADED\""
+                    --require-body "\"name\":\"devices\""
+                    --require-body "\"ready\":false"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-required-device-readiness.json")
+            set_tests_properties(runtime-required-device-readiness PROPERTIES
+                LABELS "runtime;device;release;fault-injection"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
+            add_test(NAME runtime-linux-sysfs-reference-smoke
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/linux_sysfs_runtime_smoke.py"
+                    --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --path "${PDR_INSTALL_PREFIX}/bin"
+                    --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-linux-sysfs-reference-smoke.json")
+            set_tests_properties(runtime-linux-sysfs-reference-smoke PROPERTIES
+                LABELS "runtime;device;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
+        endif()
+        set_tests_properties(security-config security-policy PROPERTIES LABELS "security")
+        set_tests_properties(release-policy release-artifacts dependency-lock release-matrix upgrade-rollback
+            PROPERTIES LABELS "release")
+    endif()
 endif()
 
 # Runtime deployment layout. The current runtime bundles are generated directly
@@ -207,6 +522,22 @@ install(DIRECTORY "${PDR_BUNDLE_OUTPUT_DIRECTORY}/"
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
               "${PDR_GENERATED_SUBPROCESS_CONFIG}"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
+# A fresh package must be directly startable. Poco's FileChannel does not
+# create the parent directory, and the OSP runtime also expects these writable
+# roots to exist before the first request or trace is persisted.
+install(DIRECTORY DESTINATION "${CMAKE_INSTALL_BINDIR}/logs")
+install(DIRECTORY DESTINATION "${CMAKE_INSTALL_BINDIR}/data")
+install(DIRECTORY DESTINATION "${CMAKE_INSTALL_BINDIR}/codeCache")
+if(WIN32)
+    # The official OTLP/HTTP exporter uses the shared curl/OpenSSL runtime on
+    # Windows. Package every third-party runtime DLL from the unified prefix;
+    # project-owned DLLs are installed from their targets below.
+    file(GLOB pdr_third_party_runtime_dlls "${PDR_INSTALL_PREFIX}/bin/*.dll")
+    list(FILTER pdr_third_party_runtime_dlls EXCLUDE REGEX
+        "/(PDRObservability|PDRBundleManagement|PDRProcessManagement)\\.dll$")
+    install(FILES ${pdr_third_party_runtime_dlls}
+        DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
 
 # Public macchina.io platform extensions retained by this runtime.
 install(TARGETS CodeGeneration Geo Serial WebTunnel OSP
@@ -220,3 +551,47 @@ install(DIRECTORY
     "${CMAKE_CURRENT_SOURCE_DIR}/platform/WebTunnel/include/"
     "${CMAKE_CURRENT_SOURCE_DIR}/platform/OSP/include/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
+include(CMakePackageConfigHelpers)
+set(PDR_PACKAGE_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/PocoDDSRuntime")
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PocoDDSRuntimeConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfig.cmake"
+    INSTALL_DESTINATION "${PDR_PACKAGE_CMAKE_DIR}")
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion)
+install(EXPORT PocoDDSRuntimeTargets
+    FILE PocoDDSRuntimeTargets.cmake
+    NAMESPACE PocoDDS::
+    DESTINATION "${PDR_PACKAGE_CMAKE_DIR}")
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfigVersion.cmake"
+    DESTINATION "${PDR_PACKAGE_CMAKE_DIR}")
+
+if(PDR_PROFILE STREQUAL "edge-test" AND PDR_BUILD_QT3D AND
+   NOT TARGET pdr-qt3d-subprocess)
+    message(FATAL_ERROR
+        "edge-test profile requires Qt6 Qt3D when PDR_BUILD_QT3D=ON; "
+        "provide Qt6_DIR/CMAKE_PREFIX_PATH or explicitly disable the feature")
+endif()
+
+foreach(feature WEBUI LAUNCHER QT3D OBSERVABILITY DATA_MODULES)
+    if((feature STREQUAL "WEBUI" AND PDR_BUILD_WEBUI) OR
+       (feature STREQUAL "LAUNCHER" AND TARGET pdr-launcher) OR
+       (feature STREQUAL "QT3D" AND TARGET pdr-qt3d-subprocess) OR
+       (feature STREQUAL "OBSERVABILITY" AND PDR_ENABLE_OBSERVABILITY) OR
+       (feature STREQUAL "DATA_MODULES" AND MYIOT_ENABLE_DATA_MODULES))
+        set(PDR_PROFILE_${feature} true)
+    else()
+        set(PDR_PROFILE_${feature} false)
+    endif()
+endforeach()
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/pdr-profile.json.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/pdr-profile.json"
+    @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/pdr-profile.json"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime")
