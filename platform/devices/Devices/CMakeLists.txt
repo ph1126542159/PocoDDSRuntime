@@ -6,7 +6,7 @@ target_include_directories(PDRDeviceCore
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
-target_link_libraries(PDRDeviceCore PUBLIC Poco::Foundation)
+target_link_libraries(PDRDeviceCore PUBLIC Poco::Foundation PocoDDS::Reliability)
 pdr_set_warnings(PDRDeviceCore)
 
 if(BUILD_TESTING)

@@ -35,7 +35,7 @@ Embedded 包中不应出现 `pdr.webui.*.bndl` 或 Qt3D 子进程；Edge/Test �
 全新安装包必须能够直接启动，且 `bin/logs`、`bin/data`、`bin/codeCache` 三个可写目录必须存在。可用随机端口执行真实运行验证：
 
 ```powershell
-python tools/runtime_smoke.py `
+python bin/runtime_smoke.py `
   --executable build/install/embedded/bin/pdr-runtime.exe `
   --working-directory build/install/embedded/bin `
   --path build/install/embedded/bin `

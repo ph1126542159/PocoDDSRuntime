@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/contracts/plugin-host-state.schema.json",
+  "title": "PocoDDSRuntime isolated plugin host state",
+  "type": "object",
+  "required": ["schemaVersion", "pluginId", "pluginVersion", "state", "hostPid", "updatedMicroseconds", "bundles"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "pluginId": { "type": "string", "pattern": "^pdr\\.plugin\\.[A-Za-z0-9._-]+$" },
+    "pluginVersion": { "type": "string" },
+    "state": { "enum": ["running", "stopped", "failed"] },
+    "hostPid": { "type": "integer", "minimum": 0 },
+    "updatedMicroseconds": { "type": "integer", "minimum": 0 },
+    "detail": { "type": "string" },
+    "children": { "type": "array" },
+    "bundles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "state", "plugin", "isolation"],
+        "properties": {
+          "id": { "type": "string" }, "name": { "type": "string" },
+          "version": { "type": "string" }, "state": { "type": "string" },
+          "manageable": { "type": "boolean" }, "plugin": { "const": true },
+          "isolation": { "const": "process" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

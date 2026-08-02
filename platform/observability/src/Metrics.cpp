@@ -143,12 +143,21 @@ public:
                  "pdr.device.starts", "pdr.device.commands",
                  "pdr.workflow.executions", "pdr.workflow.compensations",
                  "pdr.protocol.operations", "pdr.protocol.io",
+                 "pdr.health.component.samples",
+                 "pdr.diagnostics.failure.samples",
+                 "pdr.alert.transitions",
+                 "pdr.alert.delivery",
                  "http.server.request.count", "http.server.response.count"})
             counters.emplace(name, meter->CreateUInt64Counter(name));
         for (const std::string name : {
                  "pdr.dds.publish.duration", "pdr.dds.service.duration",
                  "pdr.device.command.duration", "pdr.workflow.duration",
-                 "pdr.protocol.operation.duration", "http.server.request.duration"})
+                 "pdr.protocol.operation.duration", "http.server.request.duration",
+                 "pdr.management.tasks.queue.depth",
+                 "pdr.management.tasks.workers.active",
+                 "pdr.management.tasks.resource.waiting",
+                 "pdr.management.tasks.queue.utilization",
+                 "pdr.management.tasks.wait.max"})
             histograms.emplace(name, meter->CreateDoubleHistogram(name));
         active = true;
         if (!options.otlpHttpEndpoint.empty())

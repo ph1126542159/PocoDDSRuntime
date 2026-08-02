@@ -14,6 +14,10 @@
 #include "PocoDDS/ProcessManagement/SubprocessManager.h"
 #include "PocoDDS/Devices/Device.h"
 #include "PocoDDS/Devices/DeviceService.h"
+#include "PocoDDS/Protocols/ProtocolService.h"
+#if defined(PDR_HEALTH_METRICS)
+#include "PocoDDS/Observability/Metrics.h"
+#endif
 
 #include <algorithm>
 #include <memory>
@@ -56,6 +60,20 @@ void sendError(Poco::Net::HTTPServerResponse& response,
     result.stringify(response.send());
 }
 
+void addReportJson(Poco::JSON::Array& components, const Health::Report& component)
+{
+    Poco::JSON::Object item;
+    item.set("name", component.component);
+    item.set("status", statusName(component.status));
+    item.set("detail", component.detail);
+    if (!component.code.empty()) item.set("code", component.code);
+    if (!component.remediation.empty()) item.set("remediation", component.remediation);
+    Poco::JSON::Array affected;
+    for (const auto& instance : component.affected) affected.add(instance);
+    item.set("affected", affected);
+    components.add(item);
+}
+
 class HealthHandler final : public Poco::Net::HTTPRequestHandler
 {
 public:
@@ -74,9 +92,12 @@ public:
         for (const auto& bundle : bundles)
             if (bundle->state() == Poco::OSP::Bundle::BUNDLE_ACTIVE)
                 ++active;
+        const bool bundlesUp = active > 0;
         registry.add(std::make_shared<StaticContributor>(Health::Report{
-            "bundles", active > 0 ? Health::Status::up : Health::Status::down,
-            std::to_string(active) + "/" + std::to_string(bundles.size()) + " active"}));
+            "bundles", bundlesUp ? Health::Status::up : Health::Status::down,
+            std::to_string(active) + "/" + std::to_string(bundles.size()) + " active",
+            bundlesUp ? "" : "PDR-HEALTH-BUNDLE-NONE_ACTIVE",
+            bundlesUp ? "" : "Inspect Bundle startup logs and required Bundle dependencies."}));
 
         if (auto* manager = ProcessManagement::SubprocessManager::active())
         {
@@ -88,19 +109,33 @@ public:
                 processes.begin(), processes.end(), [](const auto& process) {
                     return process.required && process.state == "running";
                 }));
+            std::vector<std::string> affected;
+            for (const auto& process : processes)
+                if (process.required && process.state != "running") affected.push_back(process.name);
+            const bool requiredRunning = runningRequired == required;
             registry.add(std::make_shared<StaticContributor>(Health::Report{
                 "subprocesses",
-                runningRequired == required ? Health::Status::up
-                                            : Health::Status::degraded,
+                requiredRunning ? Health::Status::up : Health::Status::degraded,
                 std::to_string(manager->runningCount()) + "/" +
                     std::to_string(processes.size()) + " running, " +
                     std::to_string(runningRequired) + "/" +
-                    std::to_string(required) + " required"}));
+                    std::to_string(required) + " required",
+                requiredRunning ? "" : "PDR-HEALTH-SUBPROCESS-REQUIRED_NOT_RUNNING",
+                requiredRunning ? "" : "Inspect the affected process log, then restart it from process management.",
+                std::move(affected)}));
+        }
+        else
+        {
+            registry.add(std::make_shared<StaticContributor>(Health::Report{
+                "subprocesses", Health::Status::degraded, "manager not initialized",
+                "PDR-HEALTH-SUBPROCESS-MANAGER_UNAVAILABLE",
+                "Verify ProcessManagement Bundle startup and Runtime configuration."}));
         }
 
         std::size_t requiredDevices = 0;
         std::size_t readyDevices = 0;
         std::size_t faultDevices = 0;
+        std::vector<std::string> affectedDevices;
         for (const auto& service : _context->registry().find("pdr.device"))
         {
             if (!service->properties().getBool("pdr.deviceRequired", true))
@@ -113,26 +148,103 @@ public:
                 const auto state = provider->device().snapshot().state;
                 if (state == PocoDDS::Devices::DeviceState::ready)
                     ++readyDevices;
-                else if (state == PocoDDS::Devices::DeviceState::fault)
-                    ++faultDevices;
+                else
+                {
+                    if (state == PocoDDS::Devices::DeviceState::fault) ++faultDevices;
+                    affectedDevices.push_back(service->properties().get(
+                        "pdr.device", service->name()));
+                }
             }
             catch (...)
             {
                 ++faultDevices;
+                affectedDevices.push_back(service->properties().get(
+                    "pdr.device", service->name()));
             }
         }
         if (requiredDevices > 0)
         {
+            const bool devicesReady = readyDevices == requiredDevices;
             registry.add(std::make_shared<StaticContributor>(Health::Report{
                 "devices",
-                readyDevices == requiredDevices ? Health::Status::up
-                                                : Health::Status::degraded,
+                devicesReady ? Health::Status::up : Health::Status::degraded,
                 std::to_string(readyDevices) + "/" +
                     std::to_string(requiredDevices) + " required ready, " +
-                    std::to_string(faultDevices) + " fault"}));
+                    std::to_string(faultDevices) + " fault",
+                devicesReady ? "" : "PDR-HEALTH-DEVICE-REQUIRED_NOT_READY",
+                devicesReady ? "" : "Open device diagnostics, inspect the last error, then verify wiring and transport.",
+                std::move(affectedDevices)}));
+        }
+
+        const auto protocolServices = _context->registry().find("pdr.protocol");
+        std::size_t openProtocols = 0;
+        std::size_t requiredProtocols = 0;
+        std::size_t openRequiredProtocols = 0;
+        std::vector<std::string> affectedProtocols;
+        for (const auto& service : protocolServices)
+        {
+            const bool required = service->properties().getBool("pdr.protocol.required", false);
+            if (required) ++requiredProtocols;
+            try
+            {
+                const auto provider = service->castedInstance<PocoDDS::Protocols::ProtocolService>();
+                if (provider->isOpen())
+                {
+                    ++openProtocols;
+                    if (required) ++openRequiredProtocols;
+                }
+                else if (required)
+                    affectedProtocols.push_back(service->properties().get(
+                        "pdr.protocol.id", service->name()));
+            }
+            catch (...)
+            {
+                if (required) affectedProtocols.push_back(service->properties().get(
+                    "pdr.protocol.id", service->name()));
+            }
+        }
+        const bool protocolsReady = openRequiredProtocols == requiredProtocols;
+        registry.add(std::make_shared<StaticContributor>(Health::Report{
+            "protocols", protocolsReady ? Health::Status::up : Health::Status::degraded,
+            std::to_string(openProtocols) + "/" + std::to_string(protocolServices.size()) +
+                " open; " + std::to_string(openRequiredProtocols) + "/" +
+                std::to_string(requiredProtocols) + " required open",
+            protocolsReady ? "" : "PDR-HEALTH-PROTOCOL-REQUIRED_CLOSED",
+            protocolsReady ? "" : "Inspect protocol diagnostics and endpoint connectivity, then restart the affected instance.",
+            std::move(affectedProtocols)}));
+
+        for (const auto& service : _context->registry().find("pdr.healthContributor"))
+        {
+            try
+            {
+                auto instance = service->instance();
+                auto* contributor = dynamic_cast<Health::IHealthContributor*>(instance.get());
+                if (contributor)
+                    registry.add(std::make_shared<StaticContributor>(contributor->health()));
+            }
+            catch (const std::exception& exception)
+            {
+                registry.add(std::make_shared<StaticContributor>(Health::Report{
+                    service->properties().get("pdr.healthContributor.component", service->name()),
+                    Health::Status::degraded, exception.what(),
+                    "PDR-HEALTH-CONTRIBUTOR_FAILED",
+                    "Inspect the contributing Bundle logs and service registration."}));
+            }
         }
 
         const auto report = registry.collect();
+#if defined(PDR_HEALTH_METRICS)
+        for (const auto& component : report.components)
+        {
+            PocoDDS::Observability::MetricAttributes attributes{
+                {"component", component.component},
+                {"status", statusName(component.status)}};
+            if (!component.code.empty()) attributes.emplace("code", component.code);
+            PocoDDS::Observability::Metrics::global().addCounter(
+                "pdr.health.component.samples", 1, std::move(attributes),
+                "Health probe samples by component, status and stable fault code", "{sample}");
+        }
+#endif
         const std::string path = Poco::URI(request.getURI()).getPath();
         const bool live = path == "/health/live";
         const bool ready = path == "/health/ready";
@@ -152,14 +264,9 @@ public:
         {
             Poco::JSON::Array components;
             for (const auto& component : report.components)
-            {
-                Poco::JSON::Object item;
-                item.set("name", component.component);
-                item.set("status", statusName(component.status));
-                item.set("detail", component.detail);
-                components.add(item);
-            }
+                addReportJson(components, component);
             root.set("components", components);
+            root.set("schemaVersion", 2);
         }
         const bool acceptable = live ? report.live() : (ready ? report.ready() : true);
         response.setStatus(acceptable ? Poco::Net::HTTPResponse::HTTP_OK

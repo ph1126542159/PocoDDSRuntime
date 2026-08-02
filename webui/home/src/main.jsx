@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import {
   Activity, AppWindow, ArrowLeft, Box, Boxes, ChevronDown, ChevronRight, Clock3,
   Cpu, Download, FileText, HardDrive, Layers3, MemoryStick, Menu, Network, Play, RefreshCw, RotateCw, Search, Server,
-  Settings2, SlidersHorizontal, Square, Terminal, Trash2, X, Zap, ShieldCheck,
+  SlidersHorizontal, Square, Terminal, X, Zap, ShieldCheck, Undo2,
   AlertTriangle, CheckCircle2, Database, GitBranch
 } from "lucide-react";
 import "./styles.css";
@@ -18,20 +18,27 @@ const pageMeta = {
   devices: ["设备", "当前运行时已装载的设备适配器"],
   modules: ["组件与模块", "Bundle 提供的运行时模块"],
   bundles: ["Bundles", "OSP Bundle 生命周期管理"],
+  plugins: ["插件治理", "外部插件兼容性、依赖与生命周期"],
   logs: ["日志查询", "快速定位运行时问题"],
   metrics: ["指标中心", "按运行域查看 OpenTelemetry Counter 与 Histogram"]
 };
 
 const navItems = [
   ["overview", Activity], ["processes", AppWindow], ["services", Server], ["devices", Cpu],
-  ["modules", Layers3], ["bundles", Boxes], ["metrics", Activity], ["logs", FileText]
+  ["modules", Layers3], ["bundles", Boxes], ["plugins", Boxes], ["metrics", Activity], ["logs", FileText]
 ];
 
 async function request(path, options = {}) {
   const token = sessionStorage.getItem("pdr.webui.token") || "";
+  const method = String(options.method || "GET").toUpperCase();
+  const headers = { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  if (!["GET", "HEAD"].includes(method) && !headers["X-PDR-Request-Id"]) {
+    headers["X-PDR-Request-Id"] = globalThis.crypto?.randomUUID?.() ||
+      `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
   const response = await fetch(path, {
     ...options,
-    headers: { ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+    headers
   });
   if (response.status === 401) {
     const next = window.prompt("请输入管理令牌");
@@ -50,6 +57,18 @@ function Status({ state }) {
   const running = ["active", "running", "started", "ready"].includes(normalized);
   const failed = ["fault", "failed", "error", "down"].includes(normalized);
   return <span className={`status ${running ? "ok" : failed ? "bad" : "idle"}`}><i />{state}</span>;
+}
+
+function FailureDetail({ failure, legacy }) {
+  if (!failure && !legacy) return <span className="secondary-text">—</span>;
+  if (!failure) return <em className="legacy-error" title={legacy}>{legacy}</em>;
+  const occurred = numeric(failure.occurredAtMicroseconds);
+  return <div className={`failure-detail ${failure.active ? "active" : "resolved"}`}>
+    <code>{failure.code}</code>
+    <span>{failure.category} · {failure.retryable ? "可重试" : "不可重试"} · {failure.active ? "当前故障" : "已恢复"}</span>
+    <em title={failure.message}>{failure.message || legacy || "无错误文本"}</em>
+    {!!occurred && <small>{new Date(occurred / 1000).toLocaleString()}</small>}
+  </div>;
 }
 
 function Metric({ icon: Icon, label, value, caption, tone, onClick }) {
@@ -73,6 +92,17 @@ function validateConfigValue(key, value) {
     "osp.web.server.port": [1, 65535],
     "pdr.fastdds.domainId": [0, 232],
     "pdr.subprocess.shutdownTimeoutMilliseconds": [1, 3600000],
+    "pdr.alerts.debounceMilliseconds": [0, 604800000],
+    "pdr.alerts.escalationMilliseconds": [0, 604800000],
+    "pdr.alerts.retention": [1, 100000],
+    "pdr.alerts.deliveryQueueCapacity": [1, 100000],
+    "pdr.alerts.deliveryFailureThreshold": [1, 1000],
+    "pdr.alerts.deliveryCircuitOpenMilliseconds": [100, 3600000],
+    "pdr.alerts.history.maximumBytes": [1024, 1073741824],
+    "pdr.alerts.webhook.timeoutMilliseconds": [100, 60000],
+    "pdr.alerts.webhook.maximumAttempts": [1, 10],
+    "pdr.alerts.webhook.initialBackoffMilliseconds": [0, 60000],
+    "pdr.alerts.webhook.maximumBackoffMilliseconds": [0, 60000],
     "observability.history.retentionDays": [1, 36500],
     "pdr.modbus.port": [1, 65535],
     "pdr.modbus.unitId": [0, 247],
@@ -89,7 +119,9 @@ function validateConfigValue(key, value) {
     "pdr.can.staleAfterMilliseconds": [1, 60000],
     "pdr.gnss.baudRate": [1, 4000000]
   };
-  const rangeKey = key.replace(/^(pdr\.[^.]+)\.\d+\./, "$1.");
+  const rangeKey = key
+    .replace(/^pdr\.alerts\.webhook\.\d+\./, "pdr.alerts.webhook.")
+    .replace(/^(pdr\.[^.]+)\.\d+\./, "$1.");
   if (!ranges[rangeKey]) return "";
   if (!/^-?\d+$/.test(String(value).trim())) return "必须是整数";
   const number = Number(value);
@@ -97,7 +129,33 @@ function validateConfigValue(key, value) {
   return number < minimum || number > maximum ? `有效范围 ${minimum}–${maximum}` : "";
 }
 
-function HealthOverview({ health }) {
+function AlertSinkOverview({ inventory, metrics }) {
+  const sinks = inventory?.sinks || [];
+  const delivery = result => (metrics?.metrics || [])
+    .filter(point => point.name === "pdr.alert.delivery" && point.attributes?.result === result)
+    .reduce((total, point) => total + numeric(point.value), 0);
+  const success = delivery("success");
+  const errors = delivery("error");
+  const dropped = delivery("dropped");
+  const circuitOpen = delivery("circuit_open");
+  return <div className="alert-sink-overview">
+    <div className="alert-sink-heading"><span>投递通道</span><b>{sinks.length} 个已注册</b></div>
+    <div className="alert-sink-list">{sinks.map(sink => <span key={sink.service}
+      className={["degraded", "circuit-open"].includes(sink.status) ? "degraded" : sink.registered ? "registered" : "missing"}
+      title={sink.lastError || sink.service}>
+      <i />{sink.name}<small>{sink.type} · {sink.status || "idle"}</small>
+      <em>{numeric(sink.successes)} 成功 / {numeric(sink.failures)} 失败{numeric(sink.dropped) ? ` · 丢弃 ${numeric(sink.dropped)}` : ""}{sink.delivering || numeric(sink.queueDepth) ? ` · 投递中 ${numeric(sink.queueDepth)} 排队` : ""}{sink.circuitOpen ? ` · 熔断延迟 ${numeric(sink.circuitOpenSkips)}` : ""}</em>
+    </span>)}{!sinks.length && <em>当前未发现告警 Sink</em>}</div>
+    <div className="alert-delivery-summary">
+      <span className="ok">成功 {success}</span>
+      <span className={errors ? "bad" : "idle"}>失败 {errors}</span>
+      <span className={dropped ? "bad" : "idle"}>丢弃 {dropped}</span>
+      <span className={circuitOpen ? "bad" : "idle"}>熔断延迟 {circuitOpen}</span>
+    </div>
+  </div>;
+}
+
+function HealthOverview({ health, diagnosticEvents, alertInventory, alertHistory, alertSinks, metrics }) {
   const status = String(health?.status || "UNKNOWN").toUpperCase();
   const healthy = status === "UP";
   const components = health?.components || [];
@@ -119,13 +177,37 @@ function HealthOverview({ health }) {
     </header>
     <div className="health-grid">
       <div className="health-components">{components.map(component =>
-        <article key={component.name}><i className={String(component.status).toLowerCase()} />
-          <div><b>{component.name}</b><small>{component.detail || "无详情"}</small></div>
+        <article key={component.name} className={component.code ? "has-diagnostic" : ""}>
+          <i className={String(component.status).toLowerCase()} />
+          <div><b>{component.name}</b><small>{component.detail || "无详情"}</small>
+            {component.code && <div className="health-diagnostic">
+              <code>{component.code}</code>
+              {!!component.affected?.length && <span>影响：{component.affected.join("、")}</span>}
+              {component.remediation && <em>{component.remediation}</em>}
+            </div>}
+          </div>
           <strong>{component.status}</strong></article>)}
         {!components.length && <div className="health-loading">等待健康数据…</div>}
       </div>
-      <div className="capability-grid">{capabilities.map(([name, detail, Icon]) =>
-        <article key={name}><Icon /><div><b>{name}</b><small>{detail}</small></div><span>已接入</span></article>)}</div>
+      <div className="health-side">
+        <div className="capability-grid">{capabilities.map(([name, detail, Icon]) =>
+          <article key={name}><Icon /><div><b>{name}</b><small>{detail}</small></div><span>已接入</span></article>)}</div>
+        <div className="diagnostic-event-list"><h3>告警状态</h3>
+          <small className="alert-policy">去抖 {numeric(alertInventory?.policy?.debounceMilliseconds)} ms · 升级 {numeric(alertInventory?.policy?.escalationMilliseconds)} ms</small>
+          <AlertSinkOverview inventory={alertSinks} metrics={metrics} />
+          {(alertInventory?.alerts || []).slice(0, 4).map(alert => <article key={alert.id}>
+            <Status state={alert.status === "resolved" ? "ready" : alert.status === "pending" ? "pending" : "error"} />
+            <div><b>{alert.instance}</b><code>{alert.code}</code>
+              <small>{alert.status} · {alert.severity}{alert.silenced ? " · 已静默" : ""}{alert.suppressedByDebounce ? " · 去抖抑制" : ""} · {alert.observations} 次观察</small></div>
+          </article>)}
+          {!alertInventory?.alerts?.length && (alertHistory?.records || []).slice(0, 4).map(record => <article key={`${record.alertId}-${record.event}-${record.occurredAtMicroseconds}`}>
+            <Status state={record.status === "resolved" ? "ready" : "error"} />
+            <div><b>{record.instance}</b><code>{record.code}</code>
+              <small>历史 {record.event} · {record.severity}{record.silenced ? " · 已静默" : ""}</small></div>
+          </article>)}
+          {!alertInventory?.alerts?.length && !alertHistory?.records?.length && <small className="diagnostic-event-empty">暂无告警；已记录 {diagnosticEvents?.length || 0} 条诊断事件</small>}
+        </div>
+      </div>
     </div>
   </section>;
 }
@@ -226,7 +308,8 @@ function ProtocolSummary({ data, inventory, onLifecycle }) {
           item.desiredOpen && item.autoReconnect ? "recovering" : "down"} /></td>
         <td>{numeric(item.diagnostics?.sentMessages)} / {numeric(item.diagnostics?.receivedMessages)}</td>
         <td>{numeric(item.diagnostics?.timeouts)}</td>
-        <td>{item.diagnostics?.lastError || item.error || "—"}</td>
+        <td><FailureDetail failure={item.diagnostics?.failure}
+          legacy={item.diagnostics?.lastError || item.error} /></td>
         <td><button className="icon-button" title="重新连接"
           onClick={() => onLifecycle(item, "restart")}><RotateCw size={16} /></button></td>
       </tr>)}</tbody></table></div>}
@@ -238,6 +321,7 @@ const metricDomains = [
   { id: "dds", label: "DDS", prefixes: ["pdr.dds."] },
   { id: "device", label: "设备", prefixes: ["pdr.device."] },
   { id: "workflow", label: "工作流", prefixes: ["pdr.workflow."] },
+  { id: "health", label: "健康诊断", prefixes: ["pdr.health.", "pdr.diagnostics."] },
   { id: "protocol", label: "协议汇总", prefixes: ["pdr.protocol."] },
   { id: "mqtt", label: "MQTT", prefixes: ["pdr.protocol."], protocol: "mqtt" },
   { id: "rosbridge", label: "ROS Bridge", prefixes: ["pdr.protocol."], protocol: "rosbridge" },
@@ -768,6 +852,13 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState("");
   const [drafts, setDrafts] = useState({});
+  const [configurationControl, setConfigurationControl] = useState(null);
+  const [managementAudit, setManagementAudit] = useState([]);
+  const [managementTasks, setManagementTasks] = useState([]);
+  const [managementTaskPersistence, setManagementTaskPersistence] = useState(null);
+  const [managementIdempotency, setManagementIdempotency] = useState(null);
+  const [managementTaskScheduler, setManagementTaskScheduler] = useState(null);
+  const [identitySnapshot, setIdentitySnapshot] = useState(null);
   const [collapsedSections, setCollapsedSections] = useState({});
   const toggleSection = section => setCollapsedSections(current => ({
     ...current, [section]: !current[section]
@@ -806,6 +897,50 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
     setDrafts(detail?.configuration || {});
   }, [detail?.process?.id, revision]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!selected || !(detail?.process?.main ?? selected.main)) {
+      setConfigurationControl(null);
+      setManagementAudit([]);
+      setManagementTasks([]);
+      setManagementTaskPersistence(null);
+      setManagementIdempotency(null);
+      setManagementTaskScheduler(null);
+      setIdentitySnapshot(null);
+      return;
+    }
+    let active = true;
+    request("/api/v1/process-config")
+      .then(async data => {
+        if (!active) return;
+        setConfigurationControl(data);
+        if ((data.managementSession?.permissions || []).includes("audit.read")) {
+          try {
+            const audit = await request("/api/v1/management-audit?limit=20");
+            if (active) setManagementAudit(audit.events || []);
+          } catch { if (active) setManagementAudit([]); }
+        } else setManagementAudit([]);
+        if ((data.managementSession?.permissions || []).includes("task.read")) {
+          try {
+            const tasks = await request("/api/v1/management-tasks?limit=20");
+            if (active) {
+              setManagementTasks(tasks.tasks || []);
+              setManagementTaskPersistence(tasks.persistence || null);
+              setManagementIdempotency(tasks.idempotency || null);
+              setManagementTaskScheduler(tasks.scheduler || null);
+            }
+          } catch { if (active) { setManagementTasks([]); setManagementTaskPersistence(null); setManagementIdempotency(null); setManagementTaskScheduler(null); } }
+        } else { setManagementTasks([]); setManagementTaskPersistence(null); setManagementIdempotency(null); setManagementTaskScheduler(null); }
+        if ((data.managementSession?.permissions || []).includes("identity.manage")) {
+          try {
+            const identity = await request("/api/v1/identity");
+            if (active) setIdentitySnapshot(identity);
+          } catch { if (active) setIdentitySnapshot(null); }
+        } else setIdentitySnapshot(null);
+      })
+      .catch(() => { if (active) setConfigurationControl(null); });
+    return () => { active = false; };
+  }, [selected?.id, detail?.process?.main, revision]);
+
   const selectProcess = process => {
     setSelected(process);
     setTrail(current => {
@@ -823,14 +958,28 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
   const editable = new Set(detail?.editableConfiguration || []);
   const bundles = detail?.bundles || [];
   const children = detail?.children || [];
+  const managementPermissions = new Set(configurationControl?.managementSession?.permissions || []);
+  const canManageBundles = managementPermissions.has("bundle.manage");
+  const canManageConfiguration = managementPermissions.has("configuration.manage");
+  const canCancelTasks = managementPermissions.has("task.cancel");
+  const canManageIdentity = managementPermissions.has("identity.manage");
   const operateBundle = async (bundle, action) => {
-    const verb = action === "start" ? "启动" : action === "stop" ? "停止" : "重启";
-    if (action !== "start" && !window.confirm(`确认${verb} ${bundle.name}？`)) return;
+    const resetQuarantine = action === "reset-quarantine";
+    const verb = action === "start" ? "启动" : action === "stop" ? "停止" :
+      resetQuarantine ? "解除隔离" : "重启";
+    let confirmPersistenceRecovery = false;
+    if (resetQuarantine && bundle.quarantineRecoveryRequired) {
+      confirmPersistenceRecovery = window.confirm(
+        `隔离持久化数据不可用。确认重建隔离快照并解除 ${bundle.name} 的隔离？` +
+        "\n\n损坏快照中无法读取的其他隔离记录可能会丢失。"
+      );
+      if (!confirmPersistenceRecovery) return;
+    } else if (action !== "start" && !window.confirm(`确认${verb} ${bundle.name}？`)) return;
     setBusy(`bundle:${bundle.id}`);
     try {
       const result = await request("/api/v1/bundle-lifecycle", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: bundle.id, action })
+        body: JSON.stringify({ id: bundle.id, action, ...(confirmPersistenceRecovery ? { confirmPersistenceRecovery: true } : {}) })
       });
       onNotify?.(result.message || `${verb}完成`);
       setRevision(value => value + 1);
@@ -863,8 +1012,50 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, value: String(drafts[key] ?? "") })
       });
-      onNotify?.(result.message || "配置已立即生效");
+      const outcome = result.ownerRestarted ? "已校验、持久化并重启所属 Bundle" :
+        "已校验、持久化并应用";
+      onNotify?.(`${result.message || "配置已立即生效"}（${outcome}）`);
       setRevision(value => value + 1);
+    } catch (error) { onNotify?.(error.message, true); }
+    finally { setBusy(""); }
+  };
+  const rollbackConfiguration = async () => {
+    const rollback = configurationControl?.rollback;
+    if (!rollback || !window.confirm(`确认回退最近一次配置事务 ${rollback.key}？`)) return;
+    setBusy("config:rollback");
+    try {
+      const result = await request("/api/v1/process-config", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rollback", transactionId: rollback.transactionId })
+      });
+      onNotify?.(`${result.message}（事务 ${result.transactionId}，审计已记录）`);
+      setRevision(value => value + 1);
+    } catch (error) { onNotify?.(error.message, true); }
+    finally { setBusy(""); }
+  };
+  const cancelManagementTask = async task => {
+    if (!window.confirm(`确认${task.state === "running" ? "请求停止运行中" : "取消排队"}任务 ${task.id}？`)) return;
+    setBusy(`task:${task.id}`);
+    try {
+      const result = await request("/api/v1/management-tasks", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: task.id, action: "cancel" })
+      });
+      onNotify?.(result.message || "任务已取消");
+      setRevision(value => value + 1);
+    } catch (error) { onNotify?.(error.message, true); }
+    finally { setBusy(""); }
+  };
+  const reloadIdentity = async () => {
+    if (!window.confirm("确认已经用原子替换方式更新所有 tokenFile？成功后当前旧令牌将立即失效。")) return;
+    setBusy("identity:reload");
+    try {
+      const result = await request("/api/v1/identity", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+      });
+      setIdentitySnapshot(result);
+      sessionStorage.removeItem("pdr.webui.token");
+      onNotify?.(`身份快照已从第 ${result.generationBefore} 代切换到第 ${result.generation} 代；下次管理请求请输入新令牌。`);
     } catch (error) { onNotify?.(error.message, true); }
     finally { setBusy(""); }
   };
@@ -953,18 +1144,39 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
           <div><b>{bundle.name}</b><small>{bundle.id} · {bundle.version || "版本未知"}</small></div>
           <Status state={bundle.state} />
           <div className="bundle-lifecycle">{bundle.manageable ? <>
-            <button disabled={busy || String(bundle.state).toLowerCase() === "active"}
+            <button disabled={busy || !canManageBundles || bundle.quarantined || String(bundle.state).toLowerCase() === "active"}
               onClick={() => operateBundle(bundle, "start")}><Play size={23} />启动</button>
-            <button disabled={busy || String(bundle.state).toLowerCase() !== "active"}
+            <button disabled={busy || !canManageBundles || String(bundle.state).toLowerCase() !== "active"}
               onClick={() => operateBundle(bundle, "stop")}><Square size={22} />停止</button>
-            <button disabled={busy || String(bundle.state).toLowerCase() !== "active"}
+            <button disabled={busy || !canManageBundles || bundle.quarantined || String(bundle.state).toLowerCase() !== "active"}
               onClick={() => operateBundle(bundle, "restart")}><RotateCw size={22} />重启</button>
+            {bundle.quarantined && <button disabled={busy || !canManageBundles}
+              title={bundle.quarantineLastError || "清除失败预算并允许再次启动"}
+              onClick={() => operateBundle(bundle, "reset-quarantine")}><Undo2 size={22} />解除隔离</button>}
           </> : <span className="protected-bundle">核心组件 · 只读</span>}</div>
+          {bundle.plugin && <small className={bundle.quarantined ? "plugin-incompatible" : "plugin-ready"}>
+            {bundle.quarantined ? "已隔离" : "故障预算正常"} · 连续失败 {bundle.quarantineConsecutiveFailures || 0}/
+            {bundle.quarantineFailureThreshold || 0} · 累计 {bundle.quarantineTotalFailures || 0}
+            {!bundle.quarantinePersistenceHealthy && " · 持久化异常"}
+          </small>}
         </div>)}{!bundles.length && <div className="workbench-empty">当前进程没有 Bundle 数据</div>}</div>}
         </section>
         <section className="surface process-config-card">
         <div className="section-head"><div><h2>当前进程配置信息</h2><p>敏感字段已自动隐藏</p></div>
-          <div className="section-head-actions"><span className="inventory-count">{configEntries.length} 项</span>
+          <div className="section-head-actions">
+            {configurationControl && <span title={(configurationControl.managementSession?.permissions || []).join(", ")}
+              className={`management-auth ${!configurationControl.managementAuthenticationRequired || configurationControl.managementSession?.authenticated ? "enabled" : "disabled"}`}>
+              <ShieldCheck size={21} />{configurationControl.managementAuthenticationRequired ?
+                (configurationControl.managementSession?.authenticated ?
+                  `管理身份：${configurationControl.managementSession.principal}` : "管理身份未认证") :
+                "开发模式未认证"}
+            </span>}
+            {configurationControl?.rollback && <button className="config-rollback"
+              disabled={busy || !canManageConfiguration} onClick={rollbackConfiguration}
+              title={`回退事务 ${configurationControl.rollback.transactionId}`}>
+              <Undo2 size={22} />回退 {configurationControl.rollback.key}
+            </button>}
+            <span className="inventory-count">{configEntries.length} 项</span>
             <button className={`section-collapse ${collapsedSections.configuration ? "collapsed" : ""}`}
               onClick={() => toggleSection("configuration")} aria-expanded={!collapsedSections.configuration}
               title={collapsedSections.configuration ? "展开配置信息" : "折叠配置信息"}>
@@ -979,11 +1191,52 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
               onChange={event => setDrafts(current => ({ ...current, [key]: event.target.value }))} />
             {validateConfigValue(key, drafts[key] ?? value) &&
               <small className="config-validation">{validateConfigValue(key, drafts[key] ?? value)}</small>}
-            <button disabled={busy || String(drafts[key] ?? value) === String(value) ||
+            <button disabled={busy || !canManageConfiguration || String(drafts[key] ?? value) === String(value) ||
                 Boolean(validateConfigValue(key, drafts[key] ?? value))}
               onClick={() => applyConfiguration(key)}><Zap size={21} />立即生效</button>
           </div> : <span className="readonly-config">只读</span>}
         </div>)}{!configEntries.length && <div className="workbench-empty">当前进程没有可读取的配置</div>}</div>}
+        {!collapsedSections.configuration && configurationControl?.transactions?.length > 0 &&
+          <div className="config-transactions"><h3>最近配置事务</h3>
+            {configurationControl.transactions.slice(0, 5).map(item => <div key={item.transactionId}>
+              <code>{item.transactionId}</code><b>{item.key || "请求未解析"}</b>
+              <span>{item.action} · {item.status}</span>
+            </div>)}</div>}
+        {!collapsedSections.configuration && identitySnapshot &&
+          <div className="identity-snapshot"><div><ShieldCheck size={25} />
+            <span><b>管理身份快照</b><small>第 {identitySnapshot.generation} 代 · {identitySnapshot.principalCount} 个身份 ·
+              {identitySnapshot.required ? " 强制认证" : " 开发模式"} · 文件 {identitySnapshot.fileBackedPrincipalCount || 0} / 环境 {identitySnapshot.environmentBackedPrincipalCount || 0}
+              {identitySnapshot.insecureFileCount > 0 ? ` · ${identitySnapshot.insecureFileCount} 个文件 ACL 过宽` :
+                !identitySnapshot.filePermissionChecksComplete ? " · 文件权限未能完整核验" : " · 文件权限已核验"}</small></span></div>
+            <button disabled={busy || !canManageIdentity} onClick={reloadIdentity}>
+              <RefreshCw size={20} />{busy === "identity:reload" ? "正在重载" : "重载文件令牌"}
+            </button></div>}
+        {!collapsedSections.configuration && managementAudit.length > 0 &&
+          <div className="config-transactions"><h3>最近管理操作审计</h3>
+            {managementAudit.slice(0, 10).map(item => <div key={item.eventId}>
+              <code>{item.principal || "未认证"}</code><b>{item.operation} · {item.target || "—"}</b>
+              <span>{item.action || "—"} · {item.status} · HTTP {item.httpStatus} · {item.durationMicroseconds} μs</span>
+            </div>)}</div>}
+        {!collapsedSections.configuration && (managementTasks.length > 0 || managementTaskScheduler) &&
+          <div className="config-transactions"><h3>异步管理任务
+            {managementTaskPersistence && <small> · 任务快照 v{managementTaskPersistence.schemaVersion || 1}/{managementTaskPersistence.integrityAlgorithm || "无校验"} {managementTaskPersistence.healthy ? "正常" : managementTaskPersistence.recoveryRequired ? "异常，需运维恢复" : "异常"}{managementTaskPersistence.previousAvailable ? " · 上一版可用" : ""}</small>}
+            {managementIdempotency && <small> · 幂等账本 v{managementIdempotency.schemaVersion || 1}/{managementIdempotency.integrityAlgorithm || "无校验"} {managementIdempotency.healthy ? "正常" : managementIdempotency.recoveryRequired ? "异常，需运维恢复" : "异常"}{managementIdempotency.previousAvailable ? " · 上一版可用" : ""}（{managementIdempotency.completed} 完成 / {managementIdempotency.interrupted} 待核对）</small>}
+            {managementTaskScheduler && <small> · {managementTaskScheduler.running}/{managementTaskScheduler.workerCount} worker · 排队 {managementTaskScheduler.queued} · 等锁 {managementTaskScheduler.waitingResource}{managementTaskScheduler.degraded ? " · 调度降级" : ""}</small>}
+          </h3>
+            {(managementTaskPersistence?.recoveryRequired || managementIdempotency?.recoveryRequired) &&
+              <p className="persistence-recovery-guidance"><AlertTriangle /> 当前持久化文件需要人工恢复：
+                停止 Runtime，使用 <code>pdr persistence inspect</code> 校验当前文件和上一版，
+                核对真实目标状态后再执行带哈希保护的 <code>pdr persistence recover</code>。
+                Web 不会自动回退幂等账本。</p>}
+            {managementTasks.slice(0, 10).map(item => <div key={item.id}>
+              <code>{item.state}</code><b>{item.operation} · {item.target}</b>
+               <span>{item.action} · {item.principal} · {item.phase || "—"}{item.phase === "waiting-resource" ?
+                 ` · 等待 ${item.resourceKey}${item.blockingTaskId ? `（占用任务 ${item.blockingTaskId}）` : ""}` : ""}{item.state === "interrupted" ?
+                 " · 需核对目标真实状态后重新提交" : item.phase === "cancellation-requested" ?
+                 " · 等待底层操作到达协作取消点" : ""}</span>
+               {["queued", "running"].includes(item.state) && canCancelTasks && <button disabled={busy}
+                 onClick={() => cancelManagementTask(item)}>{item.state === "running" ? "请求停止" : "取消"}</button>}
+            </div>)}</div>}
         </section>
       </div>
     </div>
@@ -991,20 +1244,20 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
   </div>;
 }
 
-function EntityActions({ item, onConfig, onLife }) {
+function EntityActions({ item, onLife }) {
+  if (item.kind !== "bundle" || !item.manageable) return <span className="readonly-config">只读</span>;
   const canStart = item.kind === "bundle" && item.state !== "active";
   return <div className="entity-actions">
-    <button className="icon-button" title="配置" onClick={() => onConfig(item)}><Settings2 size={16} /></button>
-    <button className="icon-button" title={canStart ? "启动" : "重启"}
+    <button className="icon-button" disabled={item.quarantined} title={item.quarantined ? "插件已隔离" : canStart ? "启动" : "重启"}
       onClick={() => onLife(item, canStart ? "start" : "restart")}>
       {canStart ? <Play size={16} /> : <RotateCw size={16} />}
     </button>
-    {item.kind !== "process" &&
-      <button className="icon-button danger" title="卸载" onClick={() => onLife(item, "uninstall")}><Trash2 size={16} /></button>}
+    {item.quarantined && <button className="icon-button" title="解除隔离"
+      onClick={() => onLife(item, "reset-quarantine")}><Undo2 size={16} /></button>}
   </div>;
 }
 
-function EntityTable({ items, onConfig, onLife, searchable = true }) {
+function EntityTable({ items, onLife, searchable = true }) {
   const [filter, setFilter] = useState("");
   const filtered = items.filter(item =>
     `${item.name} ${item.id} ${item.owner || ""}`.toLowerCase().includes(filter.toLowerCase()));
@@ -1019,8 +1272,16 @@ function EntityTable({ items, onConfig, onLife, searchable = true }) {
           <td><div className="entity-name"><span className={`entity-glyph ${item.kind}`}><Box size={17} /></span>
             <div><b>{item.name}</b><small>{item.id}</small></div></div></td>
           <td><Status state={item.state} /></td>
-          <td className="secondary-text">{item.owner || item.version || item.type || "—"}</td>
-          <td><EntityActions item={item} onConfig={onConfig} onLife={onLife} /></td>
+          <td className="secondary-text">{item.owner || item.version || item.type || "—"}
+            {item.plugin && <small className={item.compatible ? "plugin-ready" : "plugin-incompatible"}>
+              {item.governanceStatus} · {(item.dependencies || []).length} 个依赖
+            </small>}
+            {item.plugin && <small title={(item.compatibilityIssues || []).join("；")}>
+              API {item.pluginApiVersion || "缺失"} · ABI {item.pluginAbiVersion || "缺失"}
+              {(item.compatibilityIssues || []).length > 0 &&
+                ` · ${(item.compatibilityIssues || []).join("；")}`}
+            </small>}</td>
+          <td><EntityActions item={item} onLife={onLife} /></td>
         </tr>)}</tbody>
       </table>
       {!filtered.length && <div className="empty"><Boxes size={26} /><p>没有匹配的项目</p></div>}
@@ -1048,68 +1309,12 @@ function DeviceInventory({ inventory }) {
         <td>{device.diagnostics ? <div className="device-diagnostics">
           <b>{numeric(device.diagnostics.successfulOperations)} 成功 / {numeric(device.diagnostics.failedOperations)} 失败</b>
           <small>重连 {numeric(device.diagnostics.reconnectAttempts)} · 连续失败 {numeric(device.diagnostics.consecutiveFailures)}</small>
-          {device.diagnostics.lastError && <em title={device.diagnostics.lastError}>{device.diagnostics.lastError}</em>}
+          <FailureDetail failure={device.diagnostics.failure} legacy={device.diagnostics.lastError} />
         </div> : <span className="secondary-text">未提供</span>}</td>
         <td className="secondary-text">{device.bundle || "—"}</td>
       </tr>)}</tbody></table>
       {!devices.length && <div className="empty"><Cpu size={26} /><p>没有匹配的活跃设备</p></div>}</div>
   </section>;
-}
-
-function ConfigModal({ target, onClose, onDone }) {
-  const [rows, setRows] = useState([]);
-  const [restart, setRestart] = useState(true);
-  const [saving, setSaving] = useState(false);
-  useEffect(() => {
-    if (!target) return;
-    request(`/api/v1/config?kind=${encodeURIComponent(target.kind)}&id=${encodeURIComponent(target.id)}`)
-      .then(data => setRows(Object.entries(data.values || {}).map(([key, value]) => ({ key, value }))))
-      .catch(error => onDone(error.message, true));
-  }, [target, onDone]);
-  if (!target) return null;
-  const update = (index, field, value) => setRows(current =>
-    current.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row));
-  const save = async () => {
-    const invalid = rows.find(row => row.key.trim() &&
-      validateConfigValue(row.key.trim(), row.value));
-    if (invalid) {
-      onDone(`${invalid.key}：${validateConfigValue(invalid.key.trim(), invalid.value)}`, true);
-      return;
-    }
-    setSaving(true);
-    try {
-      const changes = Object.fromEntries(rows.filter(row => row.key.trim()).map(row => [row.key.trim(), row.value]));
-      const data = await request("/api/v1/config", {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: target.kind, id: target.id, changes, restart })
-      });
-      onDone(data.message || "配置已应用");
-      onClose();
-    } catch (error) { onDone(error.message, true); }
-    finally { setSaving(false); }
-  };
-  return <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-    <div className="modal">
-      <header><div><span>运行时配置</span><h2>{target.name}</h2><p>{target.kind} · {target.id}</p></div>
-        <button className="close" onClick={onClose}><X size={20} /></button></header>
-      <div className="config-list">
-        {rows.map((row, index) => <div className="config-row" key={index}>
-          <input value={row.key} placeholder="配置键" onChange={event => update(index, "key", event.target.value)} />
-          <input value={row.value} placeholder="配置值"
-            className={validateConfigValue(row.key.trim(), row.value) ? "invalid" : ""}
-            title={validateConfigValue(row.key.trim(), row.value)}
-            onChange={event => update(index, "value", event.target.value)} />
-          <button onClick={() => setRows(current => current.filter((_, i) => i !== index))}><X size={16} /></button>
-        </div>)}
-        {!rows.length && <div className="modal-empty">暂无配置项，可在下方添加</div>}
-      </div>
-      <button className="add-config" onClick={() => setRows(current => [...current, { key: "", value: "" }])}>＋ 添加配置项</button>
-      <label className="toggle-row"><input type="checkbox" checked={restart} onChange={event => setRestart(event.target.checked)} />
-        <span><b>应用后重启所属 Bundle</b><small>让 Bundle Activator 重新读取配置</small></span></label>
-      <footer><button className="ghost" onClick={onClose}>取消</button><button className="primary" disabled={saving} onClick={save}>
-        <Zap size={16} />{saving ? "应用中…" : "立即应用"}</button></footer>
-    </div>
-  </div>;
 }
 
 function Logs() {
@@ -1148,24 +1353,42 @@ function App() {
   const [businessMetrics, setBusinessMetrics] = useState({ metrics: [] });
   const [deviceInventory, setDeviceInventory] = useState({ count: 0, devices: [] });
   const [protocolInventory, setProtocolInventory] = useState({ count: 0, protocols: [] });
+  const [diagnosticEvents, setDiagnosticEvents] = useState([]);
+  const [alertInventory, setAlertInventory] = useState({ count: 0, policy: {}, alerts: [] });
+  const [alertHistory, setAlertHistory] = useState({ count: 0, records: [] });
+  const [alertSinks, setAlertSinks] = useState({ count: 0, sinks: [] });
   const [updated, setUpdated] = useState(null);
-  const [configTarget, setConfigTarget] = useState(null);
   const [toast, setToast] = useState(null);
   const refresh = useCallback(async () => {
-    const [data, monitoring, healthDetail, metricData, devices, protocols] = await Promise.all([
+    const [data, mainDetail, monitoring, healthDetail, metricData, devices, protocols, diagnostics, alerts, history, sinks] = await Promise.all([
       request("/api/v1/topology"),
+      request("/api/v1/process-detail").catch(() => null),
       request("/api/v1/system-metrics").catch(() => ({ samples: [] })),
       request("/health/detail").catch(() => null),
       request("/api/v1/metrics").catch(() => ({ metrics: [] })),
       request("/api/v1/devices").catch(() => ({ count: 0, devices: [] })),
-      request("/api/v1/protocols").catch(() => ({ count: 0, protocols: [] }))
+      request("/api/v1/protocols").catch(() => ({ count: 0, protocols: [] })),
+      request("/api/v1/diagnostic-events").catch(() => ({ count: 0, events: [] })),
+      request("/api/v1/alerts").catch(() => ({ count: 0, policy: {}, alerts: [] })),
+      request("/api/v1/alert-history?limit=20").catch(() => ({ count: 0, records: [] })),
+      request("/api/v1/alert-sinks").catch(() => ({ count: 0, sinks: [] }))
     ]);
     setDeviceInventory(devices);
     setProtocolInventory(protocols);
+    setDiagnosticEvents(diagnostics.events || []);
+    setAlertInventory(alerts);
+    setAlertHistory(history);
+    setAlertSinks(sinks);
     setBusinessMetrics(metricData);
     if (healthDetail) setHealth(healthDetail);
     const samples = monitoring.samples || [];
     const monitoredResources = monitoring.current || {};
+    if (mainDetail?.bundles) {
+      const management = new Map(mainDetail.bundles.map(bundle => [bundle.id, bundle]));
+      data.bundles = (data.bundles || []).map(bundle => ({
+        ...bundle, ...(management.get(bundle.id) || {})
+      }));
+    }
     if (Object.keys(monitoredResources).length)
       data.resources = { ...(data.resources || {}), ...monitoredResources };
     setTopology(data);
@@ -1193,10 +1416,10 @@ function App() {
     setToast({ message, error }); setTimeout(() => setToast(null), 2800);
   }, []);
   const life = async (item, action) => {
-    if (["restart", "uninstall"].includes(action) && !window.confirm(`确认${action === "restart" ? "重启" : "卸载"} ${item.name}？`)) return;
+    if (action === "restart" && !window.confirm(`确认重启 ${item.name}？`)) return;
     try {
-      const data = await request("/api/v1/lifecycle", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: item.kind, id: item.id, action }) });
+      const data = await request("/api/v1/bundle-lifecycle", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, action }) });
       notify(data.message || "操作已完成"); setTimeout(refresh, 400);
     } catch (error) { notify(error.message, true); }
   };
@@ -1220,7 +1443,8 @@ function App() {
     ...topology.processes.filter(item => String(item.name).toLowerCase() !== "conhost.exe")
   ];
   const currentItems = page === "processes" ? processItems : page === "services" ? topology.services :
-    page === "modules" ? topology.modules : topology.bundles;
+    page === "modules" ? topology.modules : page === "plugins" ?
+      topology.bundles.filter(item => item.plugin || String(item.id).startsWith("pdr.plugin.")) : topology.bundles;
 
   return <div className="app-shell">
     <aside className={menuOpen ? "open" : ""}>
@@ -1239,20 +1463,19 @@ function App() {
           <button className="refresh" onClick={() => refresh().catch(error => notify(error.message, true))}><RefreshCw size={17} />刷新</button></div>
       </header>
       <div className="content">
-        {page === "overview" && <><HealthOverview health={health} />
+        {page === "overview" && <><HealthOverview health={health} diagnosticEvents={diagnosticEvents} alertInventory={alertInventory} alertHistory={alertHistory} alertSinks={alertSinks} metrics={businessMetrics} />
           <BusinessMetrics data={businessMetrics} />
           <ProtocolSummary data={businessMetrics} inventory={protocolInventory} onLifecycle={protocolLife} />
           <ProcessWorkbench mainProcess={topology.mainProcess} onNotify={notify} /></>}
         {page === "processes" && <ProcessWorkspace items={processItems} />}
         {page === "devices" && <DeviceInventory inventory={deviceInventory} />}
-        {["services", "modules", "bundles"].includes(page) &&
-          <EntityTable items={currentItems} onConfig={setConfigTarget} onLife={life} />}
+        {["services", "modules", "bundles", "plugins"].includes(page) &&
+          <EntityTable items={currentItems} onLife={life} />}
         {page === "metrics" && <MetricsCenter data={businessMetrics} />}
         {page === "logs" && <Logs />}
       </div>
     </main>
     {menuOpen && <button className="mobile-overlay" onClick={() => setMenuOpen(false)} />}
-    <ConfigModal target={configTarget} onClose={() => setConfigTarget(null)} onDone={notify} />
     {toast && <div className={`toast ${toast.error ? "error" : ""}`}>{toast.error ? <X size={17} /> : <Zap size={17} />}{toast.message}</div>}
   </div>;
 }

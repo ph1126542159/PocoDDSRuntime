@@ -13,6 +13,8 @@ int main()
 {
     PocoDDS::Application::CommandContext context;
     if (context.expired()) return 1;
+    PocoDDS::Security::PrincipalStore emptyIdentityStore;
+    if (emptyIdentityStore.required() || emptyIdentityStore.size() != 0) return 4;
 #ifdef PDR_SDK_CONSUMER_PROTOCOLS
     PocoDDS::Protocols::WebTunnel::LocalForwarder::Options options;
     options.remoteUri = "ws://127.0.0.1:65535/tunnel";

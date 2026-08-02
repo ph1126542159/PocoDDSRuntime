@@ -117,7 +117,7 @@ bool XBeeAnalogSensor::ingest(const PocoDDS::Protocols::XBee::IoSample& sample)
         ++_diagnostics.successfulOperations;
         _diagnostics.consecutiveFailures = 0;
         _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
-        _diagnostics.lastError.clear();
+        resolveFailure(_diagnostics, _failure);
         current = {_options.id, _type, _state, _sequence,
                    Poco::Timestamp().epochMicroseconds(),
                    Poco::NumberFormatter::format(_value, 3)};
@@ -236,7 +236,8 @@ void XBeeAnalogSensor::markFailure(const std::string& message, DeviceState state
     ++_diagnostics.failedOperations;
     ++_diagnostics.consecutiveFailures;
     _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
-    _diagnostics.lastError = message;
+    recordFailure(_diagnostics, _failure, "PDR-DEVICE-XBEE-OPERATION_FAILED",
+                  Reliability::FailureKind::transient, true, message);
 }
 
 void XBeeAnalogSensor::checkStale()
@@ -272,6 +273,12 @@ DeviceDiagnostics XBeeAnalogSensor::diagnostics() const
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     return _diagnostics;
+}
+
+PocoDDS::Reliability::Failure XBeeAnalogSensor::failure() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _failure;
 }
 
 } // namespace PocoDDS::Devices

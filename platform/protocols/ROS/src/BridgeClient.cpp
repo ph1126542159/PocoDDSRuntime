@@ -133,13 +133,14 @@ void BridgeClient::connect()
         _receiveBuffer.clear();
         _receivingTextFragments = false;
         ++_diagnostics.successfulOperations;
-        _diagnostics.lastError.clear();
+        resolveFailure(_diagnostics, _failure);
         metric.success();
     }
     catch (const std::exception& error)
     {
         ++_diagnostics.failedOperations;
-        _diagnostics.lastError = error.what();
+        recordFailure(_diagnostics, _failure, "PDR-PROTOCOL-ROS-CONNECT_FAILED",
+                      Reliability::FailureKind::transient, true, error.what());
         throw;
     }
 }
@@ -256,7 +257,9 @@ Poco::JSON::Object::Ptr BridgeClient::receiveMessage(const Poco::Timespan& timeo
                 _receiveBuffer.clear();
                 _receivingTextFragments = false;
                 ++_diagnostics.failedOperations;
-                _diagnostics.lastError = "ROS bridge closed the WebSocket";
+                recordFailure(_diagnostics, _failure, "PDR-PROTOCOL-ROS-PEER_CLOSED",
+                              Reliability::FailureKind::transient, true,
+                              "ROS bridge closed the WebSocket");
                 metric.failure();
                 return {};
             }
@@ -309,7 +312,8 @@ Poco::JSON::Object::Ptr BridgeClient::receiveMessage(const Poco::Timespan& timeo
     {
         std::lock_guard lock(_mutex);
         ++_diagnostics.failedOperations;
-        _diagnostics.lastError = error.what();
+        recordFailure(_diagnostics, _failure, "PDR-PROTOCOL-ROS-RECEIVE_FAILED",
+                      Reliability::FailureKind::transient, true, error.what());
         throw;
     }
 
@@ -331,7 +335,7 @@ Poco::JSON::Object::Ptr BridgeClient::receiveMessage(const Poco::Timespan& timeo
             ++_diagnostics.successfulOperations;
             ++_diagnostics.receivedMessages;
             _diagnostics.receivedBytes += text.size();
-            _diagnostics.lastError.clear();
+            resolveFailure(_diagnostics, _failure);
         }
         metric.success();
         return object;
@@ -340,7 +344,8 @@ Poco::JSON::Object::Ptr BridgeClient::receiveMessage(const Poco::Timespan& timeo
     {
         std::lock_guard lock(_mutex);
         ++_diagnostics.failedOperations;
-        _diagnostics.lastError = error.what();
+        recordFailure(_diagnostics, _failure, "PDR-PROTOCOL-ROS-PAYLOAD_INVALID",
+                      Reliability::FailureKind::permanent, false, error.what());
         throw;
     }
 }
@@ -355,6 +360,12 @@ ProtocolDiagnostics BridgeClient::diagnostics() const
 {
     std::lock_guard lock(_mutex);
     return _diagnostics;
+}
+
+PocoDDS::Reliability::Failure BridgeClient::failure() const
+{
+    std::lock_guard lock(_mutex);
+    return _failure;
 }
 
 std::string BridgeClient::makeSubscribeRequest(
@@ -395,13 +406,14 @@ void BridgeClient::sendText(const std::string& payload)
         ++_diagnostics.successfulOperations;
         ++_diagnostics.sentMessages;
         _diagnostics.sentBytes += payload.size();
-        _diagnostics.lastError.clear();
+        resolveFailure(_diagnostics, _failure);
         metric.success();
     }
     catch (const std::exception& error)
     {
         ++_diagnostics.failedOperations;
-        _diagnostics.lastError = error.what();
+        recordFailure(_diagnostics, _failure, "PDR-PROTOCOL-ROS-SEND_FAILED",
+                      Reliability::FailureKind::transient, true, error.what());
         throw;
     }
 }

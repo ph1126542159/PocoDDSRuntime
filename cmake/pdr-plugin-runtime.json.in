@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "runtimeVersion": "@PROJECT_VERSION@",
+  "pluginApiVersion": "@PDR_PLUGIN_API_VERSION@",
+  "pluginAbiVersion": "@PDR_PLUGIN_ABI_VERSION@",
+  "abiFingerprint": "@PDR_PLUGIN_ABI_FINGERPRINT@",
+  "targetOs": "@MYIOT_PLATFORM_OSNAME@",
+  "targetArch": "@MYIOT_PLATFORM_OSARCH@",
+  "compilerId": "@CMAKE_CXX_COMPILER_ID@",
+  "compilerMajor": "@PDR_PLUGIN_COMPILER_MAJOR@"
+}

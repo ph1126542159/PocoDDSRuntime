@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "product": "PocoDDSRuntimePlugin",
+  "policyId": "plugin-publishers-2026-q3",
+  "allowedPublishers": [
+    {
+      "publisherId": "example-integrator",
+      "keyId": "example-integrator-2026-q3",
+      "algorithm": "Ed25519",
+      "publicKeySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "pluginPatterns": ["pdr.plugin.example-integrator.*"],
+      "notBefore": "2026-07-01T00:00:00Z",
+      "notAfter": "2026-10-01T00:00:00Z"
+    }
+  ],
+  "revokedKeys": []
+}

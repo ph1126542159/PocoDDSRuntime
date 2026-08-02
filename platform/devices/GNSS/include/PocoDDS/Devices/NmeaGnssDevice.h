@@ -22,7 +22,8 @@ struct GnssRecoveryPolicy
     std::chrono::milliseconds staleAfter{5000};
 };
 
-class NmeaGnssDevice final : public GNSSSensor, public DiagnosticDevice
+class NmeaGnssDevice final : public GNSSSensor, public DiagnosticDevice,
+                             public FailureDiagnosticDevice
 {
 public:
     NmeaGnssDevice(std::string id, std::string port, int baudRate = 9600,
@@ -46,6 +47,7 @@ public:
     bool hasFix() const override;
     void setPositionHandler(PositionHandler handler) override;
     DeviceDiagnostics diagnostics() const override;
+    PocoDDS::Reliability::Failure failure() const override;
 
     bool ingestSentence(const std::string& sentence);
 
@@ -72,6 +74,7 @@ private:
     std::chrono::steady_clock::time_point _lastFix;
     std::uint64_t _sequence{0};
     DeviceDiagnostics _diagnostics;
+    PocoDDS::Reliability::Failure _failure;
     SnapshotHandler _snapshotHandler;
     PositionHandler _positionHandler;
 };

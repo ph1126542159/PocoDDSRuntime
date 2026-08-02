@@ -32,11 +32,25 @@ Set-Location build/bin/processes/pdr-launcher
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
 | `relaunchDelay` | `1000` | 异常退出后重新启动等待时间，毫秒 |
+| `restartBudget.maxRestarts` | `5` | 滑动时间窗内允许的重启次数；`0` 表示不重启 |
+| `restartBudget.windowMilliseconds` | `60000` | 重启预算滑动时间窗，毫秒 |
+| `childArgument.count` | `0` | 追加给被监督程序的参数数量 |
+| `childArgument.N` | 无 | 第 N 个参数，按原值传递，不经 shell 解释 |
+| `resourceLimits.killProcessTreeOnExit` | `true` | Windows Job 关闭时终止全部后代进程 |
+| `resourceLimits.memoryBytes` | `0` | 单个宿主进程内存硬上限；0 不限制 |
+| `resourceLimits.activeProcessLimit` | `0` | Job 内活动进程上限；0 不限制 |
+| `resourceLimits.cpuRatePercent` | `0` | Windows CPU hard cap，1..100；0 不限制 |
+| `resourceLimits.linuxCgroupPath` | 空 | Linux 已创建并授权的 cgroup v2 绝对目录 |
 | `watchdog.file` | 空 | 心跳文件路径；空表示不启用心跳监视 |
 | `watchdog.timeout` | `600000` | 心跳超时，毫秒 |
 | `watchdog.interval` | `60000` | 心跳检查周期，毫秒 |
+| `watchdog.startupGraceMilliseconds` | `600000` | 每次启动后等待首个有效心跳的宽限期 |
+| `watchdog.requireFile` | `false` | 为 `true` 时，宽限期后心跳文件缺失也判定不健康 |
 | `osp.bundleMonitor.enabled` | `true` | launcher 自身 OSP Bundle 监视开关 |
 | `osp.bundleRepository` | `${application.dir}bundles/` | launcher 自己的 Bundle 仓库 |
+
+预算耗尽后 launcher 不再制造崩溃重启风暴，而是记录 critical 日志并以非零状态退出，由上一级服务
+管理器告警或按更长退避策略处置。心跳超时导致的强制终止也计入同一预算。
 
 ## 启动示例
 

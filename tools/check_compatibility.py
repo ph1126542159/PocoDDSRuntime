@@ -115,17 +115,33 @@ def current_surface(root: Path) -> dict[str, Any]:
     openapi = (root / "contracts/openapi/runtime.yaml").read_text(encoding="utf-8")
     asyncapi = (root / "contracts/asyncapi/runtime.yaml").read_text(encoding="utf-8")
     schema = json.loads((root / "contracts/schemas/runtime-config.schema.json").read_text(encoding="utf-8"))
+    cmake_text = (root / "CMakeLists.txt").read_text(encoding="utf-8")
+    def cmake_value(name: str) -> str:
+        match = re.search(rf'set\({re.escape(name)}\s+"([^"]+)"\)', cmake_text)
+        if not match:
+            raise ValueError(f"missing compatibility variable: {name}")
+        return match.group(1)
+
     return {
         "runtimeVersion": re.search(
             r"project\(PocoDDSRuntime VERSION ([0-9.]+)",
-            (root / "CMakeLists.txt").read_text(encoding="utf-8"),
+            cmake_text,
         ).group(1),
+        "pluginContract": {
+            "apiVersion": cmake_value("PDR_PLUGIN_API_VERSION"),
+            "abiVersion": cmake_value("PDR_PLUGIN_ABI_VERSION"),
+            "manifestHeaders": [
+                "PDR-Plugin-API", "PDR-Plugin-ABI",
+                "PDR-Plugin-ABI-Fingerprint", "PDR-Runtime-Version",
+            ],
+        },
         "cmakeTargets": [
             "PocoDDS::Application",
             "PocoDDS::Configuration",
             "PocoDDS::DeviceCore",
             "PocoDDS::Health",
             "PocoDDS::Persistence",
+            "PocoDDS::Plugins",
             "PocoDDS::Reliability",
             "PocoDDS::SDK",
             "PocoDDS::Protocols",
@@ -179,6 +195,19 @@ def compare(baseline: dict[str, Any], current: dict[str, Any]) -> list[str]:
     baseline_version = version_tuple(baseline["runtimeVersion"])
     current_version = version_tuple(current["runtimeVersion"])
     breaking: list[str] = []
+
+    old_plugin = baseline.get("pluginContract")
+    new_plugin = current.get("pluginContract")
+    if old_plugin:
+        if not new_plugin:
+            breaking.append("removed plugin compatibility contract")
+        else:
+            for field in ("apiVersion", "abiVersion"):
+                if old_plugin.get(field) != new_plugin.get(field):
+                    breaking.append(f"changed plugin contract {field}")
+            for header in old_plugin.get("manifestHeaders", []):
+                if header not in new_plugin.get("manifestHeaders", []):
+                    breaking.append(f"removed plugin manifest header: {header}")
 
     for target in baseline["cmakeTargets"]:
         if target not in current["cmakeTargets"]:

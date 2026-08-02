@@ -1,6 +1,11 @@
 {
   "runtimeVersion": "0.1.0",
-  "cmakeTargets": ["PocoDDS::Application", "PocoDDS::Configuration", "PocoDDS::DeviceCore", "PocoDDS::Health", "PocoDDS::Persistence", "PocoDDS::Reliability", "PocoDDS::SDK"],
+  "pluginContract": {
+    "apiVersion": "1.0.0",
+    "abiVersion": "1.0.0",
+    "manifestHeaders": ["PDR-Plugin-API", "PDR-Plugin-ABI", "PDR-Plugin-ABI-Fingerprint", "PDR-Runtime-Version"]
+  },
+  "cmakeTargets": ["PocoDDS::Application", "PocoDDS::Configuration", "PocoDDS::DeviceCore", "PocoDDS::Health", "PocoDDS::Persistence", "PocoDDS::Plugins", "PocoDDS::Reliability", "PocoDDS::SDK"],
   "publicHeaders": {
     "application/include/PocoDDS/Application/Application.h": ["CommandContext", "Error", "IWorkflow", "Result", "SequentialWorkflow", "WorkflowEvent", "WorkflowRegistry", "WorkflowState", "WorkflowStep"],
     "platform/configuration/include/PocoDDS/Configuration/ConfigurationValidator.h": ["AbstractConfiguration", "ConfigurationValidator", "ValidationIssue"],

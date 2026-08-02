@@ -1,0 +1,22 @@
+# Layer this file after pdr-runtime.properties and replace every example path.
+# Secret files must already exist and be restricted before production validation.
+security.profile = production
+pdr.management.authentication.required = true
+pdr.management.authentication.tokenEnvironment =
+pdr.management.authentication.tokenFile =
+pdr.management.authentication.principals.count = 2
+
+pdr.management.authentication.principals.0.id = operator
+pdr.management.authentication.principals.0.tokenEnvironment =
+pdr.management.authentication.principals.0.tokenFile = D:/PocoDDSRuntime/secrets/operator.token
+pdr.management.authentication.principals.0.permissions = protocol.manage,process.manage,bundle.manage,task.read,task.cancel
+
+pdr.management.authentication.principals.1.id = security-admin
+pdr.management.authentication.principals.1.tokenEnvironment =
+pdr.management.authentication.principals.1.tokenFile = D:/PocoDDSRuntime/secrets/security-admin.token
+pdr.management.authentication.principals.1.permissions = identity.manage,configuration.manage,audit.read,task.read
+
+pdr.management.idempotency.requireRequestId = true
+auth.simple.enable = false
+osp.web.authServiceName = pdr.auth.management
+osp.web.tokenValidatorName = pdr.auth.management.tokens

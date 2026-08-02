@@ -11,6 +11,7 @@ target_include_directories(PDRProtocolMQTT
 target_compile_definitions(PDRProtocolMQTT PRIVATE PAHO_MQTT_STATIC)
 target_link_libraries(PDRProtocolMQTT
     PUBLIC
+        PocoDDS::Reliability
         eclipse-paho-mqtt-c::paho-mqtt3cs-static
         Poco::Foundation)
 pdr_set_warnings(PDRProtocolMQTT)

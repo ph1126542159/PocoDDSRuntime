@@ -41,6 +41,25 @@ def validate(values: dict[str, str]) -> list[str]:
             errors.append("production requires osp.web.authServiceName")
         if legacy_auth:
             errors.append("production prohibits legacy SimpleAuth")
+        management_required = values.get(
+            "pdr.management.authentication.required", "false").lower() == "true"
+        try:
+            principal_count = int(values.get(
+                "pdr.management.authentication.principals.count", "0"))
+        except ValueError:
+            principal_count = 0
+        has_legacy_source = bool(
+            values.get("pdr.management.authentication.tokenEnvironment", "") or
+            values.get("pdr.management.authentication.tokenFile", "")
+        )
+        request_id_required = values.get(
+            "pdr.management.idempotency.requireRequestId", "false").lower() == "true"
+        if not management_required:
+            errors.append("production requires management authentication")
+        if principal_count <= 0 and not has_legacy_source:
+            errors.append("production requires a management identity source")
+        if not request_id_required:
+            errors.append("production requires management request IDs")
         if any(key.startswith("pdr.serial.") and key.endswith("transport") and
                value.lower() == "loopback" for key, value in values.items()):
             errors.append("production prohibits serial loopback transport")
@@ -55,7 +74,9 @@ def validate(values: dict[str, str]) -> list[str]:
             errors.append("production prohibits XBee loopback transport")
     for key, value in values.items():
         lowered = key.lower()
-        if any(token in lowered for token in ("password", "secret", "token")) and value:
+        reference = lowered.endswith(("file", "path", "environment"))
+        if (any(token in lowered for token in ("password", "secret", "token")) and
+                value and not reference):
             errors.append(f"inline secret is prohibited: {key}")
     return errors
 

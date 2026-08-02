@@ -36,10 +36,15 @@ int main()
     if (gpio.snapshot().state != PocoDDS::Devices::DeviceState::ready) return 1;
     PocoDDS::Filesystem::remove(root / "gpio23" / "value");
     if (gpio.snapshot().state != PocoDDS::Devices::DeviceState::fault) return 2;
-    if (gpio.diagnostics().lastError != "cannot read GPIO value") return 3;
+    const auto gpioFailure = gpio.diagnostics();
+    const auto gpioStructuredFailure = gpio.failure();
+    if (gpioFailure.lastError != "cannot read GPIO value" ||
+        gpioStructuredFailure.code != "PDR-DEVICE-LINUX-GPIO_IO_FAILED" ||
+        !gpioStructuredFailure.active) return 3;
     writeFile(root / "gpio23" / "value", "0");
     if (gpio.read() != 0 || gpio.snapshot().state != PocoDDS::Devices::DeviceState::ready)
         return 4;
+    if (gpio.failure().active) return 12;
     gpio.stop();
     std::string unexportValue;
     { std::ifstream(root / "unexport") >> unexportValue; }
@@ -84,7 +89,11 @@ int main()
     led.setBrightness(0.5);
     PocoDDS::Filesystem::remove(ledRoot / "brightness");
     if (led.snapshot().state != PocoDDS::Devices::DeviceState::fault) return 8;
-    if (led.diagnostics().lastError != "cannot read LED brightness") return 9;
+    const auto ledFailure = led.diagnostics();
+    const auto ledStructuredFailure = led.failure();
+    if (ledFailure.lastError != "cannot read LED brightness" ||
+        ledStructuredFailure.code != "PDR-DEVICE-LINUX-LED_IO_FAILED" ||
+        !ledStructuredFailure.active) return 9;
     writeFile(ledRoot / "brightness", "255");
     if (led.brightness() != 1.0 ||
         led.snapshot().state != PocoDDS::Devices::DeviceState::ready) return 10;

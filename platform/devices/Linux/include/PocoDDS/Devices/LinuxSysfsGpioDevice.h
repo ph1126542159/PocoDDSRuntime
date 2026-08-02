@@ -11,7 +11,8 @@
 namespace PocoDDS::Devices
 {
 
-class LinuxSysfsGpioDevice final : public DigitalIO, public DiagnosticDevice
+class LinuxSysfsGpioDevice final : public DigitalIO, public DiagnosticDevice,
+                                   public FailureDiagnosticDevice
 {
 public:
     enum class Direction { input, output };
@@ -37,6 +38,7 @@ public:
     void write(std::uint32_t value) override;
     void setValueHandler(ValueHandler handler) override;
     DeviceDiagnostics diagnostics() const override;
+    PocoDDS::Reliability::Failure failure() const override;
 
 private:
     void writeControl(const PocoDDS::Filesystem::path& file, const std::string& value) const;
@@ -56,6 +58,7 @@ private:
     mutable std::uint64_t _sequence{0};
     mutable std::string _lastPayload{"stopped"};
     mutable DeviceDiagnostics _diagnostics;
+    mutable PocoDDS::Reliability::Failure _failure;
     mutable Poco::FastMutex _mutex;
     SnapshotHandler _snapshotHandler;
     ValueHandler _valueHandler;

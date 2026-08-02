@@ -1,3 +1,3 @@
 <extensions>
-  <extension point="osp.web.server.requesthandler" path="${path}" class="Poco::OSP::WebEvent::WebEventRequestHandlerFactory" allowSpecialization="none" hidden="true" description="${description}"/>
+  <extension point="osp.web.server.requesthandler" path="${path}" class="Poco::OSP::WebEvent::WebEventRequestHandlerFactory" allowSpecialization="none" hidden="true" description="${description}" realm="${realm}" permission="${permission}" authMethods="basic,bearer,session"/>
 </extensions>

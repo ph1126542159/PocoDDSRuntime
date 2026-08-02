@@ -1296,7 +1296,8 @@ bool WebServerDispatcher::authorizeBearer(Poco::Net::HTTPServerRequest& request,
 		}
 		else
 		{
-			_pContext->logger().warning("Bearer token %s failed validation."s, token);
+			// Bearer tokens are credentials and must never be copied into logs.
+			_pContext->logger().warning("Bearer token validation failed."s);
 		}
 	}
 	return false;

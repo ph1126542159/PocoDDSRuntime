@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Management Authentication Bridge</name>
+    <symbolicName>pdr.platform.managementAuth</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::ManagementAuth::BundleActivator</class>
+      <library>pdr.platform.managementAuth</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>010</runLevel>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+  <files></files>
+</bundlespec>

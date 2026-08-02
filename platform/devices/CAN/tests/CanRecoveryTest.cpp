@@ -73,10 +73,14 @@ int main()
         Poco::Thread::sleep(2);
     const auto stale = sensor.snapshot();
     const auto diagnostics = sensor.diagnostics();
+    const auto failure = sensor.failure();
     sensor.stop();
     if (stale.state != PocoDDS::Devices::DeviceState::offline ||
         diagnostics.failedOperations != 2 || diagnostics.consecutiveFailures != 1 ||
-        diagnostics.lastError != "CAN signal stale" || snapshots < 6)
+        diagnostics.lastError != "CAN signal stale" ||
+        failure.code != "PDR-DEVICE-CAN-SIGNAL_STALE" ||
+        !failure.active || !failure.retryable ||
+        failure.occurredAtMicroseconds <= 0 || snapshots < 6)
     {
         std::cerr << "CAN_RECOVERY_FAIL state=" << PocoDDS::Devices::toString(stale.state)
                   << " success=" << diagnostics.successfulOperations

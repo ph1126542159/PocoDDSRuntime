@@ -30,6 +30,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <atomic>
 
 
 namespace Poco {
@@ -123,7 +124,7 @@ private:
 	Poco::RunnableAdapter<WebEventServiceImpl> _mainRunnable;
 	Poco::RunnableAdapter<WebEventServiceImpl> _workerRunnable;
 	Poco::FastMutex _sendMutex;
-	bool _stopped;
+	std::atomic<bool> _stopped;
 
 	friend class WebEventRequestHandler;
 	friend class AddSubscriberNotification;

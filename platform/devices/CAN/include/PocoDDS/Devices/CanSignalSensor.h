@@ -22,7 +22,8 @@ struct CanRecoveryPolicy
     std::chrono::milliseconds staleAfter{2000};
 };
 
-class CanSignalSensor final : public Sensor, public DiagnosticDevice
+class CanSignalSensor final : public Sensor, public DiagnosticDevice,
+                              public FailureDiagnosticDevice
 {
 public:
     struct Options
@@ -61,6 +62,7 @@ public:
     void setValueHandler(ValueHandler handler) override;
     bool ingest(const PocoDDS::Protocols::CAN::CanFrame& frame);
     DeviceDiagnostics diagnostics() const override;
+    PocoDDS::Reliability::Failure failure() const override;
 
 private:
     void run();
@@ -81,6 +83,7 @@ private:
     std::string _lastPayload{"no-frame"};
     std::chrono::steady_clock::time_point _lastFrame;
     DeviceDiagnostics _diagnostics;
+    PocoDDS::Reliability::Failure _failure;
     SnapshotHandler _snapshotHandler;
     ValueHandler _valueHandler;
 };

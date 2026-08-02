@@ -8,7 +8,7 @@ target_include_directories(PDRProtocolUDP
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(PDRProtocolUDP PUBLIC Poco::Net Poco::Foundation)
+target_link_libraries(PDRProtocolUDP PUBLIC PocoDDS::Reliability Poco::Net Poco::Foundation)
 pdr_set_warnings(PDRProtocolUDP)
 set_target_properties(PDRProtocolUDP PROPERTIES EXPORT_NAME UDP)
 

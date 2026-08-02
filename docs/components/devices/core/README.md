@@ -6,6 +6,18 @@
 
 需要运行诊断的适配器可以额外实现 `DiagnosticDevice`，返回 `DeviceDiagnostics`。这是独立的可选接口，不改变现有第三方 `Device` 实现的虚表；Runtime 通过 `DeviceService` 在 OSP Bundle 之间安全读取设备快照和诊断能力。
 
+结构化故障使用第二个可选接口 `FailureDiagnosticDevice`，返回 Reliability 的 `Failure`：
+
+- `code`：稳定、可用于规则和工单的 `PDR-DEVICE-*` 代码；
+- `kind`：`transient`、`permanent`、`configuration`、`hardware` 或 `safety`；
+- `retryable`：调用方是否可以自动重试；
+- `active`：故障当前仍存在，还是已经恢复但保留为最后一次故障；
+- `occurredAtMicroseconds` 与 `message`：发生时间和可读详情。
+
+该扩展没有扩大 `DeviceDiagnostics` 结构，也没有向既有接口追加虚函数，因此已编译的第三方设备
+不会因本次扩展发生返回对象尺寸或虚表变化。旧实现只有 `lastError` 时，管理 API 仍兼容输出并使用
+`PDR-DEVICE-UNCLASSIFIED` 标识尚未迁移的错误。
+
 ## 用法
 
 新增设备时继承最接近的抽象，保证 `id()` 稳定，并实现状态读取/控制及快照。设备实现不应直接耦合 WebUI；由 `DeviceGateway` 注册到 OSP，再由 DDS 桥接。

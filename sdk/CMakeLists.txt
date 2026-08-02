@@ -8,6 +8,7 @@ target_include_directories(PDRSDK INTERFACE
 target_link_libraries(PDRSDK INTERFACE
     PocoDDS::Application
     PocoDDS::Configuration
+    PocoDDS::Security
     PocoDDS::DeviceCore
     PocoDDS::Reliability
     PocoDDS::Health

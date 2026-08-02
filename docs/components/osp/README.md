@@ -36,6 +36,10 @@ WebServer 还支持 `maxQueued`、`maxThreads`、`keepAlive`、`keepAliveTime` �
 
 1. 实现 `Poco::OSP::BundleActivator`。
 2. 在 `.bndlspec` 填写唯一 symbolicName、版本、activator、runLevel 和 requiredBundles。
+   BundleCreator 会把 `<requiredBundles><bundle>...</bundle></requiredBundles>` 写入
+   `Require-Bundle` Manifest 字段，同时继续接受旧版 `manifest.dependency` 布局。发布前应解包
+   `.bndl` 核对 Manifest；`generated-plugin-consumer` 会以正常和缺失依赖两个插件验证该字段、
+   Runtime 依赖清单以及不兼容启动的 HTTP 409 门禁。
 3. 用 `myiot_add_osp_bundle()` 增加 CMake 目标。
 4. 构建并检查 `.bndl` 内容。
 5. 放入 `bundles/`，确认依赖解析和 active 状态。
@@ -100,6 +104,21 @@ auth.simple.user.permissions = view,status
 
 当前实现按 `MD5(salt + password)` 验证。这属于兼容性实现，不适合直接暴露到不可信网络；外网部署应接入更强的认证服务、TLS 和限流。
 
+Runtime 自带的共享管理身份 Bridge 是推荐入口：
+
+```properties
+pdr.management.authentication.required = true
+pdr.management.authentication.principals.count = 1
+pdr.management.authentication.principals.0.id = operator
+pdr.management.authentication.principals.0.tokenEnvironment = PDR_OPERATOR_TOKEN
+pdr.management.authentication.principals.0.permissions = protocol.manage,task.read
+osp.web.authServiceName = pdr.auth.management
+osp.web.tokenValidatorName = pdr.auth.management.tokens
+```
+
+同一环境 Token 此时同时可用于管理 API Bearer 和 OSP WebEvent Bearer；Basic 兼容客户端使用
+Principal ID 作为用户名、同一 Token 作为密码。Bridge 不保存明文配置，也不向日志暴露 Token。
+
 ## 代理与 WebEvent
 
 ```properties
@@ -114,6 +133,16 @@ osp.web.event.maxWebSockets = 0
 ```
 
 `maxWebSockets=0` 表示使用实现默认/不设显式上限，生产环境应结合资源限制评估。
+
+`/webevent` 会暴露实时 Runtime 事件，因此 Bundle 扩展固定声明 `permission=*`，由 OSP Web
+dispatcher 在创建 WebSocket handler 前完成认证。默认开发配置没有认证服务，所以该入口返回
+401；需要使用时必须先配置 `osp.web.authServiceName` 和对应 AuthService。SimpleAuth 只适合
+本机兼容测试，生产环境应使用强认证服务并通过 HTTPS/WSS 连接。客户端的 Basic、Bearer 或
+session 身份通过 dispatcher 后才能进入 WebSocket 握手，handler 本身不再维护第二套认证逻辑。
+
+仓库的 `runtime-webevent-auth-integration` 会生成临时凭据并从环境变量注入，分别证明未认证、
+错误 Basic 凭据和错误 Bearer 请求返回 401，正确 Basic 与共享管理 Bearer 请求进入握手校验，并检查所有
+凭据不进入 JSON 报告、标准输出或 Runtime 日志。
 
 ## 其他 OSP 运行项
 

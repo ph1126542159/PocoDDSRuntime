@@ -28,5 +28,11 @@ int main()
     const auto report = registry.collect();
     if (report.status != PocoDDS::Health::Status::degraded || report.ready() || !report.live())
         return 1;
+    PocoDDS::Health::Report diagnostic{
+        "device", PocoDDS::Health::Status::down, "required device fault",
+        "PDR-HEALTH-DEVICE-REQUIRED_NOT_READY", "inspect device diagnostics", {"sensor-1"}};
+    if (diagnostic.code.empty() || diagnostic.remediation.empty() ||
+        diagnostic.affected.size() != 1 || diagnostic.affected.front() != "sensor-1")
+        return 2;
     std::cout << "HEALTH_SMOKE_PASS\n";
 }

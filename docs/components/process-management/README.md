@@ -22,6 +22,10 @@ subprocess.0.argument.0 = --config=worker.properties
 
 配置保存到 `pdr-subprocesses.properties` 后重启 `pdr-runtime`。不要把 `pdr-launcher` 配置成由 `pdr-runtime` 启动且反过来启动 `pdr-runtime`，这会形成父子循环。
 
+隔离插件的槽位由 `pdr plugin apply-isolated/list-isolated/remove-isolated` 管理。工具使用
+`subprocess.N.pdrManaged` 和 `subprocess.N.pdrInstanceManifest` 识别受管条目，在独占锁内原子重写并
+保持编号连续；ProcessManagement 会忽略这两个管理元数据。不要手工修改受管条目。
+
 ## 配置项
 
 | 配置项 | 必填 | 默认值/作用 |

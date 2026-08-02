@@ -40,7 +40,10 @@ WebEventRequestHandler::~WebEventRequestHandler()
 	
 void WebEventRequestHandler::handleRequest(Poco::Net::HTTPServerRequest& request, Poco::Net::HTTPServerResponse& response)
 {
-	if (authenticate() && authorize())
+	// Authentication and authorization are enforced by WebServerDispatcher from
+	// the permission declared on the WebEvent extension before this handler is
+	// constructed. Keeping a second, incomplete check here would create a bypass
+	// whenever the two policies drift.
 	{
 		try
 		{
@@ -91,25 +94,6 @@ void WebEventRequestHandler::handleRequest(Poco::Net::HTTPServerRequest& request
 			}
 		}
 	}
-	else
-	{
-		response.setStatusAndReason(Poco::Net::HTTPResponse::HTTP_UNAUTHORIZED);
-		response.setContentLength(0);
-		response.send();
-	}
-}
-
-bool WebEventRequestHandler::authenticate() const
-{
-	// TODO: actually authenticate
-	return true;
-}
-
-
-bool WebEventRequestHandler::authorize() const
-{
-	// TODO: actually authorize
-	return true;
 }
 
 

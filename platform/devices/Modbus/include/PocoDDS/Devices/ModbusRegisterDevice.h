@@ -18,7 +18,8 @@ struct ModbusReconnectPolicy
     std::chrono::milliseconds retryDelay{50};
 };
 
-class ModbusRegisterDevice final : public Device, public DiagnosticDevice
+class ModbusRegisterDevice final : public Device, public DiagnosticDevice,
+                                   public FailureDiagnosticDevice
 {
 public:
     ModbusRegisterDevice(std::string id,
@@ -35,6 +36,7 @@ public:
     std::string execute(const std::string& operation, const std::string& payload) override;
     void setSnapshotHandler(SnapshotHandler handler) override;
     DeviceDiagnostics diagnostics() const override;
+    PocoDDS::Reliability::Failure failure() const override;
 
 private:
     void notify();
@@ -53,5 +55,6 @@ private:
     std::uint64_t _sequence{0};
     std::string _lastPayload;
     DeviceDiagnostics _diagnostics;
+    PocoDDS::Reliability::Failure _failure;
 };
 } // namespace PocoDDS::Devices

@@ -123,7 +123,7 @@ std::size_t SerialPortDevice::write(const std::vector<std::uint8_t>& data)
             ++_diagnostics.successfulOperations;
             _diagnostics.consecutiveFailures = 0;
             _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
-            _diagnostics.lastError.clear();
+            resolveFailure(_diagnostics, _failure);
             _lastPayload = std::to_string(written) + " bytes written";
             current = {_id, _type, _state, _sequence,
                        Poco::Timestamp().epochMicroseconds(), _lastPayload};
@@ -189,7 +189,7 @@ void SerialPortDevice::run()
                 ++_diagnostics.successfulOperations;
                 _diagnostics.consecutiveFailures = 0;
                 _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
-                _diagnostics.lastError.clear();
+                resolveFailure(_diagnostics, _failure);
                 _lastPayload = std::to_string(data.size()) + " bytes read";
                 current = {_id, _type, _state, _sequence,
                            Poco::Timestamp().epochMicroseconds(), _lastPayload};
@@ -213,7 +213,7 @@ void SerialPortDevice::markReady()
     _state = DeviceState::ready;
     ++_sequence;
     _diagnostics.consecutiveFailures = 0;
-    _diagnostics.lastError.clear();
+    resolveFailure(_diagnostics, _failure);
     _lastPayload = _channel->name();
 }
 
@@ -225,7 +225,8 @@ void SerialPortDevice::markFailure(const std::string& message)
     ++_diagnostics.failedOperations;
     ++_diagnostics.consecutiveFailures;
     _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
-    _diagnostics.lastError = message;
+    recordFailure(_diagnostics, _failure, "PDR-DEVICE-SERIAL-OPERATION_FAILED",
+                  Reliability::FailureKind::transient, true, message);
 }
 
 void SerialPortDevice::notify(const DeviceSnapshot& current,
@@ -252,6 +253,12 @@ DeviceDiagnostics SerialPortDevice::diagnostics() const
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     return _diagnostics;
+}
+
+PocoDDS::Reliability::Failure SerialPortDevice::failure() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _failure;
 }
 
 } // namespace PocoDDS::Devices

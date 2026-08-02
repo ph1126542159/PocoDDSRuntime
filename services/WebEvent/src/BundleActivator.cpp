@@ -2,6 +2,7 @@
 #include "PocoDDS/DDS/ServiceEndpoint.h"
 
 #include <Poco/ClassLibrary.h>
+#include <Poco/AutoPtr.h>
 #include <Poco/Delegate.h>
 #include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
@@ -102,7 +103,7 @@ private:
         _endpoint->publishEvent("notify", stringify(payload));
     }
 
-    Poco::SharedPtr<WebEventService> _service;
+    Poco::AutoPtr<WebEventService> _service;
     Poco::OSP::ServiceRef::Ptr _serviceRef;
     std::unique_ptr<PocoDDS::FastDDS::ServiceEndpoint> _endpoint;
 };

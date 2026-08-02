@@ -24,7 +24,8 @@ struct XBeeRecoveryPolicy
     std::chrono::milliseconds staleAfter{5000};
 };
 
-class XBeeAnalogSensor final : public Sensor, public DiagnosticDevice
+class XBeeAnalogSensor final : public Sensor, public DiagnosticDevice,
+                               public FailureDiagnosticDevice
 {
 public:
     enum class Conversion
@@ -70,6 +71,7 @@ public:
     std::string physicalUnit() const override;
     void setValueHandler(ValueHandler handler) override;
     DeviceDiagnostics diagnostics() const override;
+    PocoDDS::Reliability::Failure failure() const override;
 
     bool ingest(const PocoDDS::Protocols::XBee::IoSample& sample);
 
@@ -94,6 +96,7 @@ private:
     double _value{0};
     std::uint64_t _sequence{0};
     DeviceDiagnostics _diagnostics;
+    PocoDDS::Reliability::Failure _failure;
     SnapshotHandler _snapshotHandler;
     ValueHandler _valueHandler;
 };

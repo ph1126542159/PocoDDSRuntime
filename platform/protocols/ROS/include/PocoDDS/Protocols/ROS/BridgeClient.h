@@ -17,7 +17,8 @@
 namespace PocoDDS::Protocols::ROS
 {
 
-class BridgeClient final : public PocoDDS::Protocols::DiagnosticProtocol
+class BridgeClient final : public PocoDDS::Protocols::DiagnosticProtocol,
+                           public PocoDDS::Protocols::FailureDiagnosticProtocol
 {
 public:
     struct Options
@@ -68,6 +69,7 @@ public:
     Poco::JSON::Object::Ptr receiveMessage(const Poco::Timespan& timeout);
     void setMessageHandler(MessageHandler handler);
     ProtocolDiagnostics diagnostics() const override;
+    PocoDDS::Reliability::Failure failure() const override;
 
     static std::string makeSubscribeRequest(
         const std::string& topic,
@@ -93,6 +95,7 @@ private:
     std::map<std::string, std::string> _subscriptions;
     MessageHandler _handler;
     ProtocolDiagnostics _diagnostics;
+    PocoDDS::Reliability::Failure _failure;
     mutable std::mutex _mutex;
 };
 

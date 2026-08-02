@@ -22,7 +22,8 @@ struct Datagram
     bool received{false};
 };
 
-class UdpChannel final : public PocoDDS::Protocols::DiagnosticProtocol
+class UdpChannel final : public PocoDDS::Protocols::DiagnosticProtocol,
+                         public PocoDDS::Protocols::FailureDiagnosticProtocol
 {
 public:
     struct Options
@@ -44,6 +45,7 @@ public:
     Datagram receiveDatagram(std::size_t capacity, Poco::Timespan timeout);
     Poco::Net::SocketAddress localAddress() const;
     ProtocolDiagnostics diagnostics() const override;
+    PocoDDS::Reliability::Failure failure() const override;
 
 private:
     Poco::Net::SocketAddress _local;
@@ -51,6 +53,7 @@ private:
     Poco::Net::DatagramSocket _socket;
     bool _open{false};
     ProtocolDiagnostics _diagnostics;
+    PocoDDS::Reliability::Failure _failure;
     mutable std::mutex _mutex;
 };
 } // namespace PocoDDS::Protocols::UDP

@@ -113,8 +113,8 @@ target_link_libraries(my_application PRIVATE PocoDDS::SDK)
 
 省略 `COMPONENTS` 与请求 `SDK` 等价，保留已有项目兼容性；基础 SDK 不会查找 Paho MQTT。
 
-`PocoDDS::SDK` exposes Application, DeviceCore, typed configuration, reliability,
-health, persistence and SDK version APIs without requiring business code to include
+`PocoDDS::SDK` exposes Application, DeviceCore, typed configuration, shared identity,
+reliability, health, persistence and SDK version APIs without requiring business code to include
 Fast DDS, Qt, OSP or OpenTelemetry implementation headers. The
 `sdk-external-consumer` test installs the framework and builds a separate CMake
 project against that installed package.
@@ -134,6 +134,17 @@ The package exports `BtLE`, `CAN`, `Modbus`, `MQTT`, `ROS`, `SerialProtocol`,
 The external-consumer test compiles protocol headers and links the aggregate target
 from an isolated install tree.
 
+Deployable OSP plugins use the installed `Plugins` component and packaging helper:
+
+```cmake
+find_package(PocoDDSRuntime CONFIG REQUIRED COMPONENTS Plugins)
+pdr_add_osp_bundle(MyPlugin SYMBOLIC_NAME pdr.plugin.myplugin
+  BUNDLE_SPEC MyPlugin.bndlspec SOURCES src/BundleActivator.cpp)
+```
+
+External code links `PocoDDS::Plugins`, not the internal OSP target. The generated
+versioned `.bndl` is covered by an external build, package and isolated Runtime-load gate.
+
 Use the developer command to check the environment or create a standard module:
 
 ```powershell
@@ -144,9 +155,13 @@ Use the developer command to check the environment or create a standard module:
 ./tools/pdr.ps1 new service TemperatureService --output services
 ./tools/pdr.ps1 new device CanTemperatureSensor --output platform/devices
 ./tools/pdr.ps1 new workflow BoardPowerOnTest --output application/workflows
+./tools/pdr.ps1 new plugin AcmeDiagnostics --output plugins
 ./tools/pdr.ps1 verify platform/devices/CanTemperatureSensor `
   --prefix build/install --config Release `
   --report build/reports/can-temperature-sensor-verify.json
+./tools/pdr.ps1 verify plugins/AcmeDiagnostics --prefix build/install `
+  --config Release --artifact-output build/plugin-dist `
+  --report build/reports/acme-diagnostics-verify.json
 ```
 
 Generated modules contain a public header, implementation, CMake target, smoke
@@ -157,13 +172,74 @@ snapshot and command interfaces and includes indexed multi-instance configuratio
 `pdr doctor` validates the selected installed SDK prefix, exported `PocoDDS::SDK`
 target, Poco package, Python, CMake and CTest. Failed checks include actionable
 remedies, and the optional JSON report can be attached to CI or support evidence.
+Split SDK deployments use `--prefix` for PocoDDSRuntime and
+`--dependency-prefix` for the Poco development package.
 `pdr validate-config` uses the same C++ validator as Runtime to check layered base
 and site configuration without starting OSP, protocols, listeners or subprocesses.
-The install tree includes `bin/pdr.py`, `bin/pdr.ps1` and `bin/pdr-config-check`;
+`pdr identity inspect` reports non-secret identity-source and token-file permission evidence;
+`pdr identity check` is the production gate and fails unless authentication is required,
+at least one file-backed principal exists, every permission check completes and no broad
+ACL/mode is detected.
+`pdr persistence inspect` validates Runtime management snapshots and their verified
+`.previous` recovery material. `pdr persistence recover` performs hash-bound,
+audited offline recovery while preserving the original current file for forensics.
+`pdr persistence backup` atomically publishes a stopped-Runtime recovery point for
+configuration, task, idempotency and audit state; `verify-recovery-point` validates
+its manifest and every artifact independently before transfer or restore drills.
+`restore-recovery-point` archives the complete destination state, stages every
+artifact, performs a rollback-capable replacement transaction and records the
+operation in an external audit stream.
+`validate-restored-runtime` binds that transaction to live health and management
+inventory evidence, requires explicit dispositions for interrupted operations and
+emits the authoritative management-write `APPROVED` or `DENIED` verdict.
+Runtime smoke now requires graceful shutdown with exit code zero and records the
+shutdown mode and duration. Forced termination is opt-in and reserved for explicit
+crash-recovery evidence.
+The legacy `/webevent` WebSocket is protected by the OSP Web dispatcher and rejects
+anonymous clients before constructing its request handler.
+`PocoDDS::Security::ReloadablePrincipalStore` supplies the same environment- or file-backed identities
+to management APIs and the built-in OSP AuthService/TokenValidator bridge.
+`pdr upgrade apply` verifies the release manifest, compatibility and disk capacity,
+requires a trusted detached Ed25519 (or compatibility HMAC-SHA256) manifest signature for production use,
+uses an exclusive lock plus durable transaction journal, preserves mutable Runtime
+state, discards stale code cache, and requires a post-activation health gate.
+Transient Windows sharing violations during directory activation or rollback use a
+bounded, audited rename retry window instead of an unbounded wait.
+Failed health checks restore and hash-verify the old release. `pdr upgrade recover`
+reconciles interrupted directory switches fail-closed, while manual rollback carries
+the latest mutable state back to the prior binaries.
+The install tree includes `bin/pdr.py`, `bin/pdr.ps1`, `bin/pdr-config-check`,
+`bin/release_manifest.py`, `bin/upgrade_manager.py`, Runtime smoke, soak, device
+acceptance, protocol acceptance and security-gate tools;
 the installed CLI automatically uses its own package root as the default prefix.
 `pdr verify` consumes the installed SDK, then configures, builds and runs CTest in
 an isolated temporary directory. Its optional JSON report retains commands, exit
-codes and output without leaving build artifacts beside the generated source.
+codes and output without leaving build artifacts beside the generated source. For a
+plugin, verification also requires a real `.bndl`, records its SHA-256 and can copy
+the verified artifact with `--artifact-output`.
+
+Stopped-Runtime plugin publication is handled by `pdr plugin preflight/install/recover/rollback`.
+Installation requires an approved SHA-256 and explicit `--confirm-runtime-stopped`, rejects unsafe
+archives, incompatible `Require-Bundle` ranges, or mismatched plugin API/ABI/runtime contracts,
+atomically publishes the artifact, retains the
+previous version under `bin/plugin-backups`, and writes a durable JSONL audit trail. Rollback is
+guarded by both the current and backup digests. `recover` reconciles a durable interrupted-install
+journal while the Runtime remains stopped. Runtime startup and the Web plugin-governance page remain
+the post-publication acceptance boundary.
+Production plugin preflight also requires a detached Ed25519 publisher attestation governed by a
+pinned plugin trust policy with symbolic-name scopes, validity windows, and revocation. An explicit
+unsigned diagnostic bypass is recorded in both the report and audit trail.
+
+Development builds may generate release evidence from a dirty worktree, and the
+manifest records `cleanRequired: false` plus the actual `dirty` state. A governed
+production release must use the `release` presets; its release-artifact test
+refuses to generate a manifest unless the Git worktree is clean:
+
+```powershell
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
+```
 
 ## Windows build
 

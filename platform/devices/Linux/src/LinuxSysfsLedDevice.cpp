@@ -157,7 +157,7 @@ void LinuxSysfsLedDevice::markSuccess(const std::string& payload) const
     ++_diagnostics.successfulOperations;
     _diagnostics.consecutiveFailures = 0;
     _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
-    _diagnostics.lastError.clear();
+        resolveFailure(_diagnostics, _failure);
 }
 
 void LinuxSysfsLedDevice::markFailure(const std::string& message) const
@@ -169,7 +169,8 @@ void LinuxSysfsLedDevice::markFailure(const std::string& message) const
     ++_diagnostics.failedOperations;
     ++_diagnostics.consecutiveFailures;
     _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
-    _diagnostics.lastError = message;
+    recordFailure(_diagnostics, _failure, "PDR-DEVICE-LINUX-LED_IO_FAILED",
+                  Reliability::FailureKind::hardware, true, message);
 }
 
 void LinuxSysfsLedDevice::notify(const DeviceSnapshot& current) const
@@ -186,5 +187,10 @@ DeviceDiagnostics LinuxSysfsLedDevice::diagnostics() const
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     return _diagnostics;
+}
+PocoDDS::Reliability::Failure LinuxSysfsLedDevice::failure() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _failure;
 }
 } // namespace PocoDDS::Devices

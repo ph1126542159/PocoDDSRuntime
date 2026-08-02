@@ -3,6 +3,83 @@ info:
   title: PocoDDSRuntime Management API
   version: 0.1.0
 paths:
+  /api/v1/protocols:
+    get:
+      operationId: listProtocols
+      summary: List managed protocol instances and structured diagnostics
+      responses:
+        "200":
+          description: Protocol inventory
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProtocolInventory" }
+    post:
+      operationId: manageProtocol
+      summary: Open, close or restart a protocol instance
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ManagementRequestId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProtocolLifecycleRequest" }
+      responses:
+        "200": { description: Protocol lifecycle operation completed }
+        "202":
+          description: Protocol lifecycle task accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagementTaskAccepted" }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks protocol.manage }
+        "409": { description: Request ID is already in progress or was reused for different content }
+        "428": { description: Management request ID is required by Runtime policy }
+        "503": { description: Idempotency ledger requires operator recovery, or asynchronous task persistence is unavailable }
+  /api/v1/diagnostic-events:
+    get:
+      operationId: listDiagnosticEvents
+      summary: List deduplicated device and protocol failure transitions with trace links
+      responses:
+        "200":
+          description: Recent diagnostic failure and recovery events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DiagnosticEventInventory" }
+  /api/v1/alerts:
+    get:
+      operationId: listAlerts
+      summary: List deduplicated alert states and the effective runtime policy
+      responses:
+        "200":
+          description: Current and recently resolved alerts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertInventory" }
+  /api/v1/alert-history:
+    get:
+      operationId: listAlertHistory
+      summary: List locally persisted alert delivery transitions
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+      responses:
+        "200":
+          description: Persisted alert transition history
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertHistory" }
+  /api/v1/alert-sinks:
+    get:
+      operationId: listAlertSinks
+      summary: List registered alert delivery sinks without exposing secrets
+      responses:
+        "200":
+          description: Registered alert sink inventory
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertSinkInventory" }
   /api/v1/devices:
     get:
       operationId: listDevices
@@ -22,18 +99,210 @@ paths:
       responses: { "200": { description: Process log records } }
   /api/v1/process-detail:
     get:
-      responses: { "200": { description: Process details } }
+      operationId: getProcessDetail
+      summary: Return process details and authoritative Bundle management flags
+      responses:
+        "200":
+          description: Process details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProcessDetail" }
   /api/v1/process-lifecycle:
     post:
-      responses: { "200": { description: Lifecycle action accepted } }
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ManagementRequestId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProcessLifecycleRequest" }
+      responses:
+        "200": { description: Lifecycle action accepted }
+        "202":
+          description: Process lifecycle task accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagementTaskAccepted" }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks process.manage }
+        "409": { description: Request ID is already in progress or was reused for different content }
+        "428": { description: Management request ID is required by Runtime policy }
+        "503": { description: Idempotency ledger requires operator recovery, or asynchronous task persistence is unavailable }
   /api/v1/bundle-lifecycle:
     post:
-      responses: { "200": { description: Bundle lifecycle action accepted } }
+      operationId: manageBundle
+      summary: Start, stop or restart a backend-approved manageable Bundle
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ManagementRequestId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BundleLifecycleRequest" }
+      responses:
+        "200":
+          description: Bundle lifecycle action completed
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/BundleLifecycleResponse" }
+                  - { $ref: "#/components/schemas/IdempotentReplayResponse" }
+        "202":
+          description: Bundle lifecycle task accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagementTaskAccepted" }
+        "403": { description: Principal lacks bundle.manage, or Bundle is protected }
+        "404": { description: Bundle not found }
+        "401": { description: Missing or invalid management Bearer token }
+        "409": { description: Request ID is already in progress or was reused for different content }
+        "428": { description: Management request ID is required by Runtime policy }
+        "503": { description: Idempotency ledger requires operator recovery, or asynchronous task persistence is unavailable }
   /api/v1/process-config:
     get:
-      responses: { "200": { description: Editable configuration } }
+      operationId: getEditableRuntimeConfiguration
+      summary: Read the current online-editable configuration without secrets
+      responses:
+        "200":
+          description: Current editable Runtime configuration
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EditableConfiguration" }
     post:
-      responses: { "200": { description: Configuration updated } }
+      operationId: updateRuntimeConfiguration
+      summary: Validate, persist and apply one allowlisted Runtime property transactionally
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ManagementRequestId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfigurationUpdateRequest" }
+      responses:
+        "200":
+          description: Configuration validated, persisted and applied
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/ConfigurationUpdateResponse" }
+                  - { $ref: "#/components/schemas/IdempotentReplayResponse" }
+        "400": { description: Invalid request or configuration value; nothing persisted }
+        "403": { description: Principal lacks configuration.manage, or property is not online-editable }
+        "404": { description: Property is not present in the persistent Runtime file }
+        "409":
+          description: Apply failed after persistence and the transaction attempted rollback
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigurationUpdateFailure" }
+        "401": { description: Missing or invalid management Bearer token }
+        "428": { description: Management request ID is required by Runtime policy }
+        "503": { description: Idempotency ledger requires operator recovery }
+  /api/v1/management-audit:
+    get:
+      operationId: listManagementAudit
+      summary: Query recent persisted management operation audit events
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 1000, default: 100 } }
+        - { in: query, name: operation, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string, enum: [succeeded, denied, failed, replayed] } }
+        - { in: query, name: principal, schema: { type: string } }
+      responses:
+        "200":
+          description: Newest matching audit events first
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagementAuditInventory" }
+        "400": { description: Invalid filter }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks audit.read }
+  /api/v1/identity:
+    get:
+      operationId: getManagementIdentitySnapshot
+      summary: Read the active management-identity generation without exposing identities or tokens
+      security: [{ ManagementBearer: [] }]
+      responses:
+        "200":
+          description: Active identity snapshot metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdentitySnapshot" }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks identity.manage }
+    post:
+      operationId: reloadManagementIdentitySnapshot
+      summary: Atomically reload file-backed management tokens from the active configuration
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ManagementRequestId" }
+      responses:
+        "200":
+          description: Candidate snapshot validated and atomically activated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdentityReloadResponse" }
+        "400": { description: Candidate secret source is invalid; the previous generation remains active }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks identity.manage }
+        "409": { description: Request ID is already in progress or was reused }
+        "428": { description: Management request ID is required by Runtime policy }
+  /api/v1/management-tasks:
+    get:
+      operationId: listManagementTasks
+      summary: List retained asynchronous management tasks
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 1000, default: 100 } }
+        - { in: query, name: state, schema: { $ref: "#/components/schemas/ManagementTaskState" } }
+        - { in: query, name: operation, schema: { type: string } }
+      responses:
+        "200":
+          description: Newest retained tasks first
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagementTaskInventory" }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks task.read }
+    post:
+      operationId: cancelManagementTask
+      summary: Cancel a task that is still queued
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/ManagementRequestId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManagementTaskCancelRequest" }
+      responses:
+        "200": { description: Queued task cancelled }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks task.cancel }
+        "404": { description: Task not found }
+        "409": { description: Running or terminal task cannot be cancelled }
+        "428": { description: Management request ID is required by Runtime policy }
+        "503": { description: Idempotency ledger requires operator recovery }
+  /api/v1/management-tasks/{taskId}:
+    get:
+      operationId: getManagementTask
+      summary: Get one retained asynchronous management task
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Task state and result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManagementTask" }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks task.read }
+        "404": { description: Task not found }
   /api/v1/heartbeat-businesses:
     get:
       responses: { "200": { description: Heartbeat business records } }
@@ -58,9 +327,546 @@ paths:
     get:
       operationId: getHealthDetail
       responses:
-        "200": { description: Aggregated component health }
+        "200":
+          description: Aggregated component health with actionable diagnostics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthDetail"
 components:
+  parameters:
+    ManagementRequestId:
+      in: header
+      name: X-PDR-Request-Id
+      required: false
+      description: Unique management operation ID. Required when pdr.management.idempotency.requireRequestId is true; identical retries return the completed result without executing again.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: "^[A-Za-z0-9._:-]+$"
+  securitySchemes:
+    ManagementBearer:
+      type: http
+      scheme: bearer
+      description: Required for protected management APIs; principals receive explicit protocol.manage, process.manage, bundle.manage, configuration.manage, audit.read, task.read and task.cancel permissions
   schemas:
+    IdempotentReplayResponse:
+      type: object
+      required: [message, requestId, idempotentReplay, operation, target, action]
+      properties:
+        message: { type: string }
+        requestId: { type: string, minLength: 1 }
+        idempotentReplay: { type: boolean, const: true }
+        operation: { type: string, minLength: 1 }
+        target: { type: string }
+        action: { type: string, minLength: 1 }
+    BundleLifecycleRequest:
+      type: object
+      additionalProperties: false
+      required: [id, action]
+      properties:
+        id: { type: string, minLength: 1 }
+        action: { type: string, enum: [start, stop, restart, reset-quarantine] }
+        confirmPersistenceRecovery: { type: boolean, default: false }
+        async: { type: boolean, default: false }
+        startTimeoutMilliseconds: { type: integer, minimum: 1, maximum: 3600000, default: 30000 }
+        notBeforeMilliseconds: { type: integer, minimum: 0, maximum: 3599999, default: 0 }
+        executionTimeoutMilliseconds: { type: integer, minimum: 1, maximum: 3600000, default: 30000 }
+    ProtocolLifecycleRequest:
+      type: object
+      additionalProperties: false
+      required: [id, action]
+      properties:
+        id: { type: string, minLength: 1 }
+        action: { type: string, enum: [open, close, restart] }
+        async: { type: boolean, default: false }
+        startTimeoutMilliseconds: { type: integer, minimum: 1, maximum: 3600000, default: 30000 }
+        notBeforeMilliseconds: { type: integer, minimum: 0, maximum: 3599999, default: 0 }
+        executionTimeoutMilliseconds: { type: integer, minimum: 1, maximum: 3600000, default: 30000 }
+        stabilityWindowMilliseconds: { type: integer, minimum: 0, maximum: 300000, default: 0 }
+    ProcessLifecycleRequest:
+      type: object
+      additionalProperties: false
+      required: [id, action]
+      properties:
+        id: { type: string, minLength: 1 }
+        action: { type: string, enum: [start, stop, restart] }
+        async: { type: boolean, default: false }
+        startTimeoutMilliseconds: { type: integer, minimum: 1, maximum: 3600000, default: 30000 }
+        notBeforeMilliseconds: { type: integer, minimum: 0, maximum: 3599999, default: 0 }
+        executionTimeoutMilliseconds: { type: integer, minimum: 1, maximum: 3600000, default: 30000 }
+    ManagedBundle:
+      type: object
+      required: [id, name, version, state, manageable]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        version: { type: string, minLength: 1 }
+        state: { type: string, enum: [installed, resolved, starting, active, stopping, uninstalled] }
+        manageable: { type: boolean }
+        plugin: { type: boolean }
+        protected: { type: boolean }
+        compatible: { type: boolean }
+        pluginApiVersion: { type: string }
+        pluginAbiVersion: { type: string }
+        pluginAbiFingerprint: { type: string }
+        runtimeVersionRange: { type: string }
+        compatibilityIssues:
+          type: array
+          items: { type: string }
+        governanceStatus: { type: string, enum: [ready, incompatible, quarantined, protected, unmanaged] }
+        quarantined: { type: boolean }
+        quarantineFailureThreshold: { type: integer, minimum: 1 }
+        quarantineTotalFailures: { type: integer, minimum: 0 }
+        quarantineConsecutiveFailures: { type: integer, minimum: 0 }
+        quarantineUpdatedMicroseconds: { type: integer, minimum: 0 }
+        quarantineLastError: { type: string }
+        quarantinePersistenceHealthy: { type: boolean }
+        quarantineRecoveryRequired: { type: boolean }
+        quarantinePersistenceError: { type: string }
+        dependencies:
+          type: array
+          items:
+            type: object
+            required: [id, requestedVersion, available, compatible, availableVersion, state]
+            properties:
+              id: { type: string, minLength: 1 }
+              requestedVersion: { type: string }
+              available: { type: boolean }
+              compatible: { type: boolean }
+              availableVersion: { type: string }
+              state: { type: string }
+    ProcessDetail:
+      type: object
+      required: [process, children, bundles, resources]
+      properties:
+        process: { type: object }
+        children: { type: array, items: { type: object } }
+        bundles: { type: array, items: { $ref: "#/components/schemas/ManagedBundle" } }
+        resources: { type: object }
+    BundleLifecycleResponse:
+      type: object
+      required: [message, requestId, idempotentReplay]
+      properties:
+        message: { type: string }
+        id: { type: string, minLength: 1 }
+        state: { type: string, minLength: 1 }
+        requestId: { type: string }
+        idempotentReplay: { type: boolean }
+    ConfigurationUpdateRequest:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [key, value]
+          properties:
+            action: { type: string, const: apply }
+            key: { type: string, minLength: 1 }
+            value: { type: string }
+        - type: object
+          additionalProperties: false
+          required: [action, transactionId]
+          properties:
+            action: { type: string, const: rollback }
+            transactionId: { type: string, minLength: 1 }
+    ConfigurationTransaction:
+      type: object
+      required: [transactionId, timestampMicroseconds, action, key, status]
+      properties:
+        transactionId: { type: string, minLength: 1 }
+        timestampMicroseconds: { type: integer, minimum: 1 }
+        action: { type: string, enum: [apply, rollback] }
+        key: { type: string }
+        status: { type: string, enum: [committed, rejected, rolled-back] }
+        owner: { type: string }
+        ownerRestarted: { type: boolean }
+        rolledBack: { type: boolean }
+        error: { type: string }
+        remoteAddress: { type: string }
+        principal: { type: string }
+    ConfigurationRollback:
+      type: object
+      required: [transactionId, key, action, timestampMicroseconds]
+      properties:
+        transactionId: { type: string, minLength: 1 }
+        key: { type: string, minLength: 1 }
+        action: { type: string, enum: [apply, rollback] }
+        timestampMicroseconds: { type: integer, minimum: 1 }
+    EditableConfiguration:
+      type: object
+      required: [schemaVersion, managementAuthenticationRequired, managementSession, configuration, editable, rollbackFileAvailable]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        managementAuthenticationRequired: { type: boolean }
+        managementSession:
+          $ref: "#/components/schemas/ManagementSession"
+        configuration: { type: object, additionalProperties: { type: string } }
+        editable: { type: array, items: { type: string, minLength: 1 } }
+        rollbackFileAvailable: { type: boolean }
+        rollback: { $ref: "#/components/schemas/ConfigurationRollback" }
+        transactions:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/ConfigurationTransaction" }
+    ConfigurationUpdateResponse:
+      type: object
+      required: [message, transactionId, action, key, value, validated, persisted, applied, owner, ownerRestarted, rolledBack, audited, requestId, idempotentReplay, principal]
+      properties:
+        message: { type: string }
+        transactionId: { type: string, minLength: 1 }
+        action: { type: string, enum: [apply, rollback] }
+        key: { type: string, minLength: 1 }
+        value: { type: string }
+        validated: { type: boolean, const: true }
+        persisted: { type: boolean, const: true }
+        applied: { type: boolean, const: true }
+        owner: { type: string }
+        ownerRestarted: { type: boolean }
+        rolledBack: { type: boolean, const: false }
+        audited: { type: boolean, const: true }
+        requestId: { type: string }
+        idempotentReplay: { type: boolean }
+        principal: { type: string }
+    ManagementSession:
+      type: object
+      required: [authenticated, principal, permissions]
+      properties:
+        authenticated: { type: boolean }
+        principal: { type: string }
+        permissions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [protocol.manage, process.manage, bundle.manage, configuration.manage, audit.read, task.read, task.cancel]
+    ManagementTaskState:
+      type: string
+      enum: [queued, running, succeeded, failed, cancelled, timed-out, interrupted]
+    ManagementTask:
+      type: object
+      required: [id, operation, target, action, principal, requestId, state, interruptedFromState, recoveryPolicy, submittedMicroseconds, startedMicroseconds, finishedMicroseconds, startDeadlineMicroseconds, notBeforeMicroseconds, executionDeadlineMicroseconds, executionTimeoutMilliseconds, cancellationRequested, phase, phaseBeforeCancellation, cancellationMode, resourceKey, blockingTaskId, resourceWaitStartedMicroseconds, resourceAcquiredMicroseconds, resourceWaitMicroseconds]
+      properties:
+        id: { type: string, minLength: 1 }
+        operation: { type: string }
+        target: { type: string }
+        action: { type: string }
+        principal: { type: string }
+        requestId: { type: string }
+        state: { $ref: "#/components/schemas/ManagementTaskState" }
+        interruptedFromState: { type: string, enum: ["", queued, running] }
+        recoveryPolicy: { type: string, enum: [verify-before-retry] }
+        submittedMicroseconds: { type: integer, minimum: 1 }
+        startedMicroseconds: { type: integer, minimum: 0 }
+        finishedMicroseconds: { type: integer, minimum: 0 }
+        startDeadlineMicroseconds: { type: integer, minimum: 1 }
+        notBeforeMicroseconds: { type: integer, minimum: 1 }
+        executionDeadlineMicroseconds: { type: integer, minimum: 0 }
+        executionTimeoutMilliseconds: { type: integer, minimum: 1, maximum: 3600000 }
+        cancellationRequested: { type: boolean }
+        phase: { type: string, enum: [queued, waiting-resource, executing, cancellation-requested, finished] }
+        phaseBeforeCancellation: { type: string, enum: ["", queued, waiting-resource, executing] }
+        cancellationMode: { type: string, enum: [cooperative] }
+        resourceKey: { type: string, minLength: 1 }
+        blockingTaskId: { type: string }
+        resourceWaitStartedMicroseconds: { type: integer, minimum: 0 }
+        resourceAcquiredMicroseconds: { type: integer, minimum: 0 }
+        resourceWaitMicroseconds: { type: integer, minimum: 0 }
+        error: { type: string }
+        result: { type: object }
+    ManagementTaskAccepted:
+      type: object
+      required: [message, task, requestId, idempotentReplay]
+      properties:
+        message: { type: string }
+        task: { $ref: "#/components/schemas/ManagementTask" }
+        requestId: { type: string }
+        idempotentReplay: { type: boolean, const: false }
+    ManagementTaskInventory:
+      type: object
+      required: [schemaVersion, count, tasks, persistence, idempotency, scheduler]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        count: { type: integer, minimum: 0 }
+        tasks:
+          type: array
+          maxItems: 1000
+          items: { $ref: "#/components/schemas/ManagementTask" }
+        persistence:
+          $ref: "#/components/schemas/ManagementTaskPersistence"
+        idempotency:
+          $ref: "#/components/schemas/ManagementIdempotencyStatus"
+        scheduler:
+          $ref: "#/components/schemas/ManagementTaskScheduler"
+    ManagementTaskPersistence:
+      type: object
+      required: [enabled, healthy, error, recoveryRequired, schemaVersion, integrityAlgorithm, previousAvailable]
+      properties:
+        enabled: { type: boolean }
+        healthy: { type: boolean }
+        error: { type: string }
+        recoveryRequired: { type: boolean }
+        schemaVersion: { type: integer, const: 2 }
+        integrityAlgorithm: { type: string, const: SHA-256 }
+        previousAvailable: { type: boolean }
+    ManagementIdempotencyStatus:
+      type: object
+      required: [enabled, healthy, error, recoveryRequired, schemaVersion, integrityAlgorithm, previousAvailable, count, completed, interrupted, retention, ttlMilliseconds]
+      properties:
+        enabled: { type: boolean }
+        healthy: { type: boolean }
+        error: { type: string }
+        recoveryRequired: { type: boolean }
+        schemaVersion: { type: integer, const: 2 }
+        integrityAlgorithm: { type: string, const: SHA-256 }
+        previousAvailable: { type: boolean }
+        count: { type: integer, minimum: 0 }
+        completed: { type: integer, minimum: 0 }
+        interrupted: { type: integer, minimum: 0 }
+        retention: { type: integer, minimum: 1 }
+        ttlMilliseconds: { type: integer, minimum: 1000 }
+    ManagementTaskScheduler:
+      type: object
+      required: [workerCount, capacity, queued, running, waitingResource, executing, cancellationRequested, resourceOwners, oldestQueuedWaitMicroseconds, longestResourceWaitMicroseconds, degradedWaitMicroseconds, saturated, degraded]
+      properties:
+        workerCount: { type: integer, minimum: 0 }
+        capacity: { type: integer, minimum: 1 }
+        queued: { type: integer, minimum: 0 }
+        running: { type: integer, minimum: 0 }
+        waitingResource: { type: integer, minimum: 0 }
+        executing: { type: integer, minimum: 0 }
+        cancellationRequested: { type: integer, minimum: 0 }
+        resourceOwners: { type: integer, minimum: 0 }
+        oldestQueuedWaitMicroseconds: { type: integer, minimum: 0 }
+        longestResourceWaitMicroseconds: { type: integer, minimum: 0 }
+        degradedWaitMicroseconds: { type: integer, minimum: 1000 }
+        saturated: { type: boolean }
+        degraded: { type: boolean }
+    ManagementTaskCancelRequest:
+      type: object
+      additionalProperties: false
+      required: [id, action]
+      properties:
+        id: { type: string, minLength: 1 }
+        action: { type: string, const: cancel }
+    ManagementAuditEvent:
+      type: object
+      required: [schemaVersion, eventId, timestampMicroseconds, durationMicroseconds, principal, requestId, operation, target, action, status, httpStatus, remoteAddress]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        eventId: { type: string, minLength: 1 }
+        timestampMicroseconds: { type: integer, minimum: 1 }
+        durationMicroseconds: { type: integer, minimum: 0 }
+        principal: { type: string }
+        requestId: { type: string }
+        operation: { type: string }
+        target: { type: string }
+        action: { type: string }
+        status: { type: string, enum: [succeeded, denied, failed, replayed] }
+        httpStatus: { type: integer, minimum: 100, maximum: 599 }
+        remoteAddress: { type: string }
+        error: { type: string }
+    IdentitySnapshot:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, generation, required, principalCount, fileBackedPrincipalCount, environmentBackedPrincipalCount, insecureFileCount, filePermissionChecksComplete]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        generation: { type: integer, minimum: 1 }
+        required: { type: boolean }
+        principalCount: { type: integer, minimum: 0, maximum: 65 }
+        fileBackedPrincipalCount: { type: integer, minimum: 0, maximum: 65 }
+        environmentBackedPrincipalCount: { type: integer, minimum: 0, maximum: 65 }
+        insecureFileCount: { type: integer, minimum: 0, maximum: 65 }
+        filePermissionChecksComplete: { type: boolean }
+    IdentityReloadResponse:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, generationBefore, generation, required, principalCount, fileBackedPrincipalCount, environmentBackedPrincipalCount, insecureFileCount, filePermissionChecksComplete, reloaded, requestId]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        generationBefore: { type: integer, minimum: 1 }
+        generation: { type: integer, minimum: 2 }
+        required: { type: boolean }
+        principalCount: { type: integer, minimum: 0, maximum: 65 }
+        fileBackedPrincipalCount: { type: integer, minimum: 0, maximum: 65 }
+        environmentBackedPrincipalCount: { type: integer, minimum: 0, maximum: 65 }
+        insecureFileCount: { type: integer, minimum: 0, maximum: 65 }
+        filePermissionChecksComplete: { type: boolean }
+        reloaded: { type: boolean, const: true }
+        requestId: { type: string }
+    ManagementAuditInventory:
+      type: object
+      required: [schemaVersion, enabled, count, events]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        enabled: { type: boolean }
+        count: { type: integer, minimum: 0 }
+        events:
+          type: array
+          maxItems: 1000
+          items: { $ref: "#/components/schemas/ManagementAuditEvent" }
+    ConfigurationUpdateFailure:
+      type: object
+      required: [error, transactionId, action, key, persisted, applied, rolledBack]
+      properties:
+        error: { type: string }
+        transactionId: { type: string, minLength: 1 }
+        action: { type: string, enum: [apply, rollback] }
+        key: { type: string }
+        persisted: { type: boolean, const: false }
+        applied: { type: boolean, const: false }
+        rolledBack: { type: boolean }
+    DiagnosticFailure:
+      type: object
+      required: [code, category, retryable, active, occurredAtMicroseconds, message]
+      properties:
+        code: { type: string, pattern: "^PDR-(DEVICE|PROTOCOL)-[A-Z0-9_-]+$" }
+        category:
+          type: string
+          enum: [transient, permanent, configuration, hardware, safety]
+        retryable: { type: boolean }
+        active: { type: boolean }
+        occurredAtMicroseconds: { type: integer, minimum: 0 }
+        message: { type: string }
+    DiagnosticEvent:
+      allOf:
+        - $ref: "#/components/schemas/DiagnosticFailure"
+        - type: object
+          required: [traceId, domain, instance, event, observedAtMicroseconds]
+          properties:
+            traceId: { type: string, pattern: "^[0-9a-f]{32}$" }
+            domain: { type: string, enum: [device, protocol] }
+            instance: { type: string, minLength: 1 }
+            event: { type: string, enum: [failure.detected, failure.resolved] }
+            observedAtMicroseconds: { type: integer, minimum: 1 }
+    DiagnosticEventInventory:
+      type: object
+      required: [schemaVersion, count, events]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        count: { type: integer, minimum: 0 }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/DiagnosticEvent" }
+    AlertPolicy:
+      type: object
+      required: [debounceMilliseconds, escalationMilliseconds, retention, silencedCodes]
+      properties:
+        debounceMilliseconds: { type: integer, minimum: 0 }
+        escalationMilliseconds: { type: integer, minimum: 0 }
+        retention: { type: integer, minimum: 1 }
+        silencedCodes: { type: array, items: { type: string } }
+    Alert:
+      type: object
+      required: [id, domain, instance, code, status, severity, traceId, message, retryable, silenced, notified, suppressedByDebounce, firstSeenMicroseconds, lastSeenMicroseconds, resolvedAtMicroseconds, observations]
+      properties:
+        id: { type: string, pattern: "^[0-9a-f]{32}$" }
+        domain: { type: string, enum: [device, protocol] }
+        instance: { type: string, minLength: 1 }
+        code: { type: string, minLength: 1 }
+        status: { type: string, enum: [pending, firing, silenced, resolved] }
+        severity: { type: string, enum: [warning, critical] }
+        traceId: { type: string, pattern: "^[0-9a-f]{32}$" }
+        message: { type: string }
+        retryable: { type: boolean }
+        silenced: { type: boolean }
+        notified: { type: boolean }
+        suppressedByDebounce: { type: boolean }
+        firstSeenMicroseconds: { type: integer, minimum: 1 }
+        lastSeenMicroseconds: { type: integer, minimum: 1 }
+        resolvedAtMicroseconds: { type: integer, minimum: 0 }
+        observations: { type: integer, minimum: 1 }
+    AlertInventory:
+      type: object
+      required: [schemaVersion, count, policy, alerts]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        count: { type: integer, minimum: 0 }
+        policy: { $ref: "#/components/schemas/AlertPolicy" }
+        alerts: { type: array, items: { $ref: "#/components/schemas/Alert" } }
+    AlertDelivery:
+      type: object
+      required: [alertId, event, domain, instance, code, status, severity, traceId, message, retryable, silenced, occurredAtMicroseconds]
+      properties:
+        alertId: { type: string, pattern: "^[0-9a-f]{32}$" }
+        event: { type: string, enum: [alert.opened, alert.escalated, alert.resolved] }
+        domain: { type: string, enum: [device, protocol] }
+        instance: { type: string }
+        code: { type: string }
+        status: { type: string }
+        severity: { type: string, enum: [warning, critical] }
+        traceId: { type: string, pattern: "^[0-9a-f]{32}$" }
+        message: { type: string }
+        retryable: { type: boolean }
+        silenced: { type: boolean }
+        occurredAtMicroseconds: { type: integer, minimum: 1 }
+    AlertHistory:
+      type: object
+      required: [schemaVersion, count, limit, enabled, path, records]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        count: { type: integer, minimum: 0 }
+        limit: { type: integer, minimum: 1, maximum: 1000 }
+        enabled: { type: boolean }
+        path: { type: string }
+        records: { type: array, items: { $ref: "#/components/schemas/AlertDelivery" } }
+    AlertSink:
+      type: object
+      required: [name, type, service, receiveSilenced, registered, status, successes, failures, dropped, queueDepth, delivering, circuitOpenSkips, consecutiveFailures, lastSuccessMicroseconds, lastFailureMicroseconds, circuitOpen, circuitOpenUntilMicroseconds, lastError]
+      properties:
+        name: { type: string, minLength: 1 }
+        type: { type: string, minLength: 1 }
+        service: { type: string, minLength: 1 }
+        receiveSilenced: { type: boolean }
+        registered: { type: boolean, const: true }
+        status: { type: string, enum: [idle, healthy, degraded, circuit-open] }
+        successes: { type: integer, minimum: 0 }
+        failures: { type: integer, minimum: 0 }
+        dropped: { type: integer, minimum: 0 }
+        queueDepth: { type: integer, minimum: 0 }
+        delivering: { type: boolean }
+        circuitOpenSkips: { type: integer, minimum: 0 }
+        consecutiveFailures: { type: integer, minimum: 0 }
+        lastSuccessMicroseconds: { type: integer, minimum: 0 }
+        lastFailureMicroseconds: { type: integer, minimum: 0 }
+        circuitOpen: { type: boolean }
+        circuitOpenUntilMicroseconds: { type: integer, minimum: 0 }
+        lastError: { type: string }
+    AlertSinkInventory:
+      type: object
+      required: [schemaVersion, count, sinks]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        count: { type: integer, minimum: 0 }
+        sinks: { type: array, items: { $ref: "#/components/schemas/AlertSink" } }
+    HealthComponent:
+      type: object
+      required: [name, status, detail, affected]
+      properties:
+        name: { type: string, minLength: 1 }
+        status: { type: string, enum: [UP, DEGRADED, DOWN] }
+        detail: { type: string }
+        code:
+          type: string
+          pattern: "^PDR-HEALTH-[A-Z0-9_-]+$"
+          description: Stable machine-readable fault code; omitted while healthy
+        remediation:
+          type: string
+          description: Operator action; omitted while healthy
+        affected:
+          type: array
+          items: { type: string, minLength: 1 }
+    HealthDetail:
+      type: object
+      required: [schemaVersion, status, live, ready, components]
+      properties:
+        schemaVersion: { type: integer, const: 2 }
+        status: { type: string, enum: [UP, DEGRADED, DOWN] }
+        live: { type: boolean }
+        ready: { type: boolean }
+        components:
+          type: array
+          items: { $ref: "#/components/schemas/HealthComponent" }
     DeviceDescriptor:
       type: object
       required: [id, type, state, sequence, timestampMicroseconds, bundle, service, required]
@@ -86,6 +892,45 @@ components:
         lastSuccessMicroseconds: { type: integer }
         lastFailureMicroseconds: { type: integer }
         lastError: { type: string }
+        failure: { $ref: "#/components/schemas/DiagnosticFailure" }
+    ProtocolDiagnostics:
+      type: object
+      required: [successfulOperations, failedOperations, reconnectAttempts, sentMessages, receivedMessages, sentBytes, receivedBytes, timeouts, handlerFailures, lastError]
+      properties:
+        successfulOperations: { type: integer, minimum: 0 }
+        failedOperations: { type: integer, minimum: 0 }
+        reconnectAttempts: { type: integer, minimum: 0 }
+        sentMessages: { type: integer, minimum: 0 }
+        receivedMessages: { type: integer, minimum: 0 }
+        sentBytes: { type: integer, minimum: 0 }
+        receivedBytes: { type: integer, minimum: 0 }
+        timeouts: { type: integer, minimum: 0 }
+        handlerFailures: { type: integer, minimum: 0 }
+        lastError: { type: string }
+        failure: { $ref: "#/components/schemas/DiagnosticFailure" }
+    ProtocolDescriptor:
+      type: object
+      required: [id, type, bundle, service, required, autoReconnect, open]
+      properties:
+        id: { type: string, minLength: 1 }
+        type: { type: string, minLength: 1 }
+        bundle: { type: string }
+        service: { type: string, minLength: 1 }
+        required: { type: boolean }
+        autoReconnect: { type: boolean }
+        open: { type: boolean }
+        desiredOpen: { type: boolean }
+        diagnostics: { $ref: "#/components/schemas/ProtocolDiagnostics" }
+        error: { type: string }
+    ProtocolInventory:
+      type: object
+      required: [schemaVersion, count, protocols]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        count: { type: integer, minimum: 0 }
+        protocols:
+          type: array
+          items: { $ref: "#/components/schemas/ProtocolDescriptor" }
     DeviceInventory:
       type: object
       required: [schemaVersion, count, devices]

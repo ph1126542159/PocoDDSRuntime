@@ -33,7 +33,8 @@ struct Message
 
 using ClientDiagnostics = PocoDDS::Protocols::ProtocolDiagnostics;
 
-class MqttClient final : public PocoDDS::Protocols::DiagnosticProtocol
+class MqttClient final : public PocoDDS::Protocols::DiagnosticProtocol,
+                         public PocoDDS::Protocols::FailureDiagnosticProtocol
 {
 public:
     struct Options
@@ -72,6 +73,7 @@ public:
     void unsubscribe(const std::string& topic);
     void setMessageHandler(MessageHandler handler);
     ClientDiagnostics diagnostics() const override;
+    PocoDDS::Reliability::Failure failure() const override;
 
 private:
     static void onConnectionLost(void* context, char* cause);
@@ -95,5 +97,6 @@ private:
     MessageHandler _handler;
     std::map<std::string, QoS> _subscriptions;
     ClientDiagnostics _diagnostics;
+    PocoDDS::Reliability::Failure _failure;
 };
 } // namespace PocoDDS::Protocols::MQTT

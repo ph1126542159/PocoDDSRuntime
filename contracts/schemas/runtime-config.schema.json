@@ -9,14 +9,61 @@
     "pdr.fastdds.domainId"
   ],
   "properties": {
+    "logging.loggers.root.level": { "type": "string", "enum": ["fatal", "critical", "error", "warning", "notice", "information", "debug", "trace"] },
     "security.profile": { "type": "string", "enum": ["development", "production"] },
     "osp.web.server.host": { "type": "string", "minLength": 1 },
     "osp.web.server.securePort": { "type": "integer", "minimum": 0, "maximum": 65535 },
     "osp.web.authServiceName": { "type": "string" },
+    "osp.web.tokenValidatorName": { "type": "string" },
     "auth.simple.enable": { "type": "boolean" },
     "osp.web.server.port": { "type": "integer", "minimum": 1, "maximum": 65535 },
     "pdr.fastdds.domainId": { "type": "integer", "minimum": 0, "maximum": 232 },
     "pdr.subprocess.shutdownTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+    "pdr.management.manageableBundles": { "type": "string" },
+    "pdr.management.authentication.required": { "type": "boolean" },
+    "pdr.management.authentication.tokenEnvironment": { "type": "string", "pattern": "^$|^[A-Za-z_][A-Za-z0-9_]*$" },
+    "pdr.management.authentication.tokenFile": { "type": "string" },
+    "pdr.management.authentication.principals.count": { "type": "integer", "minimum": 0, "maximum": 64 },
+    "pdr.management.idempotency.requireRequestId": { "type": "boolean" },
+    "pdr.management.idempotency.retention": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.management.idempotency.ttlMilliseconds": { "type": "integer", "minimum": 1000, "maximum": 2147483647 },
+    "pdr.management.idempotency.persistence.enabled": { "type": "boolean" },
+    "pdr.management.idempotency.persistence.path": { "type": "string", "minLength": 1 },
+    "pdr.management.audit.enabled": { "type": "boolean" },
+    "pdr.management.audit.path": { "type": "string", "minLength": 1 },
+    "pdr.management.audit.maximumBytes": { "type": "integer", "minimum": 1024, "maximum": 1073741824 },
+    "pdr.management.tasks.workerCount": { "type": "integer", "minimum": 1, "maximum": 8 },
+    "pdr.management.tasks.capacity": { "type": "integer", "minimum": 1, "maximum": 10000 },
+    "pdr.management.tasks.retention": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.management.tasks.health.degradedWaitMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+    "pdr.management.tasks.persistence.enabled": { "type": "boolean" },
+    "pdr.management.tasks.persistence.path": { "type": "string", "minLength": 1 },
+    "pdr.plugins.quarantine.enabled": { "type": "boolean" },
+    "pdr.plugins.quarantine.failureThreshold": { "type": "integer", "minimum": 1, "maximum": 1000 },
+    "pdr.plugins.quarantine.path": { "type": "string", "minLength": 1 },
+    "pdr.alerts.debounceMilliseconds": { "type": "integer", "minimum": 0, "maximum": 604800000 },
+    "pdr.alerts.escalationMilliseconds": { "type": "integer", "minimum": 0, "maximum": 604800000 },
+    "pdr.alerts.retention": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.alerts.silencedCodes": { "type": "string" },
+    "pdr.alerts.deliveryQueueCapacity": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.alerts.deliveryFailureThreshold": { "type": "integer", "minimum": 1, "maximum": 1000 },
+    "pdr.alerts.deliveryCircuitOpenMilliseconds": { "type": "integer", "minimum": 100, "maximum": 3600000 },
+    "pdr.alerts.history.enabled": { "type": "boolean" },
+    "pdr.alerts.history.path": { "type": "string", "minLength": 1 },
+    "pdr.alerts.history.maximumBytes": { "type": "integer", "minimum": 1024, "maximum": 1073741824 },
+    "pdr.alerts.webhook.enabled": { "type": "boolean" },
+    "pdr.alerts.webhook.count": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "pdr.alerts.webhook.url": { "type": "string" },
+    "pdr.alerts.webhook.timeoutMilliseconds": { "type": "integer", "minimum": 100, "maximum": 60000 },
+    "pdr.alerts.webhook.maximumAttempts": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "pdr.alerts.webhook.initialBackoffMilliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 },
+    "pdr.alerts.webhook.maximumBackoffMilliseconds": { "type": "integer", "minimum": 0, "maximum": 60000 },
+    "pdr.alerts.webhook.authorizationEnvironment": { "type": "string", "pattern": "^$|^[A-Za-z_][A-Za-z0-9_]*$" },
+    "pdr.alerts.webhook.caCertificate": { "type": "string" },
+    "pdr.alerts.webhook.clientCertificate": { "type": "string" },
+    "pdr.alerts.webhook.privateKey": { "type": "string" },
+    "pdr.alerts.webhook.privateKeyPasswordEnvironment": { "type": "string", "pattern": "^$|^[A-Za-z_][A-Za-z0-9_]*$" },
+    "pdr.alerts.webhook.insecureSkipVerify": { "type": "boolean" },
     "observability.history.retentionDays": { "type": "integer", "minimum": 1, "maximum": 36500 },
     "observability.metrics.serviceName": { "type": "string", "minLength": 1 },
     "observability.metrics.serviceInstanceId": { "type": "string" },
@@ -61,6 +108,45 @@
     "pdr.gnss.staleAfterMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 }
   },
   "patternProperties": {
+    "^pdr\\.management\\.authentication\\.principals\\.[0-9]+\\.id$": {
+      "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+    },
+    "^pdr\\.management\\.authentication\\.principals\\.[0-9]+\\.tokenEnvironment$": {
+      "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "^pdr\\.management\\.authentication\\.principals\\.[0-9]+\\.tokenFile$": {
+      "type": "string", "minLength": 1
+    },
+    "^pdr\\.management\\.authentication\\.principals\\.[0-9]+\\.permissions$": {
+      "type": "string", "minLength": 1
+    },
+    "^pdr\\.alerts\\.webhook\\.[0-9]+\\.id$": {
+      "type": "string", "minLength": 1
+    },
+    "^pdr\\.alerts\\.webhook\\.[0-9]+\\.enabled$": {
+      "type": "boolean"
+    },
+    "^pdr\\.alerts\\.webhook\\.[0-9]+\\.url$": {
+      "type": "string", "minLength": 1
+    },
+    "^pdr\\.alerts\\.webhook\\.[0-9]+\\.timeoutMilliseconds$": {
+      "type": "integer", "minimum": 100, "maximum": 60000
+    },
+    "^pdr\\.alerts\\.webhook\\.[0-9]+\\.(initialBackoffMilliseconds|maximumBackoffMilliseconds)$": {
+      "type": "integer", "minimum": 0, "maximum": 60000
+    },
+    "^pdr\\.alerts\\.webhook\\.[0-9]+\\.maximumAttempts$": {
+      "type": "integer", "minimum": 1, "maximum": 10
+    },
+    "^pdr\\.alerts\\.webhook\\.[0-9]+\\.(authorizationEnvironment|privateKeyPasswordEnvironment)$": {
+      "type": "string", "pattern": "^$|^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "^pdr\\.alerts\\.webhook\\.[0-9]+\\.(caCertificate|clientCertificate|privateKey)$": {
+      "type": "string"
+    },
+    "^pdr\\.alerts\\.webhook\\.[0-9]+\\.insecureSkipVerify$": {
+      "type": "boolean"
+    },
     "^pdr\\.(simulation|modbus|serial|gnss|gpio|xbee|can|led)\\.count$": {
       "type": "integer", "minimum": 0, "maximum": 256
     },

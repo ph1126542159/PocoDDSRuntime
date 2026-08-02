@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <utility>
 
 namespace PocoDDS::Reliability
 {
@@ -22,6 +23,43 @@ enum class FailureKind
     hardware,
     safety
 };
+
+inline const char* toString(FailureKind kind) noexcept
+{
+    switch (kind)
+    {
+    case FailureKind::transient: return "transient";
+    case FailureKind::permanent: return "permanent";
+    case FailureKind::configuration: return "configuration";
+    case FailureKind::hardware: return "hardware";
+    case FailureKind::safety: return "safety";
+    }
+    return "permanent";
+}
+
+struct Failure
+{
+    std::string code;
+    FailureKind kind{FailureKind::permanent};
+    bool retryable{false};
+    bool active{false};
+    std::int64_t occurredAtMicroseconds{0};
+    std::string message;
+};
+
+inline Failure makeFailure(std::string code, FailureKind kind, bool retryable,
+                           std::string message)
+{
+    const auto now = std::chrono::system_clock::now().time_since_epoch();
+    return {std::move(code), kind, retryable, true,
+            std::chrono::duration_cast<std::chrono::microseconds>(now).count(),
+            std::move(message)};
+}
+
+inline void resolve(Failure& failure) noexcept
+{
+    failure.active = false;
+}
 
 class Deadline
 {

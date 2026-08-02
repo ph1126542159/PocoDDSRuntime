@@ -19,6 +19,9 @@ struct Report
     std::string component;
     Status status{Status::up};
     std::string detail;
+    std::string code;
+    std::string remediation;
+    std::vector<std::string> affected;
 };
 
 class IHealthContributor

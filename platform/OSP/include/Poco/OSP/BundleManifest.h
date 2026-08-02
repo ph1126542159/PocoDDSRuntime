@@ -127,7 +127,7 @@ public:
 		/// bundle extends, or an empty string
 		/// if the bundle is not an extension bundle.
 
-	Poco::Util::AbstractConfiguration& rawManifest() const;
+	const Poco::Util::AbstractConfiguration& rawManifest() const;
 		/// Returns a reference to the configuration containing
 		/// the raw manifest data.
 

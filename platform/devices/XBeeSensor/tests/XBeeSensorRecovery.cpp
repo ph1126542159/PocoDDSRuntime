@@ -112,7 +112,11 @@ int main()
     if (!waitFor([&] {
             return sensor.snapshot().state == PocoDDS::Devices::DeviceState::offline;
         }, 1500)) return 9;
-    if (sensor.diagnostics().lastError != "XBee sample stale") return 10;
+    const auto stale = sensor.diagnostics();
+    const auto failure = sensor.failure();
+    if (stale.lastError != "XBee sample stale" ||
+        failure.code != "PDR-DEVICE-XBEE-OPERATION_FAILED" ||
+        !failure.active || !failure.retryable) return 10;
     sensor.stop();
     return 0;
 }

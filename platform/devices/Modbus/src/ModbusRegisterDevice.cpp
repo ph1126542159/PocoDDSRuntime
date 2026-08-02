@@ -172,7 +172,7 @@ void ModbusRegisterDevice::markSuccess(const std::string& result)
         ++_diagnostics.successfulOperations;
         _diagnostics.consecutiveFailures = 0;
         _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
-        _diagnostics.lastError.clear();
+        resolveFailure(_diagnostics, _failure);
     }
 }
 
@@ -184,7 +184,8 @@ void ModbusRegisterDevice::markFailure(const std::string& message)
     ++_diagnostics.failedOperations;
     ++_diagnostics.consecutiveFailures;
     _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
-    _diagnostics.lastError = message;
+    recordFailure(_diagnostics, _failure, "PDR-DEVICE-MODBUS-OPERATION_FAILED",
+                  Reliability::FailureKind::transient, true, message);
 }
 
 void ModbusRegisterDevice::setSnapshotHandler(SnapshotHandler handler)
@@ -197,6 +198,12 @@ DeviceDiagnostics ModbusRegisterDevice::diagnostics() const
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     return _diagnostics;
+}
+
+PocoDDS::Reliability::Failure ModbusRegisterDevice::failure() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _failure;
 }
 
 void ModbusRegisterDevice::notify()

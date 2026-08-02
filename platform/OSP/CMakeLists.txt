@@ -98,6 +98,19 @@ target_include_directories(OSP
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+set_target_properties(OSP PROPERTIES EXPORT_NAME OSP)
+add_library(PDRPlugins INTERFACE)
+add_library(PocoDDS::Plugins ALIAS PDRPlugins)
+set_target_properties(PDRPlugins PROPERTIES EXPORT_NAME Plugins)
+target_link_libraries(PDRPlugins INTERFACE PocoDDS::SDK Poco::OSP)
+target_compile_definitions(PDRPlugins INTERFACE POCO_NO_AUTOMATIC_LIBS)
+
+install(TARGETS OSP PDRPlugins EXPORT PocoDDSRuntimeTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
 set(MYIOT_OSP_BUNDLE_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -116,10 +129,12 @@ add_subdirectory(Web)
 add_subdirectory(WebServer)
 add_subdirectory(SecureWebServer)
 add_subdirectory(SimpleAuth)
+add_subdirectory(ManagementAuth)
 add_subdirectory(BundleAdmin)
 add_subdirectory(WebEvent)
 add_subdirectory(HealthEndpoint)
 if(PDR_ENABLE_OBSERVABILITY)
+    add_subdirectory(AlertWebhook)
     add_subdirectory(SystemMonitoring)
 endif()
 add_subdirectory(StripBundle)

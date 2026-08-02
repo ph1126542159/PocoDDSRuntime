@@ -33,10 +33,10 @@ function(pdr_configure_subprocess target)
         COMMAND ${CMAKE_COMMAND} -E make_directory
             "$<TARGET_FILE_DIR:${target}>/logs"
             "$<TARGET_FILE_DIR:${target}>/bundles"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_RUNTIME_DLLS:${target}>
-            "$<TARGET_FILE_DIR:${target}>"
-        COMMAND_EXPAND_LISTS
+        COMMAND ${CMAKE_COMMAND}
+            "-DPDR_DESTINATION=$<TARGET_FILE_DIR:${target}>"
+            "-DPDR_RUNTIME_DLLS=$<JOIN:$<TARGET_RUNTIME_DLLS:${target}>,|>"
+            -P "${CMAKE_SOURCE_DIR}/cmake/CopyRuntimeDlls.cmake"
         VERBATIM)
 
     # OpenSSL is discovered through FindOpenSSL and its imported targets do not

@@ -3,8 +3,11 @@
 
 #include "Poco/Exception.h"
 #include "Poco/Util/MapConfiguration.h"
+#include "Poco/Environment.h"
+#include "Poco/TemporaryFile.h"
 
 #include <algorithm>
+#include <fstream>
 #include <iostream>
 
 int main()
@@ -29,13 +32,42 @@ int main()
     valid.setString("osp.web.authServiceName", "");
     valid.setInt("osp.web.server.securePort", 0);
     valid.setBool("auth.simple.enable", true);
-    if (validator.validate(valid).size() != 3)
+    if (validator.validate(valid).size() != 5)
         return 4;
+    Poco::Environment::set("PDR_CONFIGURATION_TEST_MANAGEMENT_TOKEN", "test-token");
+    valid.setBool("pdr.management.authentication.required", true);
+    valid.setString("pdr.management.authentication.tokenEnvironment",
+                    "PDR_CONFIGURATION_TEST_MANAGEMENT_TOKEN");
+    valid.setBool("pdr.management.idempotency.requireRequestId", true);
     valid.setString("osp.web.authServiceName", "oidc.auth");
     valid.setInt("osp.web.server.securePort", 9443);
     valid.setBool("auth.simple.enable", false);
     if (!validator.validate(valid).empty())
         return 5;
+    valid.setInt("pdr.alerts.debounceMilliseconds", 2000);
+    valid.setInt("pdr.alerts.escalationMilliseconds", 1000);
+    if (validator.validate(valid).size() != 1)
+        return 51;
+    valid.setInt("pdr.alerts.escalationMilliseconds", 3000);
+    valid.setInt("pdr.alerts.retention", 0);
+    if (validator.validate(valid).size() != 1)
+        return 52;
+    valid.setInt("pdr.alerts.retention", 500);
+    valid.setBool("pdr.alerts.history.enabled", true);
+    if (validator.validate(valid).size() != 1)
+        return 54;
+    valid.setString("pdr.alerts.history.path", "data/alerts.jsonl");
+    valid.setInt("pdr.alerts.history.maximumBytes", 1024);
+    if (!validator.validate(valid).empty())
+        return 53;
+    valid.setInt("pdr.alerts.deliveryFailureThreshold", 0);
+    if (validator.validate(valid).size() != 1)
+        return 55;
+    valid.setInt("pdr.alerts.deliveryFailureThreshold", 5);
+    valid.setInt("pdr.alerts.deliveryCircuitOpenMilliseconds", 99);
+    if (validator.validate(valid).size() != 1)
+        return 56;
+    valid.setInt("pdr.alerts.deliveryCircuitOpenMilliseconds", 30000);
 
     Poco::Util::MapConfiguration legacy;
     legacy.setBool("pdr.serial.enabled", true);
@@ -216,5 +248,195 @@ int main()
                                 issue.message.find("valid environment") != std::string::npos;
                      }))
         return 28;
+    multi.remove("pdr.ros.0.authorizationEnvironment");
+    multi.setBool("pdr.alerts.webhook.enabled", true);
+    multi.setString("pdr.alerts.webhook.url", "http://127.0.0.1:18080/alerts");
+    multi.setUInt("pdr.alerts.webhook.timeoutMilliseconds", 1000);
+    multi.setUInt("pdr.alerts.webhook.maximumAttempts", 3);
+    multi.setUInt("pdr.alerts.webhook.initialBackoffMilliseconds", 50);
+    multi.setUInt("pdr.alerts.webhook.maximumBackoffMilliseconds", 100);
+    multi.setString("pdr.alerts.webhook.authorizationEnvironment", "");
+    if (!validator.validate(multi).empty())
+        return 29;
+    multi.setUInt("pdr.alerts.webhook.maximumBackoffMilliseconds", 25);
+    const auto invalidBackoffIssues = validator.validate(multi);
+    if (std::none_of(invalidBackoffIssues.begin(), invalidBackoffIssues.end(),
+                     [](const auto& issue) {
+                         return issue.key == "pdr.alerts.webhook.maximumBackoffMilliseconds";
+                     }))
+        return 30;
+    multi.setUInt("pdr.alerts.webhook.maximumBackoffMilliseconds", 100);
+    multi.setString("pdr.alerts.webhook.authorizationEnvironment", "NOT VALID");
+    const auto invalidWebhookEnvironmentIssues = validator.validate(multi);
+    if (std::none_of(invalidWebhookEnvironmentIssues.begin(),
+                     invalidWebhookEnvironmentIssues.end(), [](const auto& issue) {
+                         return issue.key == "pdr.alerts.webhook.authorizationEnvironment" &&
+                                issue.message.find("valid environment") != std::string::npos;
+                     }))
+        return 31;
+    multi.setString("pdr.alerts.webhook.authorizationEnvironment", "");
+    multi.setString("pdr.alerts.webhook.url", "https://alerts.example.test/events");
+    multi.setString("security.profile", "production");
+    multi.setBool("pdr.alerts.webhook.insecureSkipVerify", true);
+    const auto insecureWebhookIssues = validator.validate(multi);
+    if (std::none_of(insecureWebhookIssues.begin(), insecureWebhookIssues.end(),
+                     [](const auto& issue) {
+                         return issue.key == "pdr.alerts.webhook.insecureSkipVerify";
+                     }))
+        return 32;
+    multi.setString("security.profile", "development");
+    multi.setUInt("pdr.alerts.webhook.count", 2);
+    multi.setString("pdr.alerts.webhook.0.id", "operations");
+    multi.setString("pdr.alerts.webhook.0.url", "https://ops.example.test/events");
+    multi.setUInt("pdr.alerts.webhook.0.timeoutMilliseconds", 1000);
+    multi.setString("pdr.alerts.webhook.1.id", "audit");
+    multi.setString("pdr.alerts.webhook.1.url", "http://127.0.0.1:18081/audit");
+    multi.setUInt("pdr.alerts.webhook.1.maximumAttempts", 1);
+    if (!validator.validate(multi).empty())
+        return 33;
+    multi.setString("pdr.alerts.webhook.1.id", "operations");
+    if (validator.validate(multi).empty())
+        return 34;
+    multi.setString("pdr.alerts.webhook.1.id", "audit");
+    multi.setString("pdr.management.manageableBundles",
+                    "pdr.service.*, pdr.alert.*, acme.customer.bundle");
+    if (!validator.validate(multi).empty())
+        return 35;
+    multi.setString("pdr.management.manageableBundles", "*");
+    if (validator.validate(multi).empty())
+        return 36;
+    multi.setString("pdr.management.manageableBundles", "acme.*,acme.*");
+    const auto duplicateManagementIssues = validator.validate(multi);
+    if (std::none_of(duplicateManagementIssues.begin(), duplicateManagementIssues.end(),
+                     [](const auto& issue) {
+                         return issue.key == "pdr.management.manageableBundles" &&
+                                issue.message.find("duplicate") != std::string::npos;
+                     }))
+        return 37;
+    multi.setString("pdr.management.manageableBundles",
+                    "pdr.service.*, pdr.alert.*, acme.customer.bundle");
+    multi.setString("logging.loggers.root.level", "verbose");
+    if (validator.validate(multi).empty())
+        return 38;
+    multi.setString("logging.loggers.root.level", "debug");
+    if (!validator.validate(multi).empty())
+        return 39;
+    multi.setBool("pdr.management.authentication.required", true);
+    multi.setString("pdr.management.authentication.tokenEnvironment", "");
+    if (validator.validate(multi).empty())
+        return 40;
+    multi.setString("pdr.management.authentication.tokenEnvironment", "NOT VALID");
+    if (validator.validate(multi).empty())
+        return 41;
+    multi.setString("pdr.management.authentication.tokenEnvironment",
+                    "PDR_CONFIGURATION_TEST_MANAGEMENT_TOKEN");
+    if (!validator.validate(multi).empty())
+        return 42;
+    Poco::Environment::set("PDR_CONFIGURATION_TEST_OPERATOR_TOKEN", "operator-token");
+    multi.setString("pdr.management.authentication.tokenEnvironment", "");
+    multi.setInt("pdr.management.authentication.principals.count", 1);
+    multi.setString("pdr.management.authentication.principals.0.id", "operator");
+    multi.setString("pdr.management.authentication.principals.0.tokenEnvironment",
+                    "PDR_CONFIGURATION_TEST_OPERATOR_TOKEN");
+    multi.setString("pdr.management.authentication.principals.0.permissions",
+                    "protocol.manage, process.manage, bundle.manage");
+    if (!validator.validate(multi).empty())
+        return 43;
+    multi.setString("pdr.management.authentication.principals.0.permissions",
+                    "protocol.manage,root.everything");
+    if (validator.validate(multi).empty())
+        return 44;
+    multi.setString("pdr.management.authentication.principals.0.permissions", "*");
+    if (!validator.validate(multi).empty())
+        return 45;
+    multi.setInt("pdr.management.authentication.principals.count", 2);
+    multi.setString("pdr.management.authentication.principals.1.id", "operator");
+    multi.setString("pdr.management.authentication.principals.1.tokenEnvironment",
+                    "PDR_CONFIGURATION_TEST_MANAGEMENT_TOKEN");
+    multi.setString("pdr.management.authentication.principals.1.permissions",
+                    "configuration.manage");
+    if (validator.validate(multi).empty())
+        return 46;
+    Poco::Environment::set("PDR_CONFIGURATION_TEST_DUPLICATE_TOKEN", "operator-token");
+    multi.setString("pdr.management.authentication.principals.1.id", "auditor");
+    multi.setString("pdr.management.authentication.principals.1.tokenEnvironment",
+                    "PDR_CONFIGURATION_TEST_DUPLICATE_TOKEN");
+    const auto duplicateTokenIssues = validator.validate(multi);
+    if (std::none_of(duplicateTokenIssues.begin(), duplicateTokenIssues.end(),
+                     [](const auto& issue) {
+                         return issue.key ==
+                                    "pdr.management.authentication.principals.1.tokenEnvironment" &&
+                                issue.message.find("duplicates another management bearer token value") !=
+                                    std::string::npos;
+                     }))
+        return 59;
+    multi.setInt("pdr.management.authentication.principals.count", 1);
+    Poco::TemporaryFile managementTokenFile;
+    {
+        std::ofstream tokenStream(managementTokenFile.path(),
+                                  std::ios::binary | std::ios::trunc);
+        tokenStream << "file-backed-token\n";
+        tokenStream.close();
+        if (!tokenStream.good()) return 60;
+    }
+    multi.setString("pdr.management.authentication.principals.0.tokenEnvironment", "");
+    multi.setString("pdr.management.authentication.principals.0.tokenFile",
+                    managementTokenFile.path());
+    if (!validator.validate(multi).empty()) return 61;
+    multi.setString("pdr.management.authentication.principals.0.tokenEnvironment",
+                    "PDR_CONFIGURATION_TEST_OPERATOR_TOKEN");
+    if (validator.validate(multi).empty()) return 62;
+    multi.setString("pdr.management.authentication.principals.0.tokenEnvironment", "");
+    {
+        std::ofstream tokenStream(managementTokenFile.path(),
+                                  std::ios::binary | std::ios::trunc);
+    }
+    if (validator.validate(multi).empty()) return 63;
+    {
+        std::ofstream tokenStream(managementTokenFile.path(),
+                                  std::ios::binary | std::ios::trunc);
+        tokenStream << "file-backed-token\n";
+    }
+    multi.setString("pdr.management.authentication.principals.0.permissions", "audit.read");
+    multi.setBool("pdr.management.audit.enabled", true);
+    multi.setString("pdr.management.audit.path", "");
+    if (validator.validate(multi).empty())
+        return 47;
+    multi.setString("pdr.management.audit.path", "management-audit.jsonl");
+    multi.setInt("pdr.management.audit.maximumBytes", 1023);
+    if (validator.validate(multi).empty())
+        return 48;
+    multi.setInt("pdr.management.audit.maximumBytes", 4194304);
+    multi.setInt("pdr.management.idempotency.retention", 0);
+    if (validator.validate(multi).empty()) return 56;
+    multi.setInt("pdr.management.idempotency.retention", 1000);
+    multi.setInt64("pdr.management.idempotency.ttlMilliseconds", 999);
+    if (validator.validate(multi).empty()) return 57;
+    multi.setInt64("pdr.management.idempotency.ttlMilliseconds", 86400000);
+    multi.setBool("pdr.management.idempotency.persistence.enabled", true);
+    multi.setString("pdr.management.idempotency.persistence.path", "");
+    if (validator.validate(multi).empty()) return 58;
+    multi.setString("pdr.management.idempotency.persistence.path",
+                    "management-idempotency.json");
+    if (!validator.validate(multi).empty())
+        return 49;
+    multi.setInt("pdr.management.tasks.workerCount", 0);
+    if (validator.validate(multi).empty())
+        return 50;
+    multi.setInt("pdr.management.tasks.workerCount", 2);
+    multi.setInt("pdr.management.tasks.capacity", 100);
+    multi.setInt("pdr.management.tasks.retention", 1000);
+    multi.setInt("pdr.management.tasks.health.degradedWaitMilliseconds", 0);
+    if (validator.validate(multi).empty()) return 55;
+    multi.setInt("pdr.management.tasks.health.degradedWaitMilliseconds", 30000);
+    if (!validator.validate(multi).empty())
+        return 51;
+    multi.setBool("pdr.management.tasks.persistence.enabled", true);
+    multi.setString("pdr.management.tasks.persistence.path", "");
+    if (validator.validate(multi).empty())
+        return 52;
+    multi.setString("pdr.management.tasks.persistence.path", "management-tasks.json");
+    if (!validator.validate(multi).empty())
+        return 53;
     std::cout << "CONFIGURATION_SMOKE_PASS\n";
 }

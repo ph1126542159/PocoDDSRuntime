@@ -1,8 +1,11 @@
 #pragma once
 
+#include "PocoDDS/Reliability/Reliability.h"
+
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <utility>
 
 namespace PocoDDS::Devices
 {
@@ -50,6 +53,23 @@ struct DeviceDiagnostics
     std::string lastError;
 };
 
+inline void resolveFailure(DeviceDiagnostics& diagnostics,
+                           PocoDDS::Reliability::Failure& failure) noexcept
+{
+    diagnostics.lastError.clear();
+    PocoDDS::Reliability::resolve(failure);
+}
+
+inline void recordFailure(DeviceDiagnostics& diagnostics,
+                          PocoDDS::Reliability::Failure& failure,
+                          std::string code, PocoDDS::Reliability::FailureKind kind,
+                          bool retryable, std::string message)
+{
+    diagnostics.lastError = message;
+    failure = PocoDDS::Reliability::makeFailure(
+        std::move(code), kind, retryable, std::move(message));
+}
+
 // Optional capability. Keeping diagnostics separate from Device preserves the
 // ABI of existing third-party device implementations.
 class DiagnosticDevice
@@ -57,6 +77,16 @@ class DiagnosticDevice
 public:
     virtual ~DiagnosticDevice() = default;
     virtual DeviceDiagnostics diagnostics() const = 0;
+};
+
+// Optional versioned extension. It is separate from DiagnosticDevice so
+// adding structured failures does not change existing third-party vtables or
+// the DeviceDiagnostics return layout.
+class FailureDiagnosticDevice
+{
+public:
+    virtual ~FailureDiagnosticDevice() = default;
+    virtual PocoDDS::Reliability::Failure failure() const = 0;
 };
 
 const char* toString(DeviceState state) noexcept;

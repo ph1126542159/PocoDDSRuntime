@@ -20,6 +20,8 @@ public:
         _knownOpen(protocol.isOpen()),
         _knownDiagnostics(protocol.diagnostics())
     {
+        if (auto* provider = dynamic_cast<FailureDiagnosticProtocol*>(&_protocol))
+            _knownFailure = provider->failure();
     }
 
     std::string name() const
@@ -40,12 +42,20 @@ public:
         if (operationLock.owns_lock())
         {
             auto snapshot = _protocol.diagnostics();
+            auto failure = failureSnapshot();
             std::lock_guard<std::mutex> snapshotLock(_snapshotMutex);
             _knownDiagnostics = snapshot;
+            _knownFailure = std::move(failure);
             return snapshot;
         }
         std::lock_guard<std::mutex> snapshotLock(_snapshotMutex);
         return _knownDiagnostics;
+    }
+
+    PocoDDS::Reliability::Failure failure() const
+    {
+        std::lock_guard<std::mutex> snapshotLock(_snapshotMutex);
+        return _knownFailure;
     }
 
     void open()
@@ -130,6 +140,21 @@ public:
     }
 
 private:
+    PocoDDS::Reliability::Failure failureSnapshot() const
+    {
+        if (auto* provider = dynamic_cast<const FailureDiagnosticProtocol*>(&_protocol))
+            return provider->failure();
+        PocoDDS::Reliability::Failure fallback;
+        const auto legacy = _protocol.diagnostics().lastError;
+        if (!legacy.empty())
+        {
+            fallback.code = "PDR-PROTOCOL-UNCLASSIFIED";
+            fallback.active = true;
+            fallback.message = legacy;
+        }
+        return fallback;
+    }
+
     DiagnosticProtocol& _protocol;
     const std::string _name;
     mutable std::mutex _mutex;
@@ -137,5 +162,6 @@ private:
     std::atomic<bool> _desiredOpen{true};
     mutable std::atomic<bool> _knownOpen{false};
     mutable ProtocolDiagnostics _knownDiagnostics;
+    mutable PocoDDS::Reliability::Failure _knownFailure;
 };
 }

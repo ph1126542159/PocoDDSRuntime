@@ -85,6 +85,8 @@ endif()
 set(_pdr_install_prefix "${CMAKE_CURRENT_SOURCE_DIR}/build/install")
 set(PDR_INSTALL_PREFIX "${_pdr_install_prefix}"
     CACHE PATH "Unified runtime and third-party installation prefix")
+option(PDR_RELEASE_REQUIRE_CLEAN
+    "Require a clean Git worktree when generating release artifacts" OFF)
 # Migrate the repository's former split dependency prefix. Explicit custom
 # prefixes (for example an ARM64 sysroot) remain untouched.
 if(PDR_INSTALL_PREFIX STREQUAL
@@ -110,10 +112,23 @@ set(PDR_PROFILE "custom" CACHE STRING "Deployment profile: embedded, edge-test, 
 set_property(CACHE PDR_PROFILE PROPERTY STRINGS embedded edge-test server custom)
 option(PDR_BUILD_WEBUI "Build and package administration WebUI page bundles" ON)
 option(PDR_BUILD_LAUNCHER "Build the independent runtime watchdog launcher" ON)
+option(PDR_BUILD_PLUGIN_HOST "Build the isolated OSP plugin host process" ON)
 option(PDR_BUILD_QT3D "Build the Qt3D demonstration subprocess" ON)
 if(NOT PDR_PROFILE MATCHES "^(embedded|edge-test|server|custom)$")
     message(FATAL_ERROR "Unsupported PDR_PROFILE: ${PDR_PROFILE}")
 endif()
+
+# External plugins carry this contract in their Bundle manifest. API versions use
+# semantic ranges; the ABI fingerprint is intentionally exact because OSP loads
+# plugin shared libraries into the Runtime process.
+set(PDR_PLUGIN_API_VERSION "1.0.0")
+set(PDR_PLUGIN_ABI_VERSION "1.0.0")
+string(REGEX MATCH "^[0-9]+" PDR_PLUGIN_COMPILER_MAJOR "${CMAKE_CXX_COMPILER_VERSION}")
+set(PDR_PLUGIN_ABI_FINGERPRINT
+    "${CMAKE_CXX_COMPILER_ID}-${PDR_PLUGIN_COMPILER_MAJOR}-${MYIOT_PLATFORM_OSNAME}-${MYIOT_PLATFORM_OSARCH}")
+math(EXPR PDR_PLUGIN_RUNTIME_NEXT_MINOR "${PROJECT_VERSION_MINOR} + 1")
+set(PDR_PLUGIN_RUNTIME_RANGE
+    "[${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.0,${PROJECT_VERSION_MAJOR}.${PDR_PLUGIN_RUNTIME_NEXT_MINOR}.0)")
 set(SHARED_LIBRARY_VERSION 1 CACHE STRING "Compatibility version for migrated platform libraries")
 
 include(PDRWarnings)
@@ -163,6 +178,7 @@ set(MYIOT_OSP_BUNDLE_OSARCH "${MYIOT_PLATFORM_OSARCH}")
 
 set(CMAKE_FOLDER "Platform")
 add_subdirectory(sdk)
+add_subdirectory(platform/security)
 add_subdirectory(platform/configuration)
 add_subdirectory(platform/reliability)
 add_subdirectory(platform/health)
@@ -243,11 +259,38 @@ if(BUILD_TESTING)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunGeneratedDeviceTest.cmake")
       set_tests_properties(generated-device-consumer PROPERTIES
           LABELS "sdk;device" TIMEOUT 90)
+      add_test(NAME generated-plugin-consumer
+        COMMAND "${CMAKE_COMMAND}"
+            -DPDR_CMAKE=${CMAKE_COMMAND}
+            -DPDR_CTEST=${CMAKE_CTEST_COMMAND}
+            -DPDR_PYTHON=${Python3_EXECUTABLE}
+            -DPDR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
+            -DPDR_CONFIG=$<CONFIG>
+            -DPDR_GENERATOR=${CMAKE_GENERATOR}
+            -DPDR_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+            -DPDR_DEPENDENCY_PREFIX=${PDR_INSTALL_PREFIX}
+            -DPDR_RUNTIME_FILE_NAME=$<TARGET_FILE_NAME:pdr-runtime>
+            -DPDR_PLUGIN_HOST_FILE_NAME=$<TARGET_FILE_NAME:pdr-plugin-host>
+            -DPDR_LAUNCHER_FILE_NAME=$<TARGET_FILE_NAME:pdr-launcher>
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunGeneratedPluginTest.cmake")
+      set_tests_properties(generated-plugin-consumer PROPERTIES
+          LABELS "sdk;plugin;runtime;integration" RESOURCE_LOCK pdr_runtime_http TIMEOUT 120)
     endif()
     if(Python3_Interpreter_FOUND)
         add_test(NAME developer-cli
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_pdr.py")
+        add_test(NAME plugin-transactions
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_plugin_manager.py")
+        set_tests_properties(plugin-transactions PROPERTIES
+            LABELS "plugin;release;recovery;security")
+        add_test(NAME service-ownership-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_service_ownership.py")
+        set_tests_properties(service-ownership-policy PROPERTIES
+            LABELS "runtime;security;release")
         add_test(NAME compatibility-baseline
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_compatibility.py"
@@ -298,6 +341,37 @@ if(BUILD_TESTING)
         add_test(NAME release-policy
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_release_manifest.py")
+        add_test(NAME release-qualification-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_release_qualification.py")
+        set_tests_properties(release-qualification-policy PROPERTIES LABELS "release")
+        add_test(NAME external-acceptance-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_external_acceptance.py"
+                --verifier "$<TARGET_FILE:pdr-signature-check>")
+        set_tests_properties(external-acceptance-policy PROPERTIES LABELS "release")
+        add_test(NAME evidence-bundle-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_evidence_bundle.py"
+                --verifier "$<TARGET_FILE:pdr-signature-check>")
+        set_tests_properties(evidence-bundle-policy PROPERTIES LABELS "release;security")
+        add_test(NAME release-pipeline-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_release_pipeline.py")
+        set_tests_properties(release-pipeline-policy PROPERTIES LABELS "release;recovery")
+        add_test(NAME release-signature-check
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_release_signature_check.py"
+                --executable "$<TARGET_FILE:pdr-signature-check>")
+        set_tests_properties(release-signature-check PROPERTIES LABELS "release;security")
+        add_test(NAME plugin-publisher-integration
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_plugin_publisher_integration.py"
+                --python "${Python3_EXECUTABLE}"
+                --pdr "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.py"
+                --verifier "$<TARGET_FILE:pdr-signature-check>")
+        set_tests_properties(plugin-publisher-integration PROPERTIES
+            LABELS "plugin;release;security" TIMEOUT 30)
         add_test(NAME dependency-lock
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_dependency_lock.py")
@@ -306,29 +380,53 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_release_matrix.py")
         add_test(NAME release-artifacts
             COMMAND "${CMAKE_COMMAND}"
+                -DPDR_CMAKE=${CMAKE_COMMAND}
                 -DPDR_PYTHON=${Python3_EXECUTABLE}
                 -DPDR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                 -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
+                -DPDR_CONFIG=$<CONFIG>
                 -DPDR_VERSION=${PROJECT_VERSION}
+                -DPDR_REQUIRE_CLEAN=${PDR_RELEASE_REQUIRE_CLEAN}
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunReleaseValidation.cmake")
         add_test(NAME upgrade-rollback
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_upgrade_manager.py")
         if(NOT CMAKE_CROSSCOMPILING)
+            add_test(NAME runtime-upgrade-acceptance-integration
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/upgrade_transaction_integration.py"
+                    --cmake "${CMAKE_COMMAND}"
+                    --python "${Python3_EXECUTABLE}"
+                    --source "${CMAKE_CURRENT_SOURCE_DIR}"
+                    --build "${CMAKE_BINARY_DIR}"
+                    --config "$<CONFIG>"
+                    --version "${PROJECT_VERSION}"
+                    --runtime-file-name "$<TARGET_FILE_NAME:pdr-runtime>"
+                    --signature-check-executable "$<TARGET_FILE:pdr-signature-check>"
+                    --cycles 3
+                    --workspace "${CMAKE_BINARY_DIR}/reports/runtime-upgrade-acceptance-workspace"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-upgrade-acceptance-integration.json")
+            set_tests_properties(runtime-upgrade-acceptance-integration PROPERTIES
+                LABELS "runtime;release;integration;recovery"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 120)
             add_test(NAME runtime-package-smoke
                 COMMAND "${CMAKE_COMMAND}"
                     -DPDR_CMAKE=${CMAKE_COMMAND}
                     -DPDR_PYTHON=${Python3_EXECUTABLE}
                     -DPDR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                     -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
+                    -DPDR_DEPENDENCY_PREFIX=${PDR_INSTALL_PREFIX}
                     -DPDR_CONFIG=$<CONFIG>
                     -DPDR_RUNTIME_FILE_NAME=$<TARGET_FILE_NAME:pdr-runtime>
                     -DPDR_CONFIG_CHECK_FILE_NAME=$<TARGET_FILE_NAME:pdr-config-check>
+                    -DPDR_IDENTITY_CHECK_FILE_NAME=$<TARGET_FILE_NAME:pdr-identity-check>
+                    -DPDR_SIGNATURE_CHECK_FILE_NAME=$<TARGET_FILE_NAME:pdr-signature-check>
                     -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunRuntimePackageSmoke.cmake")
             set_tests_properties(runtime-package-smoke PROPERTIES
                 LABELS "runtime;release"
                 RESOURCE_LOCK pdr_runtime_http
-                TIMEOUT 60)
+                TIMEOUT 45)
             if(PDR_BUILD_WEBUI)
                 add_test(NAME runtime-web-protocol-diagnostics
                     COMMAND "${Python3_EXECUTABLE}"
@@ -343,10 +441,19 @@ if(BUILD_TESTING)
                         --path "$<TARGET_FILE_DIR:pdr-runtime>"
                         --endpoint "/home/"
                         --endpoint "/api/v1/protocols"
+                        --endpoint "/api/v1/diagnostic-events"
+                        --endpoint "/api/v1/alerts"
+                        --endpoint "/api/v1/alert-sinks"
+                        --endpoint "/api/v1/business-traces"
                         --endpoint "/api/v1/metrics"
+                        --endpoint "/health/detail"
+                        --endpoint "/webevent"
+                        --expect-status "/webevent=401"
                         --follow-html-assets
                         --require-body "assets/app-[A-Za-z0-9_-]+\\.js"
                         --require-body "现场协议运行诊断"
+                        --require-body "投递通道"
+                        --require-body "个已注册"
                         --require-body "Broker 发布订阅"
                         --require-body "ROS Bridge"
                         --require-body "\"protocols\""
@@ -362,23 +469,120 @@ if(BUILD_TESTING)
                         --set "pdr.ros.0.uri=ws://127.0.0.1:1"
                         --set "pdr.ros.0.required=false"
                         --set "pdr.ros.0.autoReconnect=false"
+                        --set "pdr.alerts.debounceMilliseconds=0"
+                        --set "pdr.alerts.silencedCodes=PDR-PROTOCOL-ROS-*"
                         --post "/api/v1/protocols={\"id\":\"runtime-udp\",\"action\":\"close\"}"
                         --post "/api/v1/protocols={\"id\":\"runtime-udp\",\"action\":\"open\"}"
+                        --post-interval 0.25
+                        --post-health-interval 0.1
+                        --post-expect-status "1:/health/ready=503"
                         --require-log "Optional protocol runtime-ros-offline failed to open"
+                        --require-log "alert.event=alert.opened"
+                        --require-body "\"status\":\"silenced\""
+                        --require-body "local-history"
+                        --require-body "\"silenced\":true"
                         --require-log "Protocol gateway started with 2 protocol instance"
+                        --require-log "diagnostic.event=failure.detected domain=protocol instance=runtime-ros-offline error.code=PDR-PROTOCOL-ROS-CONNECT_FAILED"
                         --require-body "runtime-udp"
                         --require-body "runtime-ros-offline"
                         --require-body "\"type\":\"udp\""
                         --require-body "\"open\":true"
                         --require-body "\"open\":false"
+                        --require-body "PDR-PROTOCOL-ROS-CONNECT_FAILED"
+                        --require-body "\"event\":\"failure.detected\""
+                        --require-body "\"businessName\":\"runtime.diagnostics\""
+                        --require-body "\"businessInstanceId\":\"protocol:runtime-ros-offline\""
+                        --require-body "\"category\":\"transient\""
+                        --require-body "\"retryable\":true"
+                        --require-body "\"occurredAtMicroseconds\":"
                         --require-body "\"action\":\"close\""
                         --require-body "\"action\":\"open\""
                         --require-body "pdr.protocol.operations"
+                        --require-body "pdr.health.component.samples"
+                        --require-body "pdr.diagnostics.failure.samples"
+                        --require-body "\"schemaVersion\":2"
+                        --require-body "PDR-HEALTH-PROTOCOL-REQUIRED_CLOSED"
+                        --require-body "\"affected\":\\[\"runtime-udp\"\\]"
                         --report "${CMAKE_BINARY_DIR}/reports/runtime-web-protocol-diagnostics.json")
                 set_tests_properties(runtime-web-protocol-diagnostics PROPERTIES
                     LABELS "runtime;protocol;release;webui"
                     RESOURCE_LOCK pdr_runtime_http
                     TIMEOUT 45)
+                add_test(NAME runtime-webevent-auth-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_webevent_auth_integration.py"
+                        --python "${Python3_EXECUTABLE}"
+                        --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-webevent-auth-integration.json")
+                set_tests_properties(runtime-webevent-auth-integration PROPERTIES
+                    LABELS "runtime;security;integration;webui"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 60)
+                add_test(NAME runtime-identity-rotation-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_identity_rotation_integration.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-identity-rotation-integration.json")
+                set_tests_properties(runtime-identity-rotation-integration PROPERTIES
+                    LABELS "runtime;security;identity;integration"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 45)
+                add_test(NAME runtime-alert-debounce
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --timeout 12
+                        --stability-window 2
+                        --clear-code-cache
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --endpoint "/api/v1/alerts"
+                        --set "pdr.ros.count=1"
+                        --set "pdr.ros.0.id=runtime-ros-debounce"
+                        --set "pdr.ros.0.uri=ws://127.0.0.1:1"
+                        --set "pdr.ros.0.required=false"
+                        --set "pdr.ros.0.autoReconnect=false"
+                        --set "pdr.alerts.debounceMilliseconds=10000"
+                        --require-body "\"status\":\"pending\""
+                        --require-body "\"notified\":false"
+                        --forbid-log "alert.event=alert.opened"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-alert-debounce.json")
+                set_tests_properties(runtime-alert-debounce PROPERTIES
+                    LABELS "runtime;protocol;fault-injection;release"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 30)
+                add_test(NAME runtime-alert-history-degraded
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --timeout 12
+                        --stability-window 2
+                        --clear-code-cache
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --endpoint "/api/v1/alerts"
+                        --endpoint "/api/v1/alert-history"
+                        --set "pdr.alerts.history.path=?:/alerts.jsonl"
+                        --require-log "Alert history disabled after initialization failure"
+                        --require-body "\"enabled\":false"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-alert-history-degraded.json")
+                set_tests_properties(runtime-alert-history-degraded PROPERTIES
+                    LABELS "runtime;fault-injection;release"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 30)
             endif()
             add_test(NAME runtime-protocol-gateway-integration
                 COMMAND "${Python3_EXECUTABLE}"
@@ -389,9 +593,38 @@ if(BUILD_TESTING)
                     --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
                     --install-bin "${PDR_INSTALL_PREFIX}/bin"
                     --cycles 5
+                    --max-handle-growth 24
                     --report "${CMAKE_BINARY_DIR}/reports/runtime-protocol-gateway-integration.json")
             set_tests_properties(runtime-protocol-gateway-integration PROPERTIES
                 LABELS "runtime;protocol;integration;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 90)
+            add_test(NAME runtime-management-persistence-fault-integration
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_management_persistence_fault_integration.py"
+                    --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --install-bin "${PDR_INSTALL_PREFIX}/bin"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-management-persistence-fault.json")
+            set_tests_properties(runtime-management-persistence-fault-integration PROPERTIES
+                LABELS "runtime;fault-injection;security;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 45)
+            add_test(NAME runtime-restore-acceptance-integration
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_restore_acceptance_integration.py"
+                    --python "${Python3_EXECUTABLE}"
+                    --pdr "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.py"
+                    --executable "$<TARGET_FILE:pdr-runtime>"
+                    --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                    --install-bin "${PDR_INSTALL_PREFIX}/bin"
+                    --workspace "${CMAKE_BINARY_DIR}/reports/runtime-restore-acceptance-workspace"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-restore-acceptance-integration.json")
+            set_tests_properties(runtime-restore-acceptance-integration PROPERTIES
+                LABELS "runtime;integration;recovery;security;release"
                 RESOURCE_LOCK pdr_runtime_http
                 TIMEOUT 45)
             add_test(NAME runtime-multi-device-smoke
@@ -600,9 +833,28 @@ install(DIRECTORY "${PDR_BUNDLE_OUTPUT_DIRECTORY}/"
     DESTINATION "${CMAKE_INSTALL_BINDIR}/bundles"
     FILES_MATCHING PATTERN "*.bndl")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
-              "${PDR_GENERATED_SUBPROCESS_CONFIG}"
+               "${PDR_GENERATED_SUBPROCESS_CONFIG}"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.py"
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-production-identity.properties.example"
+              "${CMAKE_CURRENT_SOURCE_DIR}/config/release-pipeline.example.json"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples")
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/contracts/"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/contracts")
+install(PROGRAMS
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/release_manifest.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/release_qualification.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/external_acceptance.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/evidence_bundle.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/release_pipeline.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/upgrade_manager.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/plugin_manager.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/upgrade_transaction_integration.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/soak_runner.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/device_acceptance.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/protocol_acceptance.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/security_gate.py"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.ps1"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -642,6 +894,10 @@ configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PocoDDSRuntimeConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfig.cmake"
     INSTALL_DESTINATION "${PDR_PACKAGE_CMAKE_DIR}")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/pdr-plugin-runtime.json.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/pdr-plugin-runtime.json"
+    @ONLY)
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfigVersion.cmake"
     VERSION "${PROJECT_VERSION}"
@@ -653,7 +909,10 @@ install(EXPORT PocoDDSRuntimeTargets
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfigVersion.cmake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PocoDDSPlugins.cmake"
     DESTINATION "${PDR_PACKAGE_CMAKE_DIR}")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/pdr-plugin-runtime.json"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
 if(PDR_PROFILE STREQUAL "edge-test" AND PDR_BUILD_QT3D AND
    NOT TARGET pdr-qt3d-subprocess)

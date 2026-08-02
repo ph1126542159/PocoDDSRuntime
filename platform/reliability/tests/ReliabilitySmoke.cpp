@@ -1,10 +1,20 @@
 #include "PocoDDS/Reliability/Reliability.h"
+#include "PocoDDS/Reliability/AlertSink.h"
 
 #include <iostream>
 
 int main()
 {
     using namespace PocoDDS::Reliability;
+    struct CapturingSink final : AlertSink
+    {
+        void deliver(const AlertNotification& value) override { last = value; }
+        AlertNotification last;
+    } sink;
+    sink.deliver({"a1", "alert.opened", "device", "d1", "PDR-DEVICE-TEST",
+                  "firing", "warning", "trace1", "test", true, false, 1});
+    if (sink.last.instance != "d1" || !sink.last.retryable)
+        return 8;
     RetryPolicy retry;
     if (retry.delayFor(3) != std::chrono::milliseconds(400))
         return 1;

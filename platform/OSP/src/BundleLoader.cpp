@@ -285,7 +285,8 @@ void BundleLoader::startAllBundles()
 
 	for (std::vector<Bundle::Ptr>::iterator it = bundles.begin(); it != bundles.end(); ++it)
 	{
-		if ((*it)->state() == Bundle::BUNDLE_RESOLVED && !(*it)->lazyStart())
+		if ((*it)->state() == Bundle::BUNDLE_RESOLVED && !(*it)->lazyStart() &&
+			!(*it)->autoStartBlocked())
 		{
 			try
 			{

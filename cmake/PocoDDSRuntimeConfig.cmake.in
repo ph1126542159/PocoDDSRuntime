@@ -2,6 +2,13 @@
 
 include(CMakeFindDependencyMacro)
 
+set(PocoDDSRuntime_PLUGIN_API_VERSION "@PDR_PLUGIN_API_VERSION@")
+set(PocoDDSRuntime_PLUGIN_ABI_VERSION "@PDR_PLUGIN_ABI_VERSION@")
+set(PocoDDSRuntime_PLUGIN_ABI_FINGERPRINT "@PDR_PLUGIN_ABI_FINGERPRINT@")
+set(PocoDDSRuntime_PLUGIN_RUNTIME_RANGE "@PDR_PLUGIN_RUNTIME_RANGE@")
+set(PocoDDSRuntime_PLUGIN_COMPILER_ID "@CMAKE_CXX_COMPILER_ID@")
+set(PocoDDSRuntime_PLUGIN_COMPILER_MAJOR "@PDR_PLUGIN_COMPILER_MAJOR@")
+
 # No components keeps the original lightweight SDK behavior. Protocol users
 # request either Protocols or one or more individual protocol components.
 if(NOT PocoDDSRuntime_FIND_COMPONENTS)
@@ -9,7 +16,7 @@ if(NOT PocoDDSRuntime_FIND_COMPONENTS)
 endif()
 
 set(_pdr_known_components
-    SDK Protocols BtLE CAN Modbus MQTT ROS SerialProtocol UDP WebTunnelProtocol XBee)
+    SDK Security Plugins Protocols BtLE CAN Modbus MQTT ROS SerialProtocol UDP WebTunnelProtocol XBee)
 set(_pdr_poco_components Foundation Util)
 set(_pdr_need_paho FALSE)
 foreach(_pdr_component IN LISTS PocoDDSRuntime_FIND_COMPONENTS)
@@ -26,6 +33,9 @@ foreach(_pdr_component IN LISTS PocoDDSRuntime_FIND_COMPONENTS)
        _pdr_component STREQUAL "UDP" OR
        _pdr_component STREQUAL "WebTunnelProtocol")
         list(APPEND _pdr_poco_components Net)
+    endif()
+    if(_pdr_component STREQUAL "Plugins")
+        list(APPEND _pdr_poco_components Zip XML)
     endif()
     if(_pdr_component STREQUAL "Protocols" OR _pdr_component STREQUAL "ROS")
         list(APPEND _pdr_poco_components JSON)
@@ -50,6 +60,8 @@ include("${CMAKE_CURRENT_LIST_DIR}/PocoDDSRuntimeTargets.cmake")
 
 set(_pdr_component_targets
     SDK PocoDDS::SDK
+    Security PocoDDS::Security
+    Plugins PocoDDS::Plugins
     Protocols PocoDDS::Protocols
     BtLE PocoDDS::BtLE
     CAN PocoDDS::CAN
@@ -73,6 +85,10 @@ foreach(_pdr_index RANGE 0 ${_pdr_target_last} 2)
     endif()
 endforeach()
 check_required_components(PocoDDSRuntime)
+
+if("Plugins" IN_LIST PocoDDSRuntime_FIND_COMPONENTS)
+    include("${CMAKE_CURRENT_LIST_DIR}/PocoDDSPlugins.cmake")
+endif()
 
 unset(_pdr_component_targets)
 unset(_pdr_known_components)

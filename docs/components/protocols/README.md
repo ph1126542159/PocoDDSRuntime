@@ -22,6 +22,11 @@
 
 MQTT、ROS 和 UDP 返回统一的 `ProtocolDiagnostics` 快照，包括成功/失败操作、重连、收发消息与字节、超时、回调异常和最后错误。诊断读取是线程安全的，Runtime/Web 层不需要针对每个协议重新定义计数字段。
 
+MQTT、ROS 和 UDP 同时实现 ABI 独立的 `FailureDiagnosticProtocol`。结构化 `Failure` 提供稳定
+`PDR-PROTOCOL-*` 错误码、故障类别、是否可重试、是否仍活跃、发生时间和错误文本。成功操作只把
+`active` 置为 false，保留最近故障用于事后分析；旧 `lastError` 字段继续同步维护。第三方协议无需
+重新实现原接口，未迁移的自由文本错误由管理 API 标记为 `PDR-PROTOCOL-UNCLASSIFIED`。
+
 ```cmake
 find_package(PocoDDSRuntime CONFIG REQUIRED COMPONENTS Modbus CAN)
 target_link_libraries(my_bundle PRIVATE

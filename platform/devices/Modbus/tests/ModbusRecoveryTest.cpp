@@ -69,6 +69,7 @@ int main()
     }
     const auto failed = device.snapshot();
     const auto diagnostics = device.diagnostics();
+    const auto failure = device.failure();
     device.stop();
     responder.join();
 
@@ -79,7 +80,9 @@ int main()
         !writeFailed || failed.state != PocoDDS::Devices::DeviceState::fault ||
         diagnostics.successfulOperations != 1 || diagnostics.failedOperations != 2 ||
         diagnostics.reconnectAttempts != 1 || diagnostics.consecutiveFailures != 1 ||
-        diagnostics.lastError.empty() || notifications < 4)
+        diagnostics.lastError.empty() ||
+        failure.code != "PDR-DEVICE-MODBUS-OPERATION_FAILED" ||
+        !failure.active || !failure.retryable || notifications < 4)
     {
         std::cerr << "MODBUS_DEVICE_RECOVERY_FAIL value=" << value
                   << " success=" << diagnostics.successfulOperations

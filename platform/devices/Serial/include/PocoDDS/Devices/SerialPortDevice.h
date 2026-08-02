@@ -21,7 +21,8 @@ struct SerialReconnectPolicy
     std::chrono::milliseconds readTimeout{250};
 };
 
-class SerialPortDevice final : public SerialDevice, public DiagnosticDevice
+class SerialPortDevice final : public SerialDevice, public DiagnosticDevice,
+                               public FailureDiagnosticDevice
 {
 public:
     SerialPortDevice(std::string id, std::string port, int baudRate,
@@ -43,6 +44,7 @@ public:
     std::size_t write(const std::vector<std::uint8_t>& data) override;
     void setDataHandler(DataHandler handler) override;
     DeviceDiagnostics diagnostics() const override;
+    PocoDDS::Reliability::Failure failure() const override;
 
 private:
     void run();
@@ -61,6 +63,7 @@ private:
     DeviceState _state{DeviceState::offline};
     std::string _lastPayload;
     DeviceDiagnostics _diagnostics;
+    PocoDDS::Reliability::Failure _failure;
     SnapshotHandler _snapshotHandler;
     DataHandler _dataHandler;
 };

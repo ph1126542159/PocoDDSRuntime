@@ -18,6 +18,7 @@ target_include_directories(PDRProtocols
         $<INSTALL_INTERFACE:include>)
 target_link_libraries(PDRProtocols
     INTERFACE
+        PocoDDS::Reliability
         PocoDDS::BtLE
         PocoDDS::CAN
         PocoDDS::Modbus

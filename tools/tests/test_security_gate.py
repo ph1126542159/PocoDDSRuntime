@@ -31,7 +31,7 @@ class SecurityGateTests(unittest.TestCase):
                 "auth.simple.enable": "true",
             }
         )
-        self.assertEqual(len(errors), 3)
+        self.assertEqual(len(errors), 6)
 
     def test_inline_secret_is_rejected(self):
         errors = MODULE.validate(
@@ -43,11 +43,23 @@ class SecurityGateTests(unittest.TestCase):
         )
         self.assertTrue(any("inline secret" in error for error in errors))
 
+    def test_secret_file_and_environment_references_are_allowed(self):
+        errors = MODULE.validate({
+            "security.profile": "development",
+            "osp.web.server.host": "127.0.0.1",
+            "pdr.management.authentication.principals.0.tokenFile": "D:/secrets/operator.token",
+            "mqtt.passwordEnvironment": "PDR_MQTT_PASSWORD",
+        })
+        self.assertEqual(errors, [])
+
     def test_production_rejects_serial_loopback(self):
         errors = MODULE.validate({
             "security.profile": "production",
             "osp.web.server.securePort": "9443",
             "osp.web.authServiceName": "oidc",
+            "pdr.management.authentication.required": "true",
+            "pdr.management.authentication.principals.count": "1",
+            "pdr.management.idempotency.requireRequestId": "true",
             "pdr.serial.0.transport": "loopback",
         })
         self.assertEqual(errors, ["production prohibits serial loopback transport"])
@@ -57,6 +69,9 @@ class SecurityGateTests(unittest.TestCase):
             "security.profile": "production",
             "osp.web.server.securePort": "9443",
             "osp.web.authServiceName": "oidc",
+            "pdr.management.authentication.required": "true",
+            "pdr.management.authentication.principals.count": "1",
+            "pdr.management.idempotency.requireRequestId": "true",
             "pdr.can.0.transport": "loopback",
         })
         self.assertEqual(errors, ["production prohibits CAN loopback transport"])
@@ -66,6 +81,9 @@ class SecurityGateTests(unittest.TestCase):
             "security.profile": "production",
             "osp.web.server.securePort": "9443",
             "osp.web.authServiceName": "oidc",
+            "pdr.management.authentication.required": "true",
+            "pdr.management.authentication.principals.count": "1",
+            "pdr.management.idempotency.requireRequestId": "true",
             "pdr.gnss.0.transport": "loopback",
         })
         self.assertEqual(errors, ["production prohibits GNSS loopback transport"])
@@ -75,6 +93,9 @@ class SecurityGateTests(unittest.TestCase):
             "security.profile": "production",
             "osp.web.server.securePort": "9443",
             "osp.web.authServiceName": "oidc",
+            "pdr.management.authentication.required": "true",
+            "pdr.management.authentication.principals.count": "1",
+            "pdr.management.idempotency.requireRequestId": "true",
             "pdr.xbee.0.transport": "loopback",
         })
         self.assertEqual(errors, ["production prohibits XBee loopback transport"])

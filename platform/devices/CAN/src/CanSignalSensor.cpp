@@ -92,7 +92,7 @@ bool CanSignalSensor::ingest(const PocoDDS::Protocols::CAN::CanFrame& frame)
         ++_diagnostics.successfulOperations;
         _diagnostics.consecutiveFailures = 0;
         _diagnostics.lastSuccessMicroseconds = Poco::Timestamp().epochMicroseconds();
-        _diagnostics.lastError.clear();
+        resolveFailure(_diagnostics, _failure);
         _lastFrame = std::chrono::steady_clock::now();
         _lastPayload = Poco::NumberFormatter::format(_value, 3);
         current = {_options.id, _type, _state, _sequence,
@@ -204,7 +204,8 @@ void CanSignalSensor::markTransportFailure(const std::string& message)
     ++_diagnostics.failedOperations;
     ++_diagnostics.consecutiveFailures;
     _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
-    _diagnostics.lastError = message;
+    recordFailure(_diagnostics, _failure, "PDR-DEVICE-CAN-TRANSPORT_FAILED",
+                  Reliability::FailureKind::transient, true, message);
     _lastPayload = message;
 }
 
@@ -222,7 +223,9 @@ void CanSignalSensor::checkStale()
             ++_diagnostics.failedOperations;
             ++_diagnostics.consecutiveFailures;
             _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
-            _diagnostics.lastError = "CAN signal stale";
+            recordFailure(_diagnostics, _failure, "PDR-DEVICE-CAN-SIGNAL_STALE",
+                          Reliability::FailureKind::transient, true,
+                          "CAN signal stale");
             _lastPayload = "stale";
             current = {_options.id, _type, _state, _sequence,
                        Poco::Timestamp().epochMicroseconds(), _lastPayload};
@@ -258,5 +261,10 @@ DeviceDiagnostics CanSignalSensor::diagnostics() const
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     return _diagnostics;
+}
+PocoDDS::Reliability::Failure CanSignalSensor::failure() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _failure;
 }
 } // namespace PocoDDS::Devices

@@ -62,6 +62,12 @@ BundleManifest::~BundleManifest()
 }
 
 
+const Poco::Util::AbstractConfiguration& BundleManifest::rawManifest() const
+{
+	return *_pManifest;
+}
+
+
 void BundleManifest::parseManifest()
 {
 	std::string manifestVersion = _pManifest->getString(MANIFEST_VERSION);

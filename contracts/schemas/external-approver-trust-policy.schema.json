@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/contracts/external-approver-trust-policy.schema.json",
+  "title": "PocoDDSRuntime external acceptance approver trust policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "policyId", "allowedApprovers", "revokedKeys"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "product": { "const": "PocoDDSRuntimeExternalAcceptance" },
+    "policyId": { "type": "string", "minLength": 1 },
+    "allowedApprovers": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["approverId", "keyId", "algorithm", "publicKeyPath",
+                     "publicKeySha256", "acceptanceTypes"],
+        "properties": {
+          "approverId": { "type": "string", "minLength": 1 },
+          "keyId": { "type": "string", "minLength": 1 },
+          "algorithm": { "const": "Ed25519" },
+          "publicKeyPath": { "type": "string", "minLength": 1 },
+          "publicKeySha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "acceptanceTypes": {
+            "type": "array", "minItems": 1,
+            "items": { "enum": ["petalinux-target", "physical-protocols",
+                                  "production-identity", "site-network", "soak-24h", "soak-72h"] }
+          },
+          "notBefore": { "type": "string", "format": "date-time" },
+          "notAfter": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "revokedKeys": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["keyId", "revokedAt", "reason"],
+        "properties": {
+          "keyId": { "type": "string", "minLength": 1 },
+          "revokedAt": { "type": "string", "format": "date-time" },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

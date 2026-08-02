@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "product": "PocoDDSRuntime",
+  "policyId": "operations-2026-q3",
+  "allowedKeys": [
+    {
+      "keyId": "release-2026-q3",
+      "algorithm": "Ed25519",
+      "publicKeySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "notBefore": "2026-07-01T00:00:00Z",
+      "notAfter": "2026-10-01T00:00:00Z"
+    }
+  ],
+  "revokedKeys": []
+}

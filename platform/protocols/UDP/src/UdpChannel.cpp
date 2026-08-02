@@ -33,13 +33,14 @@ void UdpChannel::open()
         _socket.bind(_local);
         _open = true;
         ++_diagnostics.successfulOperations;
-        _diagnostics.lastError.clear();
+        resolveFailure(_diagnostics, _failure);
         metric.success();
     }
     catch (const std::exception& error)
     {
         ++_diagnostics.failedOperations;
-        _diagnostics.lastError = error.what();
+        recordFailure(_diagnostics, _failure, "PDR-PROTOCOL-UDP-OPEN_FAILED",
+                      Reliability::FailureKind::transient, true, error.what());
         throw;
     }
 }
@@ -82,14 +83,15 @@ std::size_t UdpChannel::send(const std::uint8_t* data, std::size_t size)
         ++_diagnostics.successfulOperations;
         ++_diagnostics.sentMessages;
         _diagnostics.sentBytes += sent;
-        _diagnostics.lastError.clear();
+        resolveFailure(_diagnostics, _failure);
         metric.success();
         return sent;
     }
     catch (const std::exception& error)
     {
         ++_diagnostics.failedOperations;
-        _diagnostics.lastError = error.what();
+        recordFailure(_diagnostics, _failure, "PDR-PROTOCOL-UDP-SEND_FAILED",
+                      Reliability::FailureKind::transient, true, error.what());
         throw;
     }
 }
@@ -130,14 +132,15 @@ Datagram UdpChannel::receiveDatagram(std::size_t capacity, Poco::Timespan timeou
         ++_diagnostics.successfulOperations;
         ++_diagnostics.receivedMessages;
         _diagnostics.receivedBytes += static_cast<std::size_t>(received);
-        _diagnostics.lastError.clear();
+        resolveFailure(_diagnostics, _failure);
         metric.success();
         return datagram;
     }
     catch (const std::exception& error)
     {
         ++_diagnostics.failedOperations;
-        _diagnostics.lastError = error.what();
+        recordFailure(_diagnostics, _failure, "PDR-PROTOCOL-UDP-RECEIVE_FAILED",
+                      Reliability::FailureKind::transient, true, error.what());
         throw;
     }
 }
@@ -154,5 +157,11 @@ ProtocolDiagnostics UdpChannel::diagnostics() const
 {
     std::lock_guard lock(_mutex);
     return _diagnostics;
+}
+
+PocoDDS::Reliability::Failure UdpChannel::failure() const
+{
+    std::lock_guard lock(_mutex);
+    return _failure;
 }
 } // namespace PocoDDS::Protocols::UDP

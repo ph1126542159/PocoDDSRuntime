@@ -7,7 +7,11 @@ add_executable(OSPBundleCreator
 set_target_properties(OSPBundleCreator
     PROPERTIES
     OUTPUT_NAME bundle
+    EXPORT_NAME BundleCreator
 )
+
+install(TARGETS OSPBundleCreator EXPORT PocoDDSRuntimeTargets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
 myiot_copy_windows_runtime_dlls(OSPBundleCreator)
 

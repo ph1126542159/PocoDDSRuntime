@@ -20,6 +20,10 @@
         <symbolicName>osp.web</symbolicName>
         <version>[1.0.0,2.0.0)</version>
       </bundle>
+      <bundle>
+        <symbolicName>pdr.platform.managementAuth</symbolicName>
+        <version>[1.0.0,2.0.0)</version>
+      </bundle>
     </requiredBundles>
   </manifest>
   <code>

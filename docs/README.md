@@ -12,7 +12,7 @@
 6. 平台治理入口：[分层规则](architecture/layering-rules.md)、[部署 Profile](architecture/deployment-profiles.md)、[稳定性与设备验收矩阵](operations/acceptance-matrix.md)、[ADR](adr/README.md)
 7. 运维入口：[运行手册](operations/runbook.md)、[故障排查](operations/troubleshooting.md)、[恢复手册](operations/recovery.md)
 8. 基于框架开发新产品时阅读：[公共 SDK 与脚手架](development/sdk-and-scaffolding.md)
-9. 生产部署和发布前阅读：[安全基线](security/README.md)
+9. 生产部署和发布前阅读：[安全基线](security/README.md)、[下一版本发布说明](releases/NEXT.md)、[迁移指南](migration/0.1.0-development.md)
 
 ## 项目目录结构
 
@@ -86,6 +86,7 @@ PocoDDSRuntime/
 - [Serial 底层库](components/platform-support/serial/README.md)
 - [WebTunnel 底层库](components/platform-support/web-tunnel/README.md)
 - [pdr-launcher](components/launcher/README.md)：独立看门狗/拉起程序
+- [pdr-plugin-host](components/plugin-host/README.md)：单插件进程隔离、心跳与状态协议
 
 ### 物理协议
 

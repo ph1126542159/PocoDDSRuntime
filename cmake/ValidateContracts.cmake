@@ -1,5 +1,13 @@
 set(required_files
     "${SOURCE_DIR}/contracts/schemas/runtime-config.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/release-trust-policy.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/plugin-trust-policy.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/plugin-host-state.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/release-qualification.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/external-acceptance.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/external-approver-trust-policy.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/evidence-bundle.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/release-pipeline.schema.json"
     "${SOURCE_DIR}/contracts/openapi/runtime.yaml"
     "${SOURCE_DIR}/contracts/asyncapi/runtime.yaml")
 foreach(path IN LISTS required_files)
@@ -13,6 +21,9 @@ foreach(path IN LISTS required_files)
 endforeach()
 
 file(READ "${SOURCE_DIR}/config/pdr-runtime.properties" runtime_properties)
+if(NOT EXISTS "${SOURCE_DIR}/config/pdr-production-identity.properties.example")
+    message(FATAL_ERROR "Production identity overlay example is missing")
+endif()
 foreach(required_key
         "osp.web.server.host"
         "osp.web.server.port"

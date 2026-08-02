@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/plugin-trust-policy.schema.json",
+  "title": "PocoDDSRuntime Plugin Publisher Trust Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "policyId", "allowedPublishers", "revokedKeys"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "product": { "const": "PocoDDSRuntimePlugin" },
+    "policyId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+    "allowedPublishers": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["publisherId", "keyId", "algorithm", "publicKeySha256", "pluginPatterns"],
+        "properties": {
+          "publisherId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+          "keyId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+          "algorithm": { "const": "Ed25519" },
+          "publicKeySha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "pluginPatterns": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^pdr\\.plugin\\." } },
+          "notBefore": { "type": "string", "format": "date-time" },
+          "notAfter": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "revokedKeys": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["keyId", "revokedAt", "reason"],
+        "properties": {
+          "keyId": { "type": "string", "minLength": 1 },
+          "revokedAt": { "type": "string", "format": "date-time" },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

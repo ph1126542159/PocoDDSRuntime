@@ -7,7 +7,7 @@ target_include_directories(PDRProtocolROS
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
-target_link_libraries(PDRProtocolROS PUBLIC Poco::Foundation Poco::JSON Poco::Net Poco::NetSSL)
+target_link_libraries(PDRProtocolROS PUBLIC PocoDDS::Reliability Poco::Foundation Poco::JSON Poco::Net Poco::NetSSL)
 pdr_set_warnings(PDRProtocolROS)
 set_target_properties(PDRProtocolROS PROPERTIES EXPORT_NAME ROS)
 

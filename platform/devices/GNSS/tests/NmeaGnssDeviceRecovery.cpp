@@ -82,7 +82,11 @@ int main()
             return !device.hasFix() &&
                 device.snapshot().state == PocoDDS::Devices::DeviceState::offline;
         }, 500)) return 4;
-    if (device.diagnostics().lastError != "GNSS fix invalid") return 5;
+    const auto invalid = device.diagnostics();
+    const auto invalidFailure = device.failure();
+    if (invalid.lastError != "GNSS fix invalid" ||
+        invalidFailure.code != "PDR-DEVICE-GNSS-FIX_INVALID" ||
+        !invalidFailure.active || !invalidFailure.retryable) return 5;
 
     channel->inject(
         "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A\r\n");
@@ -105,7 +109,11 @@ int main()
     if (!waitFor([&] {
             return device.snapshot().state == PocoDDS::Devices::DeviceState::offline;
         }, 1500)) return 12;
-    if (device.diagnostics().lastError != "GNSS fix stale") return 13;
+    const auto stale = device.diagnostics();
+    const auto staleFailure = device.failure();
+    if (stale.lastError != "GNSS fix stale" ||
+        staleFailure.code != "PDR-DEVICE-GNSS-FIX_STALE" ||
+        !staleFailure.active) return 13;
     device.stop();
     return 0;
 }

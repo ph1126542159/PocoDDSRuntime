@@ -443,33 +443,38 @@ private:
 			versionStr = _defaultVersion;
 		}
 		Poco::OSP::Version version(versionStr);
-		ManifestInfo::Dependencies requiredBundles;
+		auto readDependencies = [this](const std::string& collection)
+		{
+			ManifestInfo::Dependencies dependencies;
+			Poco::UInt32 index = 0;
+			std::string symbolicName;
+			do
+			{
+				std::string path(PREFIX + collection + "[");
+				path.append(Poco::NumberFormatter::format(index++));
+				path.append("].");
+				symbolicName = getString(path + "symbolicName", "");
+				std::string versionRange = getString(path + "version", "");
+				Poco::trimInPlace(symbolicName);
+				Poco::trimInPlace(versionRange);
+				if (!symbolicName.empty())
+				{
+					ManifestInfo::Dependency dependency;
+					dependency.symbolicName = symbolicName;
+					if (!versionRange.empty()) dependency.versions = versionRange;
+					dependencies.push_back(dependency);
+				}
+			}
+			while (!symbolicName.empty());
+			return dependencies;
+		};
+		ManifestInfo::Dependencies requiredBundles =
+			readDependencies("requiredBundles.bundle");
+		if (requiredBundles.empty())
+			requiredBundles = readDependencies("dependency");
 		Poco::UInt32 idx = 0;
 		std::string symName;
 		std::string versionRange;
-		do
-		{
-			std::string path(PREFIX+"dependency[");
-			path.append(Poco::NumberFormatter::format(idx++));
-			path.append("].");
-			symName = path + "symbolicName";
-			versionRange = path + "version";
-			symName = getString(symName, "");
-			versionRange = getString(versionRange, "");
-			Poco::trimInPlace(symName);
-			Poco::trimInPlace(versionRange);
-			if (!symName.empty())
-			{
-				ManifestInfo::Dependency dep;
-				dep.symbolicName = symName;
-				if (!versionRange.empty())
-				{
-					dep.versions = versionRange;
-				}
-				requiredBundles.push_back(dep);
-			}
-		}
-		while (!symName.empty());
 
 		ManifestInfo::Dependencies requiredModules;
 		idx = 0;
@@ -541,6 +546,17 @@ private:
 		out << BundleManifest::BUNDLE_SYMBOLICNAME << ": " << info.symbolicName() << std::endl;
 		out << BundleManifest::BUNDLE_VERSION << ": " << info.version().toString() << std::endl;
 		out << BundleManifest::BUNDLE_VENDOR << ": " << info.vendor() << std::endl;
+		const std::pair<const char*, const char*> pluginHeaders[] = {
+			{"PDR-Plugin-API", "manifest.pluginApi"},
+			{"PDR-Plugin-ABI", "manifest.pluginAbi"},
+			{"PDR-Plugin-ABI-Fingerprint", "manifest.pluginAbiFingerprint"},
+			{"PDR-Runtime-Version", "manifest.runtimeVersion"}
+		};
+		for (const auto& header : pluginHeaders)
+		{
+			const std::string value = getString(header.second, "");
+			if (!value.empty()) out << header.first << ": " << value << std::endl;
+		}
 		if (!info.copyright().empty())
 			out << BundleManifest::BUNDLE_COPYRIGHT << ": " << info.copyright() << std::endl;
 		if (!info.activatorClass().empty() && !info.activatorLibrary().empty())

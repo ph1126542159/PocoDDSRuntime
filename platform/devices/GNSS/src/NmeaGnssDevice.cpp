@@ -226,14 +226,16 @@ bool NmeaGnssDevice::ingestSentence(const std::string& sentence)
             ++_diagnostics.successfulOperations;
             _diagnostics.consecutiveFailures = 0;
             _diagnostics.lastSuccessMicroseconds = updated.timestampMicroseconds;
-            _diagnostics.lastError.clear();
+            resolveFailure(_diagnostics, _failure);
         }
         else
         {
             ++_diagnostics.failedOperations;
             ++_diagnostics.consecutiveFailures;
             _diagnostics.lastFailureMicroseconds = updated.timestampMicroseconds;
-            _diagnostics.lastError = "GNSS fix invalid";
+            recordFailure(_diagnostics, _failure, "PDR-DEVICE-GNSS-FIX_INVALID",
+                          Reliability::FailureKind::transient, true,
+                          "GNSS fix invalid");
         }
         ++_sequence;
     }
@@ -327,7 +329,10 @@ void NmeaGnssDevice::markFailure(const std::string& message, DeviceState state)
     ++_diagnostics.failedOperations;
     ++_diagnostics.consecutiveFailures;
     _diagnostics.lastFailureMicroseconds = Poco::Timestamp().epochMicroseconds();
-    _diagnostics.lastError = message;
+    recordFailure(_diagnostics, _failure,
+                  message == "GNSS fix stale" ? "PDR-DEVICE-GNSS-FIX_STALE"
+                                               : "PDR-DEVICE-GNSS-TRANSPORT_FAILED",
+                  Reliability::FailureKind::transient, true, message);
 }
 
 void NmeaGnssDevice::checkStale()
@@ -362,6 +367,12 @@ DeviceDiagnostics NmeaGnssDevice::diagnostics() const
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     return _diagnostics;
+}
+
+PocoDDS::Reliability::Failure NmeaGnssDevice::failure() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _failure;
 }
 
 } // namespace PocoDDS::Devices

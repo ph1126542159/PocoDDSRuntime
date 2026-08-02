@@ -119,10 +119,13 @@ int main()
     Poco::Thread::sleep(10);
     const auto writeSnapshot = writer.snapshot();
     const auto writeDiagnostics = writer.diagnostics();
+    const auto writeFailure = writer.failure();
     writer.stop();
     if (!failed || writeChannel->writeCount != 1 || writeChannel->openCount != 1 ||
         writeSnapshot.state != PocoDDS::Devices::DeviceState::fault ||
-        writeDiagnostics.failedOperations == 0)
+        writeDiagnostics.failedOperations == 0 ||
+        writeFailure.code != "PDR-DEVICE-SERIAL-OPERATION_FAILED" ||
+        !writeFailure.active || !writeFailure.retryable)
         return 3;
 
     std::cout << "SERIAL_RECOVERY_PASS read-reconnected=1 write-replayed=0\n";

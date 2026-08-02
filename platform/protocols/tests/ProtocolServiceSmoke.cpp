@@ -13,7 +13,8 @@
 
 namespace
 {
-class ConcurrencyProbeProtocol final : public PocoDDS::Protocols::DiagnosticProtocol
+class ConcurrencyProbeProtocol final : public PocoDDS::Protocols::DiagnosticProtocol,
+                                       public PocoDDS::Protocols::FailureDiagnosticProtocol
 {
 public:
     std::string name() const override
@@ -46,6 +47,14 @@ public:
     {
         Guard guard(*this);
         return _diagnostics;
+    }
+
+    PocoDDS::Reliability::Failure failure() const override
+    {
+        Guard guard(*this);
+        return {"PDR-PROTOCOL-TEST-LAST_FAILURE",
+                PocoDDS::Reliability::FailureKind::transient, true, false, 1,
+                "recovered test failure"};
     }
 
     int maximumConcurrency() const noexcept { return _maximumActive.load(); }
@@ -135,7 +144,8 @@ int main()
     start = true;
     for (auto& worker : workers) worker.join();
 
-    if (!service.isOpen() || protocol.maximumConcurrency() != 1)
+    if (!service.isOpen() || protocol.maximumConcurrency() != 1 ||
+        service.failure().code != "PDR-PROTOCOL-TEST-LAST_FAILURE")
     {
         std::cerr << "PROTOCOL_SERVICE_SMOKE_FAIL open=" << service.isOpen()
                   << " maximumConcurrency=" << protocol.maximumConcurrency() << '\n';

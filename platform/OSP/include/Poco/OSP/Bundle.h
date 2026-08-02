@@ -165,6 +165,13 @@ public:
 		/// Returns true if lazy start has been specified for
 		/// the bundle.
 
+	bool autoStartBlocked() const;
+		/// Returns true if automatic startup has been administratively blocked.
+
+	void setAutoStartBlocked(bool blocked);
+		/// Enables or disables the automatic-start guard. Explicit start() calls
+		/// remain possible so a management layer can apply its own reset gate.
+
 	bool sealed() const;
 		/// Returns true if the bundle is sealed and cannot be
 		/// extended by an extension bundle.
@@ -389,6 +396,7 @@ private:
 	mutable Poco::FastMutex _extensionBundlesMutex;
 	ResolvedDependencies    _resolvedDependencies;
 	ModuleProviders         _moduleProviders;
+	bool                    _autoStartBlocked{false};
 
 	friend class BundleLoader;
 	friend class BundleFactory;
@@ -502,6 +510,18 @@ inline bool Bundle::preventUninstall() const
 inline bool Bundle::lazyStart() const
 {
 	return _pManifest->lazyStart();
+}
+
+
+inline bool Bundle::autoStartBlocked() const
+{
+	return _autoStartBlocked;
+}
+
+
+inline void Bundle::setAutoStartBlocked(bool blocked)
+{
+	_autoStartBlocked = blocked;
 }
 
 

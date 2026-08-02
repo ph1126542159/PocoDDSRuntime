@@ -37,6 +37,8 @@ observability.metrics.offlineCacheMaximumFiles = 1000
 | 设备 | 在线和启动状态、命令类型/操作/结果、命令耗时 |
 | 工作流 | 执行结果、执行耗时、补偿结果 |
 | 协议 | Modbus、Serial、UDP、XBee、MQTT、ROS、SocketCAN、Bluetooth LE、WebTunnel 的操作、I/O 字节、错误和耗时 |
+| 告警 | `pdr.alert.transitions` 统计 opened、escalated、resolved；`pdr.alert.delivery` 按 Sink 统计 success、error、dropped |
+| 管理任务 | `pdr.management.tasks.queue.depth`、`workers.active`、`resource.waiting`、`queue.utilization` 和 `wait.max` |
 | 系统 | CPU、内存、磁盘、网络、线程和子进程 |
 | HTTP | 请求/响应数量和请求耗时，按方法、规范化路由及状态类别聚合 |
 

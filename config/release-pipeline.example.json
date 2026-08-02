@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "pipelineId": "windows-release",
+  "sourceRoot": "E:/PocoDDSRuntime",
+  "buildRoot": "E:/PocoDDSRuntime/build/full",
+  "stages": [
+    {
+      "id": "build",
+      "command": ["C:/Qt/Tools/CMake_64/bin/cmake.exe", "--build", "E:/PocoDDSRuntime/build/full", "--config", "Release"],
+      "timeoutSeconds": 3600,
+      "requiredOutputs": ["bin/pdr-runtime.exe", "bin/pdr-signature-check.exe"]
+    },
+    {
+      "id": "test",
+      "command": ["C:/Qt/Tools/CMake_64/bin/ctest.exe", "--test-dir", "E:/PocoDDSRuntime/build/full", "-C", "Release", "--output-on-failure", "-j", "2"],
+      "timeoutSeconds": 7200,
+      "requiredInputs": ["bin/pdr-runtime.exe"],
+      "requiredOutputs": ["Testing/Temporary/LastTest.log"]
+    },
+    {
+      "id": "qualify",
+      "command": [
+        "C:/Users/ph/AppData/Local/Programs/Python/Python311/python.exe", "E:/PocoDDSRuntime/tools/pdr.py",
+        "release", "qualify", "--source", "E:/PocoDDSRuntime", "--build", "E:/PocoDDSRuntime/build/full",
+        "--version", "0.1.0", "--config", "Release", "--ctest-log", "E:/PocoDDSRuntime/build/full/Testing/Temporary/LastTest.log",
+        "--expected-tests", "97", "--artifact-manifest", "E:/PocoDDSRuntime/build/full/reports/release-smoke/SHA256SUMS.json",
+        "--artifacts", "E:/PocoDDSRuntime/build/full/release-smoke-install",
+        "--evidence", "package=E:/PocoDDSRuntime/build/full/reports/runtime-package-smoke.json",
+        "--evidence", "upgrade=E:/PocoDDSRuntime/build/full/reports/runtime-upgrade-acceptance-integration.json",
+        "--evidence", "identity=E:/PocoDDSRuntime/build/full/reports/runtime-identity-rotation-integration.json",
+        "--evidence", "persistence=E:/PocoDDSRuntime/build/full/reports/runtime-management-persistence-fault.json",
+        "--evidence", "protocol=E:/PocoDDSRuntime/build/full/reports/runtime-protocol-gateway-integration.json",
+        "--required-external", "petalinux-target", "--required-external", "physical-protocols",
+        "--required-external", "production-identity", "--required-external", "site-network",
+        "--required-external", "soak-24h", "--required-external", "soak-72h",
+        "--report", "E:/PocoDDSRuntime/build/full/reports/release-qualification.json"
+      ],
+      "timeoutSeconds": 300,
+      "requiredInputs": ["Testing/Temporary/LastTest.log", "reports/release-smoke/SHA256SUMS.json"],
+      "requiredOutputs": ["reports/release-qualification.json"]
+    },
+    {
+      "id": "bundle",
+      "command": [
+        "C:/Users/ph/AppData/Local/Programs/Python/Python311/python.exe", "E:/PocoDDSRuntime/tools/pdr.py",
+        "release", "bundle-create", "--qualification", "E:/PocoDDSRuntime/build/full/reports/release-qualification.json",
+        "--include-artifacts", "--output", "E:/PocoDDSRuntime/build/full/reports/pdr-0.1.0-evidence.zip",
+        "--signature-output", "E:/PocoDDSRuntime/build/full/reports/pdr-0.1.0-evidence.sig.json",
+        "--key-id", "release-evidence-2026", "--private-key-path-environment", "PDR_EVIDENCE_BUNDLE_PRIVATE_KEY"
+      ],
+      "timeoutSeconds": 1800,
+      "requiredInputs": ["reports/release-qualification.json"],
+      "requiredOutputs": ["reports/pdr-0.1.0-evidence.zip", "reports/pdr-0.1.0-evidence.sig.json"]
+    }
+  ]
+}

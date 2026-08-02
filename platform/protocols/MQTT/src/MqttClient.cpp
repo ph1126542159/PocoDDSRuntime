@@ -288,7 +288,7 @@ int MqttClient::onMessageArrived(void* context,
         ++self->_diagnostics.successfulOperations;
         ++self->_diagnostics.receivedMessages;
         self->_diagnostics.receivedBytes += payloadSize;
-        self->_diagnostics.lastError.clear();
+        resolveFailure(self->_diagnostics, self->_failure);
     }
     PocoDDS::Protocols::ProtocolMetrics::emit(
         {"mqtt", "receive", success ? "success" : "error", 0, payloadSize});
@@ -308,19 +308,26 @@ void MqttClient::markSuccess()
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     ++_diagnostics.successfulOperations;
-    _diagnostics.lastError.clear();
+    resolveFailure(_diagnostics, _failure);
 }
 
 void MqttClient::markFailure(const std::string& message)
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     ++_diagnostics.failedOperations;
-    _diagnostics.lastError = message;
+    recordFailure(_diagnostics, _failure, "PDR-PROTOCOL-MQTT-OPERATION_FAILED",
+                  Reliability::FailureKind::transient, true, message);
 }
 
 ClientDiagnostics MqttClient::diagnostics() const
 {
     Poco::FastMutex::ScopedLock lock(_mutex);
     return _diagnostics;
+}
+
+PocoDDS::Reliability::Failure MqttClient::failure() const
+{
+    Poco::FastMutex::ScopedLock lock(_mutex);
+    return _failure;
 }
 } // namespace PocoDDS::Protocols::MQTT

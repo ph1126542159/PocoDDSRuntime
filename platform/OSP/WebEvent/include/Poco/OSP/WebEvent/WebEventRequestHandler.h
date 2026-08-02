@@ -48,9 +48,6 @@ public:
 		/// as the SUBSCRIBE message.
 
 private:
-	bool authenticate() const;
-	bool authorize() const;
-
 	WebEventServiceImpl::Ptr _pWebEventServiceImpl;
 	Poco::OSP::BundleContext::Ptr _pContext;
 };

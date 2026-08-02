@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/contracts/release-qualification.schema.json",
+  "title": "PocoDDSRuntime release qualification evidence",
+  "type": "object",
+  "required": [
+    "schemaVersion", "operation", "generatedAt", "verdict", "passed", "releaseApproved"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "operation": { "const": "release-qualification" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "verdict": {
+      "enum": ["DENIED", "LOCAL_VALIDATION_PASSED", "RELEASE_CANDIDATE_APPROVED"]
+    },
+    "passed": { "type": "boolean" },
+    "releaseApproved": { "type": "boolean" },
+    "tests": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "not-run", "sha256"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "not-run": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "releaseDenialReasons": { "type": "array", "items": { "type": "string" } },
+    "boundaries": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

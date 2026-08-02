@@ -3,8 +3,12 @@
 function(pdr_add_webui_bundle target bundle_spec)
     get_filename_component(spec "${bundle_spec}" ABSOLUTE
         BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-    file(GLOB_RECURSE resources CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/bundle/*")
+    if(ARGC GREATER 2 AND ARGV2 STREQUAL "GENERATED_RESOURCES")
+        set(resources "${ARGV3}")
+    else()
+        file(GLOB_RECURSE resources CONFIGURE_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/bundle/*")
+    endif()
     set(stamp "${CMAKE_CURRENT_BINARY_DIR}/${target}.bndl.stamp")
     add_custom_command(
         OUTPUT "${stamp}"

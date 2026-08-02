@@ -59,6 +59,16 @@
       "cacheVariables": {
         "PDR_AUTO_BOOTSTRAP_DEPENDENCIES": "ON"
       }
+    },
+    {
+      "name": "release",
+      "inherits": "server",
+      "displayName": "Governed release",
+      "description": "Production release gate; requires a clean Git worktree",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "PDR_RELEASE_REQUIRE_CLEAN": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -68,6 +78,12 @@
     {
       "name": "full",
       "configurePreset": "full",
+      "configuration": "Release",
+      "jobs": 2
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
       "configuration": "Release",
       "jobs": 2
     }
@@ -83,6 +99,12 @@
       "configurePreset": "edge-test",
       "description": "Deterministic dependency outage, retry, duplicate, backpressure and shutdown tests",
       "filter": { "include": { "label": "fault-injection" } },
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "description": "Full governed release suite with clean-worktree enforcement",
       "output": { "outputOnFailure": true }
     }
   ]

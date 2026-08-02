@@ -260,7 +260,7 @@ WebEventServiceImpl::~WebEventServiceImpl()
 {
 	try
 	{
-		_stopped = true;
+		_stopped.store(true, std::memory_order_release);
 		_mainQueue.wakeUpAll();
 		_workerQueue.wakeUpAll();
 		_mainThread.join();
@@ -313,7 +313,7 @@ bool WebEventServiceImpl::isA(const std::type_info& otherType) const
 
 void WebEventServiceImpl::runMain()
 {
-	while (!_stopped)
+	while (!_stopped.load(std::memory_order_acquire))
 	{
 		try
 		{
@@ -365,7 +365,7 @@ void WebEventServiceImpl::runMain()
 
 void WebEventServiceImpl::runWorker()
 {
-	while (!_stopped)
+	while (!_stopped.load(std::memory_order_acquire))
 	{
 		try
 		{
