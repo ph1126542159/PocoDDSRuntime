@@ -18,7 +18,7 @@
 `manual_rollback`，并且验收报告必须是 `signatureVerified=true`、算法为 `Ed25519`、记录实际
 `keyId` 和固定的公钥 SHA-256，且验收工作区不得残留发布私钥。
 2026-08-01 的 Windows 主机验收使用同一真实安装树连续执行 20 轮，报告
-`build/full/reports/runtime-upgrade-acceptance-20-cycles.json` 记录 20/20 轮通过、20 次
+`build/reports/runtime-upgrade-acceptance-20-cycles.json` 记录 20/20 轮通过、20 次
 Runtime 优雅退出、上述六类审计事件各 20 条、80 次目录切换及零事务残留。该结果只证明
 Windows 主机的正常升级和人工回滚闭环；健康失败自动回滚、进程中断恢复仍由仓库测试覆盖，
 目标 Linux/PetaLinux、真实设备和断电注入必须分别取得对应平台证据后才能完成正式 L5。

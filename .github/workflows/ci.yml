@@ -54,16 +54,16 @@ jobs:
           cmake --build build/dependencies --config Release --parallel 2
       - name: Configure full stack
         run: >-
-          cmake -S . -B build/full -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
           -DPDR_ENABLE_OBSERVABILITY=ON
           -DMYIOT_ENABLE_DATA_MODULES=OFF
       - name: Build full stack
-        run: cmake --build build/full --config Release --parallel 2
+        run: cmake --build build --config Release --parallel 2
       - name: Run full acceptance suite
-        run: ctest --test-dir build/full -C Release --output-on-failure
+        run: ctest --test-dir build -C Release --output-on-failure
       - name: Install reusable SDK
-        run: cmake --install build/full --prefix ${{ github.workspace }}/build/sdk
+        run: cmake --install build --prefix ${{ github.workspace }}/build/sdk
       - name: Generate release hashes and SPDX SBOM
         run: >-
           python3 tools/release_manifest.py generate

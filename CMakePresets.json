@@ -51,11 +51,11 @@
       }
     },
     {
-      "name": "full",
+      "name": "default",
       "inherits": "server",
-      "displayName": "Full build (all targets)",
-      "description": "Default desktop profile; automatically bootstraps all dependencies",
-      "binaryDir": "${sourceDir}/build/full",
+      "displayName": "Default build",
+      "description": "Default desktop profile; builds in the repository's single build tree",
+      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "PDR_AUTO_BOOTSTRAP_DEPENDENCIES": "ON"
       }
@@ -76,8 +76,8 @@
     { "name": "edge-test", "configurePreset": "edge-test" },
     { "name": "server", "configurePreset": "server" },
     {
-      "name": "full",
-      "configurePreset": "full",
+      "name": "default",
+      "configurePreset": "default",
       "configuration": "Release",
       "jobs": 2
     },

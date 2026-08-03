@@ -20,7 +20,7 @@ SPEC.loader.exec_module(BUNDLE)
 
 
 class EvidenceBundleTests(unittest.TestCase):
-    verifier = (Path(__file__).resolve().parents[2] / "build/full/bin/pdr-signature-check.exe").resolve()
+    verifier = (Path(__file__).resolve().parents[2] / "build/bin/pdr-signature-check.exe").resolve()
 
     def test_signed_bundle_round_trip_and_tamper_rejection(self):
         with tempfile.TemporaryDirectory() as directory:

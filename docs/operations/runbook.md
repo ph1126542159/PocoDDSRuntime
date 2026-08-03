@@ -45,16 +45,16 @@ Windows 可能在 Runtime 已退出后短暂保留文件句柄。升级器对权
 
 ```powershell
 python E:/PocoDDSRuntime/tools/pdr.py release qualify `
-  --source E:/PocoDDSRuntime --build E:/PocoDDSRuntime/build/full `
+  --source E:/PocoDDSRuntime --build E:/PocoDDSRuntime/build `
   --version 0.1.0 --config Release --expected-tests 96 `
-  --ctest-log E:/PocoDDSRuntime/build/full/Testing/Temporary/LastTest.log `
-  --artifact-manifest E:/PocoDDSRuntime/build/full/reports/release-smoke/SHA256SUMS.json `
-  --artifacts E:/PocoDDSRuntime/build/full/release-smoke-install `
-  --evidence package=E:/PocoDDSRuntime/build/full/reports/runtime-package-smoke.json `
-  --evidence upgrade=E:/PocoDDSRuntime/build/full/reports/runtime-upgrade-acceptance-integration.json `
+  --ctest-log E:/PocoDDSRuntime/build/Testing/Temporary/LastTest.log `
+  --artifact-manifest E:/PocoDDSRuntime/build/reports/release-smoke/SHA256SUMS.json `
+  --artifacts E:/PocoDDSRuntime/build/release-smoke-install `
+  --evidence package=E:/PocoDDSRuntime/build/reports/runtime-package-smoke.json `
+  --evidence upgrade=E:/PocoDDSRuntime/build/reports/runtime-upgrade-acceptance-integration.json `
   --required-external petalinux-target --required-external physical-protocols `
   --required-external production-identity --required-external soak-24h `
-  --report E:/PocoDDSRuntime/build/full/reports/release-qualification.json
+  --report E:/PocoDDSRuntime/build/reports/release-qualification.json
 ```
 
 `LOCAL_VALIDATION_PASSED` 只表示本机自动化证据完整。只有 Release 配置、干净 Git 提交、制品清单、
@@ -72,7 +72,7 @@ python E:/PocoDDSRuntime/tools/pdr.py release qualify `
 ```powershell
 python tools/pdr.py release external-template `
   --type petalinux-target --version 0.1.0 --git-commit <commit> `
-  --artifact-manifest build/full/reports/release-smoke/SHA256SUMS.json `
+  --artifact-manifest build/reports/release-smoke/SHA256SUMS.json `
   --output field/petalinux-target.template.json
 ```
 
@@ -130,7 +130,7 @@ Qualification 对每份外部报告同时要求同名 `--external-signature NAME
 
 ```powershell
 python tools/pdr.py release bundle-create `
-  --qualification build/full/reports/release-qualification.json `
+  --qualification build/reports/release-qualification.json `
   --include-artifacts --output dist/pdr-0.1.0-evidence.zip `
   --signature-output dist/pdr-0.1.0-evidence.sig.json `
   --key-id release-evidence-2026 `
@@ -161,7 +161,7 @@ python bin/pdr.py release bundle-verify `
 ```powershell
 python tools/pdr.py release pipeline-run `
   --plan site/release-pipeline.json `
-  --state build/full/reports/release-pipeline-state.json `
+  --state build/reports/release-pipeline-state.json `
   --confirm-run
 ```
 
@@ -173,10 +173,10 @@ python tools/pdr.py release pipeline-run `
 
 ```powershell
 python tools/pdr.py release pipeline-status `
-  --state build/full/reports/release-pipeline-state.json
+  --state build/reports/release-pipeline-state.json
 python tools/pdr.py release pipeline-resume `
   --plan site/release-pipeline.json `
-  --state build/full/reports/release-pipeline-state.json `
+  --state build/reports/release-pipeline-state.json `
   --confirm-run
 ```
 
@@ -417,10 +417,10 @@ Schema、摘要缺失或摘要不匹配均进入同一故障隔离流程。API �
 当前文件和 `.previous` 的文件 SHA-256、Schema、记录数和内容摘要验证结果：
 
 ```powershell
-python tools/pdr.py persistence inspect build/full/bin/management-idempotency.json `
-  --kind idempotency --report build/full/reports/idempotency-inspect.json
-python tools/pdr.py persistence inspect build/full/bin/management-tasks.json `
-  --kind tasks --report build/full/reports/tasks-inspect.json
+python tools/pdr.py persistence inspect build/bin/management-idempotency.json `
+  --kind idempotency --report build/reports/idempotency-inspect.json
+python tools/pdr.py persistence inspect build/bin/management-tasks.json `
+  --kind tasks --report build/reports/tasks-inspect.json
 ```
 
 只有当前文件损坏且 `recoveryCandidateAvailable=true` 时才进入恢复。先停止 Runtime，核对设备、
@@ -428,11 +428,11 @@ python tools/pdr.py persistence inspect build/full/bin/management-tasks.json `
 乐观并发保护；文件在检查后或准备恢复期间发生变化都会拒绝替换：
 
 ```powershell
-python tools/pdr.py persistence recover build/full/bin/management-idempotency.json `
+python tools/pdr.py persistence recover build/bin/management-idempotency.json `
   --kind idempotency --operator operator-name --confirm-runtime-stopped `
   --expected-current-sha256 <current.fileSha256> `
   --expected-previous-sha256 <previous.fileSha256> `
-  --report build/full/reports/idempotency-recover.json
+  --report build/reports/idempotency-recover.json
 ```
 
 成功恢复会把故障当前文件保留为
@@ -449,13 +449,13 @@ python tools/pdr.py persistence recover build/full/bin/management-idempotency.js
 
 ```powershell
 python tools/pdr.py persistence backup `
-  --tasks build/full/bin/management-tasks.json `
-  --idempotency build/full/bin/management-idempotency.json `
-  --configuration build/full/bin/pdr-runtime.properties `
-  --management-audit build/full/bin/management-audit.jsonl `
+  --tasks build/bin/management-tasks.json `
+  --idempotency build/bin/management-idempotency.json `
+  --configuration build/bin/pdr-runtime.properties `
+  --management-audit build/bin/management-audit.jsonl `
   --output D:/PocoDDSRuntime-recovery-points `
   --operator operator-name --confirm-runtime-stopped `
-  --report build/full/reports/recovery-point-create.json
+  --report build/reports/recovery-point-create.json
 ```
 
 命令会自动纳入存在的 `management-audit.jsonl.1`，在输出目录内建立隐藏暂存目录，复制并核对
@@ -468,7 +468,7 @@ python tools/pdr.py persistence backup `
 ```powershell
 python tools/pdr.py persistence verify-recovery-point `
   D:/PocoDDSRuntime-recovery-points/<recovery-point> `
-  --report build/full/reports/recovery-point-verify.json
+  --report build/reports/recovery-point-verify.json
 ```
 
 复验会拒绝清单或文件摘要不匹配、缺失/多余文件、重复角色和路径越界。SHA-256 用于传输与

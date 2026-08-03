@@ -19,7 +19,7 @@ SPEC.loader.exec_module(EXTERNAL)
 
 
 class ExternalAcceptanceTests(unittest.TestCase):
-    verifier = (Path(__file__).resolve().parents[2] / "build/full/bin/pdr-signature-check.exe").resolve()
+    verifier = (Path(__file__).resolve().parents[2] / "build/bin/pdr-signature-check.exe").resolve()
 
     @staticmethod
     def signing_key(root: Path) -> tuple[Path, Path]:

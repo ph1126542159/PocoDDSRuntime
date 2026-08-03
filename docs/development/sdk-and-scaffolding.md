@@ -101,8 +101,8 @@ python3 tools/pdr.py validate-config config/pdr-runtime.properties \
   --prefix build/install --report build/reports/config-validation.json
 python3 tools/pdr.py identity check config/pdr-runtime.properties config/site.properties \
   --prefix build/install --report build/reports/identity-check.json
-python3 tools/pdr.py persistence inspect build/full/bin/management-tasks.json \
-  --kind tasks --report build/full/reports/tasks-inspect.json
+python3 tools/pdr.py persistence inspect build/bin/management-tasks.json \
+  --kind tasks --report build/reports/tasks-inspect.json
 python3 tools/pdr.py new service TemperatureService --output services
 python3 tools/pdr.py verify services/TemperatureService \
   --prefix build/install --config Release \
