@@ -5,7 +5,7 @@
 | Profile | CMake Preset | Observability | Data | Web UI | Launcher | Qt3D | 典型用途 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | Embedded | `embedded` | 关 | 关 | 关 | 开 | 关 | PetaLinux、资源受限设备 |
-| Edge/Test | `edge-test` | 开 | 关 | 开 | 开 | 开 | Qt 端测、现场上位机 |
+| Edge/Test | `edge-test` | 开 | 关 | 开 | 开 | 关 | Qt 端测、现场上位机 |
 | Server | `server` | 开 | 开 | 开 | 开 | 关 | 后台服务、集中部署 |
 
 ## 构建与安装
@@ -16,7 +16,7 @@ cmake --build build/profiles/embedded --config Release
 cmake --install build/profiles/embedded --config Release --prefix build/install/embedded
 ```
 
-将 `embedded` 替换为 `edge-test` 或 `server` 即可构建其他档位。Edge/Test 要求 Qt3D；如果 CMake 无法自动定位 Qt，可设置 `Qt6_DIR`。不同 CPU 架构和 Profile 必须使用独立构建、安装目录，不能混用二进制依赖。
+将 `embedded` 替换为 `edge-test` 或 `server` 即可构建其他档位。三个命名交付 Profile 默认不包含 Qt3D；桌面 `default` Preset 会启用 Qt3D Demo，用于本机多进程验证。不同 CPU 架构和 Profile 必须使用独立构建、安装目录，不能混用二进制依赖。
 
 ## 可审计能力清单
 
@@ -30,7 +30,7 @@ cmake --install build/profiles/embedded --config Release --prefix build/install/
 ctest --test-dir build/profiles/embedded -C Release --output-on-failure
 ```
 
-Embedded 包中不应出现 `pdr.webui.*.bndl` 或 Qt3D 子进程；Edge/Test 应同时包含三项 Web UI Bundle 和 Qt3D 子进程；Server 应包含 Web UI 和数据模块，但不包含 Qt3D 子进程。
+Embedded 包中不应出现 `pdr.webui.*.bndl` 或 Qt3D 子进程；Edge/Test 应包含三项 Web UI Bundle，但不包含 Qt3D Demo；Server 应包含 Web UI 和数据模块，但不包含 Qt3D 子进程。
 
 全新安装包必须能够直接启动，且 `bin/logs`、`bin/data`、`bin/codeCache` 三个可写目录必须存在。可用随机端口执行真实运行验证：
 

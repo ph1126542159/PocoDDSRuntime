@@ -63,15 +63,18 @@ function(pdr_configure_test_output_tree directory)
     foreach(target IN LISTS directory_targets)
         get_target_property(target_type "${target}" TYPE)
         if(target_type STREQUAL "EXECUTABLE" AND
-           target MATCHES "(-smoke|-test|-probe)$")
+           target MATCHES "(-smoke|-test|-probe|-recovery|-integration|-child|-fault-injection)$")
             set_target_properties("${target}" PROPERTIES
                 RUNTIME_OUTPUT_DIRECTORY "${PDR_TEST_OUTPUT_DIRECTORY}"
+                ARCHIVE_OUTPUT_DIRECTORY "${PDR_TEST_OUTPUT_DIRECTORY}"
                 FOLDER "Tests")
             if(CMAKE_CONFIGURATION_TYPES)
                 foreach(configuration IN LISTS CMAKE_CONFIGURATION_TYPES)
                     string(TOUPPER "${configuration}" configuration_upper)
                     set_target_properties("${target}" PROPERTIES
                         RUNTIME_OUTPUT_DIRECTORY_${configuration_upper}
+                            "${PDR_TEST_OUTPUT_DIRECTORY}"
+                        ARCHIVE_OUTPUT_DIRECTORY_${configuration_upper}
                             "${PDR_TEST_OUTPUT_DIRECTORY}")
                 endforeach()
             endif()

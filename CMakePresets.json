@@ -34,7 +34,7 @@
         "MYIOT_ENABLE_DATA_MODULES": "OFF",
         "PDR_BUILD_WEBUI": "ON",
         "PDR_BUILD_LAUNCHER": "ON",
-        "PDR_BUILD_QT3D": "ON"
+        "PDR_BUILD_QT3D": "OFF"
       }
     },
     {
@@ -57,7 +57,8 @@
       "description": "Default desktop profile; builds in the repository's single build tree",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "PDR_AUTO_BOOTSTRAP_DEPENDENCIES": "ON"
+        "PDR_AUTO_BOOTSTRAP_DEPENDENCIES": "ON",
+        "PDR_BUILD_QT3D": "ON"
       }
     },
     {
