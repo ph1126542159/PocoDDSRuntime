@@ -55,6 +55,28 @@ function(pdr_configure_subprocess target)
                 VERBATIM)
         endforeach()
     endif()
+
+    # PDRObservability reaches the shared curl runtime through the static
+    # OpenTelemetry OTLP exporter. That transitive edge is not reported by
+    # TARGET_RUNTIME_DLLS, so a subprocess could accidentally load an
+    # unrelated libcurl.dll from PATH (including a 32-bit copy) and fail with
+    # STATUS_INVALID_IMAGE_FORMAT (0xc000007b). Keep subprocess deployments
+    # self-contained by copying the configured x64 curl runtime explicitly.
+    if(WIN32)
+        if(TARGET CURL::libcurl_shared)
+            set(pdr_curl_runtime_target CURL::libcurl_shared)
+        elseif(TARGET CURL::libcurl)
+            set(pdr_curl_runtime_target CURL::libcurl)
+        endif()
+        if(pdr_curl_runtime_target)
+            add_custom_command(TARGET ${target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:${pdr_curl_runtime_target}>"
+                    "$<TARGET_FILE_DIR:${target}>"
+                VERBATIM)
+        endif()
+        unset(pdr_curl_runtime_target)
+    endif()
 endfunction()
 
 function(pdr_configure_test_output_tree directory)

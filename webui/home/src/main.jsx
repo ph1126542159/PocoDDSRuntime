@@ -10,16 +10,17 @@ import {
 import "./styles.css";
 import "./embedded.css";
 import "./flow-layout.css";
+import "./bright-theme.css";
 
 const pageMeta = {
-  overview: ["运行总览", "实时掌握运行时状态与资源"],
-  processes: ["进程", "当前运行时挂载的进程"],
+  overview: ["运行态势", "实时掌握运行时状态与资源"],
+  processes: ["进程管理", "当前运行时挂载的进程"],
   services: ["服务", "OSP 服务注册中心"],
   devices: ["设备", "当前运行时已装载的设备适配器"],
   modules: ["组件与模块", "Bundle 提供的运行时模块"],
   bundles: ["Bundles", "OSP Bundle 生命周期管理"],
   plugins: ["插件治理", "外部插件兼容性、依赖与生命周期"],
-  logs: ["日志查询", "快速定位运行时问题"],
+  logs: ["日志中心", "快速定位运行时问题"],
   metrics: ["指标中心", "按运行域查看 OpenTelemetry Counter 与 Histogram"]
 };
 
@@ -244,6 +245,97 @@ function ResourceCharts({ resources, history }) {
       <footer><span>最近 {Math.max(history.length, 1)} 次采样</span><b>{card.detail}</b></footer>
     </article>;
   })}</div>;
+}
+
+function RuntimeTopologyOverview({ health, topology, processDetail, childProcessDetail, history, alertInventory, onOpenProcesses, onOpenLogs }) {
+  const [range, setRange] = useState("1h");
+  const mainProcess = processDetail?.process || topology.mainProcess;
+  const children = processDetail?.children || [];
+  const qt3d = children.find(item => String(item.name || item.id).toLowerCase().includes("qt3d")) || children[0];
+  const mainRunning = ["active", "running", "ready"].includes(String(mainProcess?.state || "").toLowerCase());
+  const childRunning = Boolean(qt3d?.online) || ["active", "running", "ready"].includes(String(qt3d?.state || "").toLowerCase());
+  const workers = childRunning ? (childProcessDetail?.children || qt3d?.workers || qt3d?.renderWorkers || []) : [];
+  const resources = processDetail?.resources || topology.resources || topology.system || {};
+  const unresolvedAlerts = (alertInventory?.alerts || []).filter(item => item.status !== "resolved").length;
+  const healthy = health?.status === "UP" && health?.live && health?.ready;
+  const cpu = numeric(resources.cpuPercent ?? resources.cpu);
+  const memory = numeric(resources.memoryPercent ?? resources.memory);
+  const memoryUsed = numeric(resources.memoryUsedMb) / 1024;
+  const memoryTotal = numeric(resources.memoryTotalMb) / 1024;
+  const threadCount = numeric(resources.threadCount);
+  const bundles = topology.bundles?.length || processDetail?.bundles?.length || 0;
+  const rangeSamples = { "15m": 15, "1h": 60, "6h": 60, "24h": 60 }[range];
+  const visibleHistory = history.slice(-rangeSamples);
+  const processCount = (mainProcess ? 1 : 0) + (qt3d ? 1 : 0) + workers.length;
+  const qt3dResources = childProcessDetail?.resources || qt3d?.resources || {};
+  const stateText = value => ["active", "running", "ready"].includes(String(value || "").toLowerCase()) ? "运行中" : "已停止";
+  const valueOrDash = (value, suffix = "") => value == null || value === "" ? "—" : `${numeric(value).toFixed(suffix === "%" ? 1 : 0)}${suffix}`;
+  const row = (item, label, level, icon, running, itemResources = {}) => {
+    const Icon = icon;
+    return <div className={`precision-process-row level-${level}`} key={`${label}-${item?.pid || item?.id || level}`}>
+      <div className="precision-process-name"><span className="tree-branch" /><Icon size={19} />
+        <div><b>{label}</b><small>{level === 0 ? "主进程" : level === 1 ? "父进程" : "渲染节点"}</small></div></div>
+      <code>{item?.pid || item?.id || "—"}</code>
+      <span className={`precision-state ${running ? "ok" : "bad"}`}><i />{running ? "运行中" : "已停止"}</span>
+      <span>{valueOrDash(itemResources.cpuPercent ?? itemResources.cpu, "%")}</span>
+      <span>{itemResources.memoryUsedMb != null ? `${(numeric(itemResources.memoryUsedMb) / 1024).toFixed(1)} GB` : "—"}</span>
+      <span>{itemResources.threadCount ?? "—"}</span>
+    </div>;
+  };
+
+  return <section className="precision-overview" aria-label="Runtime 运行态势">
+    <div className="precision-health-strip">
+      <article className={healthy ? "healthy" : "attention"}><span><ShieldCheck /></span><div><b>{healthy ? "全部服务正常" : "系统需要关注"}</b><small>{healthy ? "系统运行稳定" : "请检查异常组件"}</small></div></article>
+      <article><span><Server /></span><div><small>运行环境</small><b>生产环境</b><em>{health?.ready ? "环境健康" : "等待就绪"}</em></div></article>
+      <article><span><Clock3 /></span><div><small>运行时长</small><b>{mainRunning ? "持续运行" : "未运行"}</b><em>主进程 PID {mainProcess?.pid || mainProcess?.id || "—"}</em></div></article>
+      <article><span><Boxes /></span><div><small>Bundles</small><b>{bundles}/{bundles || "—"}</b><em>已就绪 / 总数</em></div></article>
+      <article><span><AppWindow /></span><div><small>进程总数</small><b>{processCount}</b><em>主进程 1 · 子进程 {Math.max(0, processCount - 1)}</em></div></article>
+    </div>
+
+    <div className="precision-workspace">
+      <section className="precision-topology">
+        <header><div><h2>运行拓扑</h2><p>Runtime 与 Qt3D 进程链路</p></div><span><i />{workers.length} 个工作进程在线</span></header>
+        <div className="precision-process-head"><span>进程 / 节点</span><span>PID</span><span>状态</span><span>CPU</span><span>内存</span><span>线程</span></div>
+        <div className="precision-process-tree">
+          {row(mainProcess, "Runtime 主进程", 0, Box, mainRunning, resources)}
+          {row(qt3d, "Qt3D 子进程", 1, Layers3, childRunning, qt3dResources)}
+          <div className="precision-worker-label"><span />{workers.length || 0} 个渲染工作进程</div>
+          {workers.map((worker, index) => {
+            const workerName = String(worker.name || "").toLowerCase();
+            const label = workerName.includes("scene") ? "场景渲染进程" : workerName.includes("material") ? "材质渲染进程" :
+              workerName.includes("device") ? "设备渲染进程" : `渲染工作进程 #${index + 1}`;
+            return row(worker, label, 2, AppWindow,
+              ["active", "running", "ready"].includes(String(worker.state || "running").toLowerCase()), worker.resources || worker);
+          })}
+          {!workers.length && <div className="precision-process-empty"><AlertTriangle size={18} />当前没有渲染工作进程</div>}
+        </div>
+        <footer><div className="precision-legend"><span><i />父子进程关系</span><span><i />监控连接</span></div>
+          <div><button className="precision-primary" onClick={onOpenProcesses}>打开进程工作台 <ChevronRight size={17} /></button>
+            <button className="precision-secondary" onClick={onOpenLogs}><FileText size={17} />查看完整日志</button></div></footer>
+      </section>
+
+      <aside className="precision-attention">
+        <header><h2>需要关注</h2><span>{unresolvedAlerts ? `${unresolvedAlerts} 项未处理` : "当前正常"}</span></header>
+        <article className="attention-summary"><span><CheckCircle2 /></span><div><b>{unresolvedAlerts ? "存在待处理事件" : "暂无阻断问题"}</b><p>{unresolvedAlerts ? "建议查看告警详情并确认影响范围" : "当前系统运行正常，继续保持"}</p></div></article>
+        {memory >= 80 && <article className="attention-item warning"><AlertTriangle /><div><b>内存使用率偏高</b><p>当前使用率 {percent(memory)}，建议持续关注</p><small>刚刚</small></div></article>}
+        <article className="attention-item info"><Boxes /><div><b>Bundles 已就绪</b><p>{bundles} 个 Bundles 已成功加载</p><small>状态同步完成</small></div></article>
+        <article className={`attention-item ${childRunning ? "success" : "warning"}`}>{childRunning ? <CheckCircle2 /> : <AlertTriangle />}<div>
+          <b>{childRunning ? "Qt3D 链路正常" : "Qt3D 子进程未运行"}</b><p>{childRunning ? `${workers.length} 个渲染工作进程在线` : "打开进程工作台查看启动日志"}</p><small>{stateText(qt3d?.state)}</small></div></article>
+        <button className="attention-more" onClick={onOpenLogs}>查看全部事件 <ChevronRight size={16} /></button>
+      </aside>
+    </div>
+
+    <section className="precision-resources">
+      <header><div><h2>资源趋势</h2><p>最近 {range === "15m" ? "15 分钟" : range === "1h" ? "60 分钟" : range === "6h" ? "6 小时" : "24 小时"}</p></div>
+        <div className="precision-range">{[["15m", "15 分钟"], ["1h", "1 小时"], ["6h", "6 小时"], ["24h", "24 小时"]].map(([id, label]) =>
+          <button key={id} className={range === id ? "active" : ""} onClick={() => setRange(id)}>{label}</button>)}</div></header>
+      <div className="precision-chart-grid">
+        <article><div><b><i className="blue" />CPU</b><span>当前 <strong>{percent(cpu)}</strong></span></div><Sparkline values={visibleHistory.map(item => item.cpu)} color="#246fe5" /></article>
+        <article><div><b><i className="green" />内存</b><span>当前 <strong>{memoryUsed ? `${memoryUsed.toFixed(1)} GB` : percent(memory)}</strong>{memoryTotal ? ` / ${memoryTotal.toFixed(1)} GB` : ""}</span></div><Sparkline values={visibleHistory.map(item => item.memory)} color="#12a36d" /></article>
+        <article><div><b><i className="violet" />线程</b><span>当前 <strong>{threadCount || "—"}</strong></span></div><Sparkline values={visibleHistory.map(item => item.threads)} color="#7756db" /></article>
+      </div>
+    </section>
+  </section>;
 }
 
 function BusinessMetrics({ data }) {
@@ -1350,6 +1442,8 @@ function App() {
   const [topology, setTopology] = useState({ processes: [], services: [], modules: [], bundles: [] });
   const [resourceHistory, setResourceHistory] = useState([]);
   const [health, setHealth] = useState(null);
+  const [processDetail, setProcessDetail] = useState(null);
+  const [childProcessDetail, setChildProcessDetail] = useState(null);
   const [businessMetrics, setBusinessMetrics] = useState({ metrics: [] });
   const [deviceInventory, setDeviceInventory] = useState({ count: 0, devices: [] });
   const [protocolInventory, setProtocolInventory] = useState({ count: 0, protocols: [] });
@@ -1380,6 +1474,13 @@ function App() {
     setAlertHistory(history);
     setAlertSinks(sinks);
     setBusinessMetrics(metricData);
+    setProcessDetail(mainDetail);
+    const managedChild = (mainDetail?.children || []).find(item =>
+      String(item.name || item.id).toLowerCase().includes("qt3d")) || mainDetail?.children?.[0];
+    if (managedChild) {
+      const query = new URLSearchParams({ id: managedChild.pid ?? managedChild.id, name: managedChild.name });
+      setChildProcessDetail(await request(`/api/v1/process-detail?${query}`).catch(() => null));
+    } else setChildProcessDetail(null);
     if (healthDetail) setHealth(healthDetail);
     const samples = monitoring.samples || [];
     const monitoredResources = monitoring.current || {};
@@ -1446,28 +1547,29 @@ function App() {
     page === "modules" ? topology.modules : page === "plugins" ?
       topology.bundles.filter(item => item.plugin || String(item.id).startsWith("pdr.plugin.")) : topology.bundles;
 
-  return <div className="app-shell">
+  return <div className="app-shell precision-shell">
+    <header className="command-bar">
+      <button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)}><Menu size={20} /></button>
+      <div className="command-brand"><span><Box size={23} /></span><b>PocoDDS Runtime</b></div>
+      <i className="command-divider" />
+      <strong className="command-title">{pageMeta[page][0]}</strong>
+      <div className="command-actions"><span className="last-update">最后刷新：{updated ? updated.toLocaleString() : "连接中"}</span>
+        <button className="command-refresh" aria-label="刷新" onClick={() => refresh().catch(error => notify(error.message, true))}><RefreshCw size={18} /></button>
+        <span className={`command-online ${health?.ready === false ? "degraded" : ""}`}><i />{health?.ready === false ? "异常" : "已连接"}</span></div>
+    </header>
     <aside className={menuOpen ? "open" : ""}>
-      <div className="brand"><span><Activity size={21} /></span><div><b>PocoDDS</b><small>Runtime Console</small></div></div>
       <nav>{navItems.map(([id, Icon]) => <button key={id} className={page === id ? "active" : ""}
         onClick={() => { setPage(id); setMenuOpen(false); }}><Icon size={18} /><span>{pageMeta[id][0]}</span><ChevronRight size={15} /></button>)}</nav>
       <div className={`runtime-state ${health?.ready === false ? "degraded" : ""}`}><i /><div>
-        <b>{health?.ready === false ? "Runtime Degraded" : "Runtime Online"}</b>
-        <small>{topology.host || "Local host"}</small></div></div>
+        <b>{health?.ready === false ? "Runtime 异常" : "Runtime 在线"}</b>
+        <small>{topology.host || "本地主机"}</small></div></div>
     </aside>
     <main>
-      <header className="topbar">
-        <button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)}><Menu size={20} /></button>
-        <div><p>管理控制台</p><h1>{pageMeta[page][0]}</h1><span>{pageMeta[page][1]}</span></div>
-        <div className="top-actions"><span className="last-update"><Clock3 size={15} />{updated ? updated.toLocaleTimeString() : "连接中"}</span>
-          <button className="refresh" onClick={() => refresh().catch(error => notify(error.message, true))}><RefreshCw size={17} />刷新</button></div>
-      </header>
       <div className="content">
-        {page === "overview" && <><HealthOverview health={health} diagnosticEvents={diagnosticEvents} alertInventory={alertInventory} alertHistory={alertHistory} alertSinks={alertSinks} metrics={businessMetrics} />
-          <BusinessMetrics data={businessMetrics} />
-          <ProtocolSummary data={businessMetrics} inventory={protocolInventory} onLifecycle={protocolLife} />
-          <ProcessWorkbench mainProcess={topology.mainProcess} onNotify={notify} /></>}
-        {page === "processes" && <ProcessWorkspace items={processItems} />}
+        {page === "overview" && <RuntimeTopologyOverview health={health} topology={topology}
+          processDetail={processDetail} childProcessDetail={childProcessDetail} history={resourceHistory} alertInventory={alertInventory}
+          onOpenProcesses={() => setPage("processes")} onOpenLogs={() => setPage("logs")} />}
+        {page === "processes" && <ProcessWorkbench mainProcess={topology.mainProcess} onNotify={notify} />}
         {page === "devices" && <DeviceInventory inventory={deviceInventory} />}
         {["services", "modules", "bundles", "plugins"].includes(page) &&
           <EntityTable items={currentItems} onLife={life} />}
