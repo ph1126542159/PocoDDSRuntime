@@ -223,6 +223,8 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
 
     CallbackReturn on_activate(const rclcpp_lifecycle::State&) override
     {
+        if (_runtime)
+            _runtime->setEmergencyStop(true, "startup interlock");
         if (!_runtime || !_runtime->activate())
             return CallbackReturn::FAILURE;
         _runtimeFaulted = false;
@@ -356,6 +358,14 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
         {
             response->accepted = false;
             response->state = "not configured";
+            return;
+        }
+        if (!request->engaged &&
+            get_current_state().id() != lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE)
+        {
+            response->accepted = false;
+            response->state = "release requires active lifecycle";
+            publishSafety(true, false, response->state);
             return;
         }
         _runtime->setEmergencyStop(request->engaged, request->reason);
