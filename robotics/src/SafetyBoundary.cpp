@@ -25,10 +25,8 @@ bool finite(const RobotCommand& command)
 {
     if (!finite(command.baseVelocity))
         return false;
-    return std::all_of(command.joints.begin(), command.joints.end(),
-                       [](const JointCommand& joint) {
-                           return !joint.name.empty() && std::isfinite(joint.value);
-                       });
+    return std::all_of(command.joints.begin(), command.joints.end(), [](const JointCommand& joint)
+                       { return !joint.name.empty() && std::isfinite(joint.value); });
 }
 } // namespace
 
@@ -52,9 +50,9 @@ bool SafetyBoundary::emergencyStop() const noexcept
     return _emergencyStop;
 }
 
-SafetyDecision SafetyBoundary::evaluate(
-    const RobotCommand& requested, std::chrono::steady_clock::time_point commandTime,
-    std::chrono::steady_clock::time_point now) const
+SafetyDecision SafetyBoundary::evaluate(const RobotCommand& requested,
+                                        std::chrono::steady_clock::time_point commandTime,
+                                        std::chrono::steady_clock::time_point now) const
 {
     std::lock_guard<std::mutex> lock(_mutex);
     if (_emergencyStop)
@@ -82,8 +80,8 @@ SafetyDecision SafetyBoundary::evaluate(
             limit.maximumEffort <= 0.0)
             return {false, {}, "invalid joint safety limit: " + joint.name};
         if (joint.mode == JointCommandMode::position)
-            joint.value = std::max(limit.minimumPosition,
-                                   std::min(joint.value, limit.maximumPosition));
+            joint.value =
+                std::max(limit.minimumPosition, std::min(joint.value, limit.maximumPosition));
         else if (joint.mode == JointCommandMode::velocity)
             joint.value = clampMagnitude(joint.value, limit.maximumVelocity);
         else

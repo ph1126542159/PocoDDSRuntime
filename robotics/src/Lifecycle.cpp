@@ -18,8 +18,8 @@ std::string LifecycleComponent::lastError() const
 }
 
 template <typename Callback>
-bool LifecycleComponent::transition(
-    LifecycleState required, LifecycleState next, Callback&& callback)
+bool LifecycleComponent::transition(LifecycleState required, LifecycleState next,
+                                    Callback&& callback)
 {
     {
         std::lock_guard<std::mutex> lock(_mutex);

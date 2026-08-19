@@ -34,7 +34,7 @@ struct SafetyDecision
 
 class SafetyBoundary
 {
-public:
+  public:
     explicit SafetyBoundary(SafetyLimits limits = {});
     void setEmergencyStop(bool engaged, std::string reason = {});
     bool emergencyStop() const noexcept;
@@ -42,7 +42,7 @@ public:
                             std::chrono::steady_clock::time_point commandTime,
                             std::chrono::steady_clock::time_point now) const;
 
-private:
+  private:
     SafetyLimits _limits;
     mutable std::mutex _mutex;
     bool _emergencyStop{true};

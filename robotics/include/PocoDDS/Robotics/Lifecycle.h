@@ -17,7 +17,7 @@ enum class LifecycleState
 
 class LifecycleComponent
 {
-public:
+  public:
     virtual ~LifecycleComponent() = default;
 
     LifecycleState state() const noexcept;
@@ -28,14 +28,14 @@ public:
     bool cleanup();
     void shutdown() noexcept;
 
-protected:
+  protected:
     virtual bool onConfigure();
     virtual bool onActivate();
     virtual bool onDeactivate();
     virtual bool onCleanup();
     virtual void onShutdown() noexcept;
 
-private:
+  private:
     template <typename Callback>
     bool transition(LifecycleState required, LifecycleState next, Callback&& callback);
 

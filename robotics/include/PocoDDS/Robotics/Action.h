@@ -33,7 +33,7 @@ struct ActionFeedback
 
 class ActionCoordinator
 {
-public:
+  public:
     using Executor = std::function<ActionFeedback(const ActionGoal&, bool cancelRequested)>;
 
     bool submit(ActionGoal goal, Executor executor);
@@ -41,7 +41,7 @@ public:
     std::optional<ActionFeedback> tick(const std::string& goalId);
     std::optional<ActionFeedback> feedback(const std::string& goalId) const;
 
-private:
+  private:
     struct Entry
     {
         ActionGoal goal;

@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: lukka/get-cmake@latest
       - name: Validate contracts
         run: cmake -DSOURCE_DIR=${{ github.workspace }} -P cmake/ValidateContracts.cmake
@@ -29,9 +31,13 @@ jobs:
       - name: Check formatting
         shell: bash
         run: |
-          git ls-files -z -- application platform robotics services server SubSystem |
+          base_ref="${{ github.base_ref }}"
+          base_ref="${base_ref:-main}"
+          base_sha="$(git merge-base HEAD "origin/${base_ref}")"
+          git diff --name-only -z "${base_sha}" HEAD -- \
+            application platform robotics services server SubSystem |
             grep -zE '\.(h|hpp|cpp)$' |
-            xargs -0 clang-format --dry-run --Werror
+            xargs -0 -r clang-format --dry-run --Werror
 
   robotics-portable:
     strategy:
