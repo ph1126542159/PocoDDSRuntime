@@ -544,48 +544,58 @@ def main() -> int:
         "--post-response-status", f"{configuration_post_index + 16}=202",
         "--post-request-id", f"{configuration_post_index + 16}=async-task-delay-proof",
         "--post-interval-override", f"{configuration_post_index + 16}=0",
-        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start","async":true,"startTimeoutMilliseconds":1}',
-        "--post-response-status", f"{configuration_post_index + 17}=202",
-        "--post-request-id", f"{configuration_post_index + 17}=async-task-timeout-proof",
-        "--post-interval-override", f"{configuration_post_index + 17}=0",
-        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start","async":true,"startTimeoutMilliseconds":30000}',
-        "--post-response-status", f"{configuration_post_index + 18}=202",
-        "--post-request-id", f"{configuration_post_index + 18}=async-task-ready-bypass-proof",
-        "--post-interval-override", f"{configuration_post_index + 18}=0.5",
-        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start","async":true,"startTimeoutMilliseconds":30000,"notBeforeMilliseconds":5000}',
-        "--post-response-status", f"{configuration_post_index + 19}=202",
-        "--post-request-id", f"{configuration_post_index + 19}=async-task-cancel-proof",
-        "--post-interval-override", f"{configuration_post_index + 19}=0",
-        "--post", '/api/v1/management-tasks={"id":"${lastManagementTaskId}","action":"cancel"}',
-        "--post-request-id", f"{configuration_post_index + 20}=async-task-cancel-request",
-        "--post-interval-override", f"{configuration_post_index + 20}=5",
-        "--post", '/api/v1/protocols={"id":"runtime-mqtt","action":"restart","async":true,"startTimeoutMilliseconds":30000,"executionTimeoutMilliseconds":1}',
-        "--post-response-status", f"{configuration_post_index + 21}=202",
-        "--post-request-id", f"{configuration_post_index + 21}=async-task-execution-timeout-proof",
-        "--post-interval-override", f"{configuration_post_index + 21}=1",
         "--post", '/api/v1/protocols={"id":"runtime-mqtt","action":"open","async":true,"startTimeoutMilliseconds":30000,"executionTimeoutMilliseconds":10000,"stabilityWindowMilliseconds":3000}',
-        "--post-response-status", f"{configuration_post_index + 22}=202",
-        "--post-request-id", f"{configuration_post_index + 22}=async-task-resource-owner-proof",
-        "--post-interval-override", f"{configuration_post_index + 22}=0.25",
-        "--post", '/api/v1/protocols={"id":"runtime-ros","action":"open","async":true,"startTimeoutMilliseconds":30000,"executionTimeoutMilliseconds":10000}',
-        "--post-response-status", f"{configuration_post_index + 23}=202",
-        "--post-request-id", f"{configuration_post_index + 23}=async-task-parallel-resource-proof",
-        "--post-interval-override", f"{configuration_post_index + 23}=0.25",
-        "--post", '/api/v1/protocols={"id":"runtime-mqtt","action":"open","async":true,"startTimeoutMilliseconds":30000,"executionTimeoutMilliseconds":10000}',
-        "--post-response-status", f"{configuration_post_index + 24}=202",
-        "--post-request-id", f"{configuration_post_index + 24}=async-task-running-cancel-proof",
-        "--post-interval-override", f"{configuration_post_index + 24}=0.25",
-        "--post-expect-status", f"{configuration_post_index + 24}:/health/ready=503",
+        "--post-response-status", f"{configuration_post_index + 17}=202",
+        "--post-request-id", f"{configuration_post_index + 17}=async-task-timeout-owner-proof",
+        "--post-interval-override", f"{configuration_post_index + 17}=0.25",
+        "--post", '/api/v1/protocols={"id":"runtime-ros","action":"open","async":true,"startTimeoutMilliseconds":30000,"executionTimeoutMilliseconds":10000,"stabilityWindowMilliseconds":2000}',
+        "--post-response-status", f"{configuration_post_index + 18}=202",
+        "--post-request-id", f"{configuration_post_index + 18}=async-task-timeout-peer-proof",
+        "--post-interval-override", f"{configuration_post_index + 18}=0.25",
+        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start","async":true,"startTimeoutMilliseconds":1}',
+        "--post-response-status", f"{configuration_post_index + 19}=202",
+        "--post-request-id", f"{configuration_post_index + 19}=async-task-timeout-proof",
+        "--post-interval-override", f"{configuration_post_index + 19}=0",
+        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start","async":true,"startTimeoutMilliseconds":30000}',
+        "--post-response-status", f"{configuration_post_index + 20}=202",
+        "--post-request-id", f"{configuration_post_index + 20}=async-task-ready-bypass-proof",
+        "--post-interval-override", f"{configuration_post_index + 20}=0.5",
+        "--post-expect-status", f"{configuration_post_index + 20}:/health/ready=503",
+        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start","async":true,"startTimeoutMilliseconds":30000,"notBeforeMilliseconds":5000}',
+        "--post-response-status", f"{configuration_post_index + 21}=202",
+        "--post-request-id", f"{configuration_post_index + 21}=async-task-cancel-proof",
+        "--post-interval-override", f"{configuration_post_index + 21}=0",
         "--post", '/api/v1/management-tasks={"id":"${lastManagementTaskId}","action":"cancel"}',
+        "--post-request-id", f"{configuration_post_index + 22}=async-task-cancel-request",
+        "--post-interval-override", f"{configuration_post_index + 22}=5",
+        "--post-expect-status", f"{configuration_post_index + 22}:/health/ready=503",
+        "--post", '/api/v1/protocols={"id":"runtime-mqtt","action":"restart","async":true,"startTimeoutMilliseconds":30000,"executionTimeoutMilliseconds":1}',
+        "--post-response-status", f"{configuration_post_index + 23}=202",
+        "--post-request-id", f"{configuration_post_index + 23}=async-task-execution-timeout-proof",
+        "--post-interval-override", f"{configuration_post_index + 23}=1",
+        "--post", '/api/v1/protocols={"id":"runtime-mqtt","action":"open","async":true,"startTimeoutMilliseconds":30000,"executionTimeoutMilliseconds":10000,"stabilityWindowMilliseconds":3000}',
+        "--post-response-status", f"{configuration_post_index + 24}=202",
+        "--post-request-id", f"{configuration_post_index + 24}=async-task-resource-owner-proof",
+        "--post-interval-override", f"{configuration_post_index + 24}=0.25",
+        "--post", '/api/v1/protocols={"id":"runtime-ros","action":"open","async":true,"startTimeoutMilliseconds":30000,"executionTimeoutMilliseconds":10000}',
         "--post-response-status", f"{configuration_post_index + 25}=202",
-        "--post-request-id", f"{configuration_post_index + 25}=async-task-running-cancel-request",
-        "--post-interval-override", f"{configuration_post_index + 25}=4",
-        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start"}',
-        "--post-request-id", f"{configuration_post_index + 26}=async-task-final-observation",
-        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start","async":true,"startTimeoutMilliseconds":120000,"notBeforeMilliseconds":60000}',
+        "--post-request-id", f"{configuration_post_index + 25}=async-task-parallel-resource-proof",
+        "--post-interval-override", f"{configuration_post_index + 25}=0.25",
+        "--post", '/api/v1/protocols={"id":"runtime-mqtt","action":"open","async":true,"startTimeoutMilliseconds":30000,"executionTimeoutMilliseconds":10000}',
+        "--post-response-status", f"{configuration_post_index + 26}=202",
+        "--post-request-id", f"{configuration_post_index + 26}=async-task-running-cancel-proof",
+        "--post-interval-override", f"{configuration_post_index + 26}=0.25",
+        "--post-expect-status", f"{configuration_post_index + 26}:/health/ready=503",
+        "--post", '/api/v1/management-tasks={"id":"${lastManagementTaskId}","action":"cancel"}',
         "--post-response-status", f"{configuration_post_index + 27}=202",
-        "--post-request-id", f"{configuration_post_index + 27}=async-task-interrupted-proof",
-        "--post-interval-override", f"{configuration_post_index + 27}=0",
+        "--post-request-id", f"{configuration_post_index + 27}=async-task-running-cancel-request",
+        "--post-interval-override", f"{configuration_post_index + 27}=4",
+        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start"}',
+        "--post-request-id", f"{configuration_post_index + 28}=async-task-final-observation",
+        "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start","async":true,"startTimeoutMilliseconds":120000,"notBeforeMilliseconds":60000}',
+        "--post-response-status", f"{configuration_post_index + 29}=202",
+        "--post-request-id", f"{configuration_post_index + 29}=async-task-interrupted-proof",
+        "--post-interval-override", f"{configuration_post_index + 29}=0",
     ])
     runtime_environment = os.environ.copy()
     runtime_environment["PDR_TEST_WEBHOOK_AUTH"] = "Bearer pdr-webhook-test"
@@ -927,7 +937,7 @@ def main() -> int:
         except json.JSONDecodeError:
             pass
     management_tasks_passed = (
-        len(async_acceptances) == 10 and
+        len(async_acceptances) == 12 and
         all(task.get("state") == "queued" for task in async_acceptances) and
         any(task.get("requestId") == "async-task-running-proof" and
             task.get("state") == "succeeded" for task in management_tasks.values()) and
@@ -1092,7 +1102,14 @@ def main() -> int:
         json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
     )
     if not result["passed"]:
-        print("RUNTIME_PROTOCOL_GATEWAY_INTEGRATION_FAIL", file=sys.stderr)
+        print(
+            "RUNTIME_PROTOCOL_GATEWAY_INTEGRATION_FAIL "
+            f"mqttConnections={mqtt.connections} rosConnections={ros.connections} "
+            f"resourceSamples={observed_resource_samples}/{expected_resource_samples} "
+            f"webhook={webhook_passed} managementTasks={management_tasks_passed} "
+            f"taskRecovery={management_task_recovery_passed}",
+            file=sys.stderr,
+        )
         return 1
     print(
         "RUNTIME_PROTOCOL_GATEWAY_INTEGRATION_PASS "

@@ -248,7 +248,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-non-qt-full-stack-reports
-          path: build/reports
+          path: build/reports/*.json
           if-no-files-found: warn
       - name: Install reusable SDK
         run: cmake --install build --prefix ${{ github.workspace }}/build/sdk
