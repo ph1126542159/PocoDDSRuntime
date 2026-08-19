@@ -8,6 +8,7 @@
 __pycache__/
 *.py[cod]
 /webui/node_modules/
+/webui/home/node_modules/
 /robotics/ros2_ws/build/
 /robotics/ros2_ws/install/
 /robotics/ros2_ws/log/
