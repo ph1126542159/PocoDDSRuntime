@@ -169,11 +169,12 @@ jobs:
           --output-on-failure
       - name: Configure direct Fast-DDS release lifecycle diagnostics
         run: >-
-          cmake -S . -B build/lifecycle-debug -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake -S . -B build/lifecycle-debug -DCMAKE_BUILD_TYPE=Release
           -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
           -DPDR_ENABLE_OBSERVABILITY=OFF
           -DPDR_BUILD_QT3D=OFF
           -DMYIOT_ENABLE_DATA_MODULES=OFF
+          -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -g"
       - name: Build direct Fast-DDS release lifecycle target
         run: >-
           cmake --build build/lifecycle-debug
