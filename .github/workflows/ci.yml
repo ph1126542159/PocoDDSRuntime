@@ -167,6 +167,32 @@ jobs:
         run: >-
           ctest --test-dir build/asan -R '^fastdds-device-smoke$'
           --output-on-failure
+      - name: Configure direct Fast-DDS release lifecycle diagnostics
+        run: >-
+          cmake -S . -B build/lifecycle-debug -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
+          -DPDR_ENABLE_OBSERVABILITY=OFF
+          -DPDR_BUILD_QT3D=OFF
+          -DMYIOT_ENABLE_DATA_MODULES=OFF
+      - name: Build direct Fast-DDS release lifecycle target
+        run: >-
+          cmake --build build/lifecycle-debug
+          --target pdr-fastdds-device-smoke --parallel 2
+      - name: Run direct Fast-DDS release lifecycle acceptance
+        shell: bash
+        run: |
+          if build/lifecycle-debug/test/pdr-fastdds-device-smoke; then
+            exit 0
+          fi
+          if ! command -v gdb >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends gdb
+          fi
+          gdb --batch --quiet \
+            -ex run \
+            -ex "thread apply all backtrace" \
+            --args build/lifecycle-debug/test/pdr-fastdds-device-smoke
+          exit 1
 
   linux-full-stack:
     name: linux-non-qt-full-stack
