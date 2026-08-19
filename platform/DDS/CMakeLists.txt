@@ -22,6 +22,14 @@ if(PDR_ENABLE_OBSERVABILITY)
     target_compile_definitions(PDRFastDDS PUBLIC PDR_ENABLE_OBSERVABILITY=1)
 endif()
 
+# PDRFastDDS embeds the static Fast-DDS compatibility stack.  Do not re-export
+# those archive symbols from the shared library on ELF systems; consumers may
+# also link the public Fast-DDS headers/target and must keep an independent copy
+# of static-library globals.
+if(UNIX AND NOT APPLE)
+    target_link_options(PDRFastDDS PRIVATE "LINKER:--exclude-libs,ALL")
+endif()
+
 pdr_set_warnings(PDRFastDDS)
 
 if(BUILD_TESTING)
