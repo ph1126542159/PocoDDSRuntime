@@ -25,7 +25,9 @@ function(pdr_add_osp_bundle target_name)
         OUTPUT_NAME "${PDR_PLUGIN_SYMBOLIC_NAME}" PREFIX "" DEBUG_POSTFIX "")
     target_link_libraries(${target_name} PRIVATE PocoDDS::Plugins ${PDR_PLUGIN_LINK_LIBS})
     if(UNIX AND NOT APPLE)
-        target_link_options(${target_name} PRIVATE "-Wl,-Bsymbolic")
+        target_link_options(${target_name} PRIVATE
+            "LINKER:--exclude-libs,ALL"
+            "LINKER:-Bsymbolic")
     endif()
     if(PDR_PLUGIN_INCLUDE_DIRS)
         target_include_directories(${target_name} PRIVATE ${PDR_PLUGIN_INCLUDE_DIRS})

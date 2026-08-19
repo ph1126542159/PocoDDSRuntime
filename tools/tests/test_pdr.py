@@ -801,8 +801,11 @@ class PdrToolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runtime = root / "runtime"
-            launcher = runtime / "processes" / "pdr-launcher" / "pdr-launcher.exe"
-            host = runtime / "processes" / "pdr-plugin-host" / "pdr-plugin-host.exe"
+            executable_suffix = ".exe" if os.name == "nt" else ""
+            launcher = (runtime / "processes" / "pdr-launcher" /
+                        f"pdr-launcher{executable_suffix}")
+            host = (runtime / "processes" / "pdr-plugin-host" /
+                    f"pdr-plugin-host{executable_suffix}")
             launcher.parent.mkdir(parents=True)
             host.parent.mkdir(parents=True)
             launcher.write_bytes(b"launcher")

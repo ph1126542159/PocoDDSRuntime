@@ -20,7 +20,13 @@ if(PDR_ENABLE_OBSERVABILITY)
 endif()
 
 pdr_set_warnings(pdr-runtime)
+pdr_isolate_embedded_static_dependencies(pdr-runtime)
 pdr_configure_main_process(pdr-runtime)
+
+if(UNIX AND NOT APPLE)
+    set_target_properties(pdr-runtime PROPERTIES
+        INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+endif()
 
 if(TARGET pdr-qt3d-subprocess)
     set(PDR_QT3D_SUBPROCESS_ENABLED true)

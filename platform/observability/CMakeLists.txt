@@ -36,15 +36,7 @@ target_link_libraries(PDRObservability
         Poco::JSON
         Poco::Foundation)
 
-# Native dependencies are intentionally built as position-independent static
-# archives.  On ELF platforms their internal globals must not be exported from
-# this shared object: otherwise the executable and another PDR shared library
-# can interpose the same static-library symbol and register two destructors for
-# one instance.  Keep the PDRObservability API exported while localising symbols
-# pulled in from archives.
-if(UNIX AND NOT APPLE)
-    target_link_options(PDRObservability PRIVATE "LINKER:--exclude-libs,ALL")
-endif()
+pdr_isolate_embedded_static_dependencies(PDRObservability)
 pdr_set_warnings(PDRObservability)
 
 if(BUILD_TESTING)

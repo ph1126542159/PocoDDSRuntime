@@ -11,6 +11,7 @@ target_compile_definitions(PDRBundleManagement
 target_link_libraries(PDRBundleManagement
     PUBLIC Poco::OSP
     PRIVATE Poco::Foundation)
+pdr_isolate_embedded_static_dependencies(PDRBundleManagement)
 pdr_set_warnings(PDRBundleManagement)
 
 install(TARGETS PDRBundleManagement

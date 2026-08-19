@@ -12,6 +12,7 @@ target_link_libraries(PDRProcessManagement
     PRIVATE
         Poco::Util
         Poco::Foundation)
+pdr_isolate_embedded_static_dependencies(PDRProcessManagement)
 pdr_set_warnings(PDRProcessManagement)
 
 install(TARGETS PDRProcessManagement
