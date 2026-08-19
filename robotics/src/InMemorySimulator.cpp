@@ -1,12 +1,30 @@
 #include "PocoDDS/Robotics/SimulationAdapter.h"
 
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 #include <stdexcept>
 
 namespace PocoDDS::Robotics
 {
+void SimulationAdapter::deactivate() noexcept
+{
+    _backendActive = false;
+    try
+    {
+        applyCommand({});
+    }
+    catch (...)
+    {
+    }
+}
+
+bool SimulationAdapter::write(const RobotCommand& command, std::chrono::nanoseconds)
+{
+    applyCommand(command);
+    return true;
+}
+
 std::string InMemorySimulator::backendName() const { return "in-memory"; }
 
 bool InMemorySimulator::connect(const std::string& world)
@@ -16,9 +34,12 @@ bool InMemorySimulator::connect(const std::string& world)
     std::lock_guard<std::mutex> lock(_mutex);
     _world = world;
     _connected = true;
+    _backendActive = false;
     _frame = {};
     _command = {};
     _yaw = 0.0;
+    _readCount = 0;
+    _writeCount = 0;
     _frame.state.frameId = "world";
     return true;
 }
@@ -29,6 +50,10 @@ void InMemorySimulator::reset()
     _frame = {};
     _command = {};
     _yaw = 0.0;
+    _readCount = 0;
+    _writeCount = 0;
+    _connected = false;
+    _backendActive = false;
     _frame.state.frameId = "world";
 }
 
@@ -39,6 +64,7 @@ void InMemorySimulator::applyCommand(const RobotCommand& command)
         throw std::logic_error("simulator is not connected");
     _command = command;
     _frame.state.twist = command.baseVelocity;
+    ++_writeCount;
 }
 
 RobotFrame InMemorySimulator::step(std::chrono::nanoseconds duration)
@@ -61,9 +87,8 @@ RobotFrame InMemorySimulator::step(std::chrono::nanoseconds duration)
     for (const auto& command : _command.joints)
     {
         auto found = std::find_if(state.joints.begin(), state.joints.end(),
-                                  [&command](const JointState& joint) {
-                                      return joint.name == command.name;
-                                  });
+                                  [&command](const JointState& joint)
+                                  { return joint.name == command.name; });
         if (found == state.joints.end())
         {
             state.joints.push_back({command.name});
@@ -79,6 +104,7 @@ RobotFrame InMemorySimulator::step(std::chrono::nanoseconds duration)
         else
             found->effort = command.value;
     }
+    ++_readCount;
     return _frame;
 }
 
@@ -86,5 +112,16 @@ bool InMemorySimulator::connected() const noexcept
 {
     std::lock_guard<std::mutex> lock(_mutex);
     return _connected;
+}
+
+BackendHealth InMemorySimulator::health() const
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    return {_connected,
+            _backendActive,
+            _connected && _backendActive,
+            _readCount,
+            _writeCount,
+            _backendActive ? "ready" : (_connected ? "inactive" : "disconnected")};
 }
 } // namespace PocoDDS::Robotics

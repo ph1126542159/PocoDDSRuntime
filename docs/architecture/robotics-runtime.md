@@ -44,6 +44,19 @@ standard lifecycle services to configure and activate it. The node exposes:
 - `robot/set_emergency_stop` fail-safe service;
 - `robot/execute_behavior` cancellable action.
 
+The node supports four backends:
+
+- `in_memory` for deterministic unit tests;
+- `mock_hardware` for hardware-path fault injection without a device;
+- `topic_simulation` using `robot/sim/command` and `robot/sim/frame`;
+- `topic_hardware` using `robot/hardware/command` and
+  `robot/hardware/frame`.
+
+The two topic backends require a first feedback frame before activation and
+fail closed when feedback exceeds the configured timeout. The hardware backend
+reports `simulated=false`; a CAN, EtherCAT, serial, vendor-SDK, or ros2_control
+gateway can implement the other side of the contract.
+
 ## Simulation adapter contract
 
 Every simulator adapter must support connect, reset, command injection,
@@ -53,7 +66,7 @@ world/base frames, joints, sensors and actuator units into the shared model.
 | Backend | Integration path | Primary use | Boundary |
 |---|---|---|---|
 | In-memory | Native `SimulationAdapter` | Fast unit and safety tests | No contacts or sensor physics |
-| Gazebo | `ros_gz_bridge` plus YAML topic mapping | ROS navigation, sensors, `ros2_control` | Validate bridge message support and QoS |
+| Gazebo | `pdr_robot_bringup` SDF, `ros_gz_bridge`, and unified bridge | Reference closed-loop SIL | Linux CI installs the official ROS/Gazebo pairing |
 | Isaac Sim | NVIDIA ROS 2 bridge | Photorealistic perception and synthetic data | GPU/platform/RMW matrix is narrower |
 | Webots | `webots_ros2` driver/control packages | Cross-platform education and system tests | Controller and device mappings are backend-specific |
 | MuJoCo | Native C API adapter or a separately qualified ROS 2 bridge | Dynamics and learning/control research | No official first-party ROS 2 bridge is assumed |
@@ -65,11 +78,32 @@ measured control-loop timing.
 
 ## Migration stages
 
-1. Portable core and deterministic in-memory simulation.
-2. ROS 2 messages, Lifecycle, Action and one Gazebo closed-loop model.
-3. `ros2_control` hardware interface, URDF/Xacro and controller manager.
-4. Nav2/MoveIt 2 or a behavior-tree layer selected by robot type.
-5. SIL regression, fault injection, HIL and finally tethered physical tests.
+1. Implemented: portable core, deterministic simulation, hardware abstraction,
+   watchdogs, limits, behavior orchestration, cancellation, and fault injection.
+2. Implemented: ROS 2 messages, Lifecycle, Action, simulation/hardware topic
+   backends, and a Gazebo differential-drive closed-loop model.
+3. Integration boundary implemented: standard ROS odometry, joint state,
+   velocity, and joint-command mappings for Gazebo, Webots, Isaac Sim, and
+   MuJoCo adapters.
+4. Robot-specific extension: select Nav2, MoveIt 2, or another behavior-tree
+   layer and bind a concrete hardware gateway for the target robot.
+5. Promotion gate: pass SIL regression, HIL, tethered tests, independent
+   physical e-stop validation, and measured control-loop timing.
+
+## Gazebo SIL acceptance
+
+On Ubuntu 24.04 / ROS 2 Jazzy, install `ros-jazzy-ros-gz`, build the workspace,
+then run:
+
+```bash
+ros2 launch pdr_robot_bringup gazebo_sil.launch.py
+ros2 run pdr_robot_bringup gazebo_sil_check.py
+```
+
+The checker waits for active Lifecycle state, releases the startup software
+interlock, commands forward motion through the runtime, verifies at least
+5 cm of displacement from `robot/state`, sends zero velocity, and prints
+`PDR_GAZEBO_SIL_PASS`. The same check runs in the `gazebo-sil` CI job.
 
 ## External integration references
 

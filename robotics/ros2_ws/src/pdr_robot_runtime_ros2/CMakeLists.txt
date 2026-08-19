@@ -13,10 +13,24 @@ find_package(std_msgs REQUIRED)
 
 add_executable(pdr_robot_runtime_node src/RobotRuntimeNode.cpp)
 target_compile_features(pdr_robot_runtime_node PRIVATE cxx_std_17)
-target_link_libraries(pdr_robot_runtime_node PRIVATE PocoDDS::RoboticsRuntime)
-ament_target_dependencies(pdr_robot_runtime_node
-  geometry_msgs lifecycle_msgs pdr_robot_msgs rclcpp rclcpp_action rclcpp_lifecycle std_msgs)
+target_link_libraries(pdr_robot_runtime_node PRIVATE
+  PocoDDS::RoboticsRuntime
+  geometry_msgs::geometry_msgs
+  lifecycle_msgs::lifecycle_msgs
+  pdr_robot_msgs::pdr_robot_msgs
+  rclcpp::rclcpp
+  rclcpp_action::rclcpp_action
+  rclcpp_lifecycle::rclcpp_lifecycle
+  std_msgs::std_msgs)
 
 install(TARGETS pdr_robot_runtime_node DESTINATION lib/${PROJECT_NAME})
-install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(pdr_robot_contract_test test/RobotContractTest.cpp)
+  target_link_libraries(pdr_robot_contract_test
+    PocoDDS::RoboticsRuntime
+    pdr_robot_msgs::pdr_robot_msgs)
+endif()
 ament_package()

@@ -29,9 +29,102 @@ jobs:
       - name: Check formatting
         shell: bash
         run: |
-          git ls-files -z -- application platform services server SubSystem |
+          git ls-files -z -- application platform robotics services server SubSystem |
             grep -zE '\.(h|hpp|cpp)$' |
             xargs -0 clang-format --dry-run --Werror
+
+  robotics-portable:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - name: Configure robotics core
+        run: cmake --preset robotics
+      - name: Build robotics core
+        run: cmake --build --preset robotics
+      - name: Test robotics core
+        run: ctest --preset robotics -C Release --output-on-failure
+      - name: Install robotics SDK
+        run: cmake --install build/robotics --config Release
+
+  ros2-robotics:
+    runs-on: ubuntu-latest
+    container: ros:jazzy-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential cmake \
+            python3-colcon-common-extensions ros-jazzy-ament-cmake-gtest
+      - name: Build and install portable core
+        shell: bash
+        run: |
+          cmake --preset robotics
+          cmake --build --preset robotics
+          ctest --preset robotics -C Release --output-on-failure
+          cmake --install build/robotics --config Release
+      - name: Build ROS 2 messages and runtime adapter
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd robotics/ros2_ws
+          colcon build --event-handlers console_direct+ --cmake-args \
+            -DCMAKE_PREFIX_PATH=${GITHUB_WORKSPACE}/build/install
+      - name: Test ROS 2 workspace
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd robotics/ros2_ws
+          colcon test --event-handlers console_direct+
+          colcon test-result --verbose
+
+  gazebo-sil:
+    runs-on: ubuntu-latest
+    container: ros:jazzy-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Gazebo Harmonic and build tools
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential cmake \
+            python3-colcon-common-extensions ros-jazzy-ament-cmake-gtest \
+            ros-jazzy-ros-gz
+      - name: Build robotics core and Gazebo SIL workspace
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cmake --preset robotics
+          cmake --build --preset robotics
+          cmake --install build/robotics --config Release
+          cd robotics/ros2_ws
+          colcon build --packages-up-to pdr_robot_bringup \
+            --event-handlers console_direct+ --cmake-args \
+            -DCMAKE_PREFIX_PATH=${GITHUB_WORKSPACE}/build/install
+      - name: Run Gazebo closed-loop SIL acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /opt/ros/jazzy/setup.bash
+          source robotics/ros2_ws/install/setup.bash
+          ros2 launch pdr_robot_bringup gazebo_sil.launch.py \
+            >/tmp/pdr-gazebo-sil.log 2>&1 &
+          launch_pid=$!
+          cleanup() {
+            kill "${launch_pid}" 2>/dev/null || true
+            wait "${launch_pid}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          if ! timeout 60 ros2 run pdr_robot_bringup gazebo_sil_check.py; then
+            cat /tmp/pdr-gazebo-sil.log
+            exit 1
+          fi
 
   linux-full-stack:
     runs-on: ubuntu-latest

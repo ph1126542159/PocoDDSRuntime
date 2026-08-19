@@ -11,6 +11,9 @@ __pycache__/
 /robotics/ros2_ws/build/
 /robotics/ros2_ws/install/
 /robotics/ros2_ws/log/
+/robotics/ros2_ws/build_*/
+/robotics/ros2_ws/install_*/
+/robotics/ros2_ws/log_*/
 deploy/observability/certificates/*.key
 deploy/observability/certificates/*.crt
 deploy/observability/certificates/*.csr

@@ -1,0 +1,16 @@
+pdr_robot_runtime:
+  ros__parameters:
+    use_sim_time: true
+    backend: topic_simulation
+    world: pdr_world
+    simulator_name: gazebo
+    simulator_feedback_timeout_ms: 500
+    tick_period_ms: 20
+    maximum_linear_speed: 1.0
+    maximum_angular_speed: 1.5
+    command_timeout_ms: 250
+    joint_names: [left_wheel_joint, right_wheel_joint]
+    joint_min_positions: [-1000000.0, -1000000.0]
+    joint_max_positions: [1000000.0, 1000000.0]
+    joint_max_velocities: [20.0, 20.0]
+    joint_max_efforts: [10.0, 10.0]

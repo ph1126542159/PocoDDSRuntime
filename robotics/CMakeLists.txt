@@ -1,8 +1,11 @@
 add_library(PDRRoboticsRuntime
     src/Action.cpp
     src/Behavior.cpp
+    src/ExternalHardware.cpp
+    src/ExternalSimulator.cpp
     src/InMemorySimulator.cpp
     src/Lifecycle.cpp
+    src/MockHardware.cpp
     src/RobotRuntime.cpp
     src/SafetyBoundary.cpp)
 add_library(PocoDDS::RoboticsRuntime ALIAS PDRRoboticsRuntime)

@@ -1,6 +1,10 @@
 pdr_robot_runtime:
   ros__parameters:
+    backend: in_memory
     world: empty
+    hardware_description: mock://robot
+    simulator_name: external-simulator
+    simulator_feedback_timeout_ms: 500
     tick_period_ms: 20
     maximum_linear_speed: 1.0
     maximum_angular_speed: 1.0
