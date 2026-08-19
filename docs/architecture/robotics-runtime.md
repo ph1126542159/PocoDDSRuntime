@@ -33,7 +33,7 @@ After installing and sourcing a supported ROS 2 distribution:
 ```powershell
 $env:CMAKE_PREFIX_PATH = "E:\PocoDDSRuntime\build\install;$env:CMAKE_PREFIX_PATH"
 Set-Location E:\PocoDDSRuntime\robotics\ros2_ws
-colcon build --symlink-install
+colcon build --merge-install --symlink-install
 ```
 
 Source `install/local_setup.ps1`, start `pdr_robot_runtime_node`, then use the

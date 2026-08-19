@@ -80,7 +80,7 @@ jobs:
         run: |
           source /opt/ros/jazzy/setup.bash
           cd robotics/ros2_ws
-          colcon build --event-handlers console_direct+ --cmake-args \
+          colcon build --merge-install --event-handlers console_direct+ --cmake-args \
             -DCMAKE_PREFIX_PATH=${GITHUB_WORKSPACE}/build/install
       - name: Test ROS 2 workspace
         shell: bash
@@ -110,7 +110,7 @@ jobs:
           cmake --build --preset robotics
           cmake --install build/robotics --config Release
           cd robotics/ros2_ws
-          colcon build --packages-up-to pdr_robot_bringup \
+          colcon build --merge-install --packages-up-to pdr_robot_bringup \
             --event-handlers console_direct+ --cmake-args \
             -DCMAKE_PREFIX_PATH=${GITHUB_WORKSPACE}/build/install
       - name: Run Gazebo closed-loop SIL acceptance

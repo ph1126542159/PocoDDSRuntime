@@ -7,8 +7,7 @@ header.
 Build the core and install it first, then source ROS 2 and run:
 
 ```powershell
-colcon build --symlink-install --cmake-args
-  -DCMAKE_PREFIX_PATH=E:/PocoDDSRuntime/build/install
+colcon build --merge-install --symlink-install --cmake-args -DCMAKE_PREFIX_PATH=E:/PocoDDSRuntime/build/install
 ```
 
 The workspace contains typed message/service/action contracts, a managed
