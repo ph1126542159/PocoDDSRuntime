@@ -162,11 +162,26 @@ jobs:
       - name: Build direct Fast-DDS smoke target
         run: cmake --build build/asan --target pdr-fastdds-device-smoke --parallel 2
       - name: Run direct Fast-DDS memory-safety acceptance
+        shell: bash
         env:
           ASAN_OPTIONS: abort_on_error=1:detect_leaks=0:strict_string_checks=1
-        run: >-
-          ctest --test-dir build/asan -R '^fastdds-device-smoke$'
-          --output-on-failure
+        run: |
+          set +e
+          ctest --test-dir build/asan -R '^fastdds-device-smoke$' --output-on-failure
+          result=$?
+          set -e
+          if [[ ${result} -eq 0 ]]; then
+            exit 0
+          fi
+          if ! command -v gdb >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends gdb
+          fi
+          gdb --batch --quiet \
+            -ex run \
+            -ex "thread apply all backtrace full" \
+            --args build/asan/test/pdr-fastdds-device-smoke
+          exit "${result}"
       - name: Configure direct Fast-DDS release lifecycle diagnostics
         run: >-
           cmake -S . -B build/lifecycle-debug -DCMAKE_BUILD_TYPE=Release
