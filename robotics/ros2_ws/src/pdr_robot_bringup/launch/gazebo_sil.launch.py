@@ -42,6 +42,7 @@ def generate_launch_description():
         package="pdr_robot_runtime_ros2",
         executable="pdr_robot_runtime_node",
         name="pdr_robot_runtime",
+        namespace="",
         output="screen",
         parameters=[str(bringup / "config" / "gazebo_runtime.yaml")],
     )
