@@ -139,6 +139,23 @@ int main()
         !outageDetected || !cached || !recovered || !replayed ||
         json.find("pdr.test.requests") == std::string::npos ||
         json.find("metrics-test") == std::string::npos)
+    {
+        std::cerr << "METRICS_TEST_FAIL"
+                  << " counter=" << counterOk
+                  << " queue=" << queueOk
+                  << " histogram=" << histogramOk
+                  << " flush=" << flushOk
+                  << " export=" << exportOk
+                  << " outage=" << outageDetected
+                  << " cached=" << cached
+                  << " recovered=" << recovered
+                  << " replayed=" << replayed
+                  << " jsonMetric="
+                  << (json.find("pdr.test.requests") != std::string::npos)
+                  << " jsonService="
+                  << (json.find("metrics-test") != std::string::npos)
+                  << '\n';
         return 1;
+    }
     std::cout << "METRICS_TEST_PASS\n";
 }

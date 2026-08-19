@@ -1146,7 +1146,13 @@ def doctor(args: argparse.Namespace) -> int:
     package_dir = prefix / "lib" / "cmake" / "PocoDDSRuntime"
     config = package_dir / "PocoDDSRuntimeConfig.cmake"
     targets = package_dir / "PocoDDSRuntimeTargets.cmake"
-    poco = dependency_prefix / "cmake" / "PocoConfig.cmake"
+    poco_candidates = (
+        dependency_prefix / "cmake" / "PocoConfig.cmake",
+        dependency_prefix / "lib" / "cmake" / "Poco" / "PocoConfig.cmake",
+        dependency_prefix / "lib64" / "cmake" / "Poco" / "PocoConfig.cmake",
+    )
+    poco = next((candidate for candidate in poco_candidates if candidate.is_file()),
+                poco_candidates[0])
     add(
         "sdk-package", config.is_file(), str(config),
         "install PocoDDSRuntime to the selected --prefix",

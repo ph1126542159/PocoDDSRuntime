@@ -243,6 +243,13 @@ jobs:
         run: cmake --build build --config Release --parallel 2
       - name: Run full acceptance suite
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: Upload full-stack acceptance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-non-qt-full-stack-reports
+          path: build/reports
+          if-no-files-found: warn
       - name: Install reusable SDK
         run: cmake --install build --prefix ${{ github.workspace }}/build/sdk
       - name: Generate release hashes and SPDX SBOM
