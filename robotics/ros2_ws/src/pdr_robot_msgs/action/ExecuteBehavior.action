@@ -1,0 +1,8 @@
+string behavior
+string parameters_json
+---
+bool success
+string detail
+---
+float32 progress
+string current_step

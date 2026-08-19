@@ -1,0 +1,12 @@
+pdr_robot_runtime:
+  ros__parameters:
+    world: empty
+    tick_period_ms: 20
+    maximum_linear_speed: 1.0
+    maximum_angular_speed: 1.0
+    command_timeout_ms: 250
+    joint_names: []
+    joint_min_positions: []
+    joint_max_positions: []
+    joint_max_velocities: []
+    joint_max_efforts: []

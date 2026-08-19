@@ -114,6 +114,16 @@ option(PDR_BUILD_WEBUI "Build and package administration WebUI page bundles" ON)
 option(PDR_BUILD_LAUNCHER "Build the independent runtime watchdog launcher" ON)
 option(PDR_BUILD_PLUGIN_HOST "Build the isolated OSP plugin host process" ON)
 option(PDR_BUILD_QT3D "Build the Qt3D demonstration subprocess" ON)
+option(PDR_BUILD_LEGACY_RUNTIME
+    "Build the existing Poco/OSP runtime and direct Fast-DDS integrations" ON)
+option(PDR_BUILD_ROBOTICS_RUNTIME
+    "Build the transport-neutral embodied robotics runtime core" OFF)
+set(PDR_COMM_BACKEND "FASTDDS" CACHE STRING
+    "Inter-process communication backend: FASTDDS or ROS2")
+set_property(CACHE PDR_COMM_BACKEND PROPERTY STRINGS FASTDDS ROS2)
+if(NOT PDR_COMM_BACKEND MATCHES "^(FASTDDS|ROS2)$")
+    message(FATAL_ERROR "Unsupported PDR_COMM_BACKEND: ${PDR_COMM_BACKEND}")
+endif()
 if(NOT PDR_PROFILE MATCHES "^(embedded|edge-test|server|custom)$")
     message(FATAL_ERROR "Unsupported PDR_PROFILE: ${PDR_PROFILE}")
 endif()
@@ -133,6 +143,34 @@ set(SHARED_LIBRARY_VERSION 1 CACHE STRING "Compatibility version for migrated pl
 
 include(PDRWarnings)
 include(PDRProcessLayout)
+
+if(PDR_BUILD_ROBOTICS_RUNTIME)
+    set(CMAKE_FOLDER "Robotics")
+    add_subdirectory(robotics)
+endif()
+
+if(NOT PDR_BUILD_LEGACY_RUNTIME)
+    if(NOT PDR_BUILD_ROBOTICS_RUNTIME)
+        message(FATAL_ERROR
+            "PDR_BUILD_LEGACY_RUNTIME=OFF requires PDR_BUILD_ROBOTICS_RUNTIME=ON")
+    endif()
+    if(PDR_COMM_BACKEND STREQUAL "FASTDDS")
+        message(WARNING
+            "The standalone robotics core uses an in-process test transport. "
+            "Select PDR_COMM_BACKEND=ROS2 and build robotics/ros2_ws with colcon "
+            "to enable inter-process ROS 2 communication.")
+    endif()
+    unset(CMAKE_FOLDER)
+    pdr_configure_test_output_tree("${CMAKE_CURRENT_SOURCE_DIR}")
+    return()
+endif()
+
+if(NOT PDR_COMM_BACKEND STREQUAL "FASTDDS")
+    message(FATAL_ERROR
+        "The legacy runtime still requires PDR_COMM_BACKEND=FASTDDS. "
+        "Use the robotics preset for the ROS2 migration path.")
+endif()
+
 include(PDRDependencies)
 pdr_bootstrap_missing_dependencies()
 pdr_require_poco()

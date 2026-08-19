@@ -8,6 +8,9 @@
 __pycache__/
 *.py[cod]
 /webui/node_modules/
+/robotics/ros2_ws/build/
+/robotics/ros2_ws/install/
+/robotics/ros2_ws/log/
 deploy/observability/certificates/*.key
 deploy/observability/certificates/*.crt
 deploy/observability/certificates/*.csr

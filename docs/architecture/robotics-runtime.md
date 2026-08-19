@@ -1,0 +1,87 @@
+# Embodied robotics runtime
+
+## Scope
+
+The robotics runtime is a cross-platform, transport-neutral control-plane core.
+It defines typed robot state, lifecycle transitions, cancellable actions,
+deterministic behavior sequencing, simulation/hardware ports and a fail-closed
+safety boundary. It does not put hard real-time motor loops, physical e-stop
+circuits or safety PLC functions into a desktop process.
+
+The existing Poco/OSP runtime remains available during migration. The
+`robotics` CMake preset builds only the new core and turns Qt, WebUI, Poco/OSP
+and direct Fast-DDS code off. ROS 2 communication is built separately with
+`colcon`, so ROS 2 selects its own RMW implementation without linking the old
+Fast-DDS API into the same process.
+
+## Build and test the portable core
+
+```powershell
+C:\Qt\Tools\CMake_64\bin\cmake.exe --preset robotics
+C:\Qt\Tools\CMake_64\bin\cmake.exe --build --preset robotics
+C:\Qt\Tools\CMake_64\bin\ctest.exe --preset robotics -C Release -V
+C:\Qt\Tools\CMake_64\bin\cmake.exe --install build/robotics --config Release
+```
+
+The same preset is valid on Linux with an available C++17 compiler. Generator
+selection is intentionally left to CMake.
+
+## Build the ROS 2 adapter
+
+After installing and sourcing a supported ROS 2 distribution:
+
+```powershell
+$env:CMAKE_PREFIX_PATH = "E:\PocoDDSRuntime\build\install;$env:CMAKE_PREFIX_PATH"
+Set-Location E:\PocoDDSRuntime\robotics\ros2_ws
+colcon build --symlink-install
+```
+
+Source `install/local_setup.ps1`, start `pdr_robot_runtime_node`, then use the
+standard lifecycle services to configure and activate it. The node exposes:
+
+- `robot/state` and `robot/safety_state` typed topics;
+- `robot/command` for base and joint commands, plus `robot/cmd_vel` convenience input;
+- `robot/set_emergency_stop` fail-safe service;
+- `robot/execute_behavior` cancellable action.
+
+## Simulation adapter contract
+
+Every simulator adapter must support connect, reset, command injection,
+deterministic stepping and state extraction. A backend must map simulation time,
+world/base frames, joints, sensors and actuator units into the shared model.
+
+| Backend | Integration path | Primary use | Boundary |
+|---|---|---|---|
+| In-memory | Native `SimulationAdapter` | Fast unit and safety tests | No contacts or sensor physics |
+| Gazebo | `ros_gz_bridge` plus YAML topic mapping | ROS navigation, sensors, `ros2_control` | Validate bridge message support and QoS |
+| Isaac Sim | NVIDIA ROS 2 bridge | Photorealistic perception and synthetic data | GPU/platform/RMW matrix is narrower |
+| Webots | `webots_ros2` driver/control packages | Cross-platform education and system tests | Controller and device mappings are backend-specific |
+| MuJoCo | Native C API adapter or a separately qualified ROS 2 bridge | Dynamics and learning/control research | No official first-party ROS 2 bridge is assumed |
+
+Simulation-in-the-loop is not hardware acceptance. Promotion to a real robot
+requires the same behavior suite to pass against a hardware adapter, plus an
+independent physical e-stop, limits, watchdog, power/current protection and
+measured control-loop timing.
+
+## Migration stages
+
+1. Portable core and deterministic in-memory simulation.
+2. ROS 2 messages, Lifecycle, Action and one Gazebo closed-loop model.
+3. `ros2_control` hardware interface, URDF/Xacro and controller manager.
+4. Nav2/MoveIt 2 or a behavior-tree layer selected by robot type.
+5. SIL regression, fault injection, HIL and finally tethered physical tests.
+
+## External integration references
+
+- Gazebo ROS 2 integration and `ros_gz_bridge`:
+  <https://gazebosim.org/docs/harmonic/ros2_integration/>
+- NVIDIA Isaac Sim ROS 2 bridge:
+  <https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_ros.html>
+- Cyberbotics Webots ROS 2 packages:
+  <https://github.com/cyberbotics/webots_ros2>
+- MuJoCo cross-platform C API and simulation loop:
+  <https://mujoco.readthedocs.io/en/stable/programming/index.html>
+
+These links establish supported integration mechanisms, not project acceptance.
+Each selected simulator still needs a version-pinned adapter and closed-loop
+test evidence in this repository.
