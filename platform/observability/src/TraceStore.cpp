@@ -1,9 +1,9 @@
 #include "PocoDDS/Observability/TraceStore.h"
 #include "PocoDDS/Observability/TraceSerialization.h"
 
+#include <Poco/Data/SQLite/Connector.h>
 #include <Poco/Data/Session.h>
 #include <Poco/Data/Statement.h>
-#include <Poco/Data/SQLite/Connector.h>
 #include <Poco/DateTime.h>
 #include <Poco/DateTimeFormatter.h>
 #include <Poco/File.h>
@@ -22,11 +22,11 @@ using namespace Poco::Data::Keywords;
 
 class TraceStore::Persistence
 {
-public:
+  public:
     Persistence(std::string directory, unsigned retentionDays)
         : _directory(std::move(directory)),
-          _retentionMicroseconds(static_cast<long long>(retentionDays) * 24LL * 60LL *
-                                 60LL * 1000000LL)
+          _retentionMicroseconds(static_cast<Poco::Int64>(retentionDays) * 24LL * 60LL * 60LL *
+                                 1000000LL)
     {
         if (retentionDays == 0)
             throw std::invalid_argument("trace history retention must be greater than zero");
@@ -35,12 +35,12 @@ public:
         Poco::Data::Session catalog("SQLite", catalogPath());
         catalog << "PRAGMA journal_mode=WAL", now;
         catalog << "PRAGMA synchronous=NORMAL", now;
-        catalog << "CREATE TABLE IF NOT EXISTS shards ("
-                   "hour_key TEXT PRIMARY KEY, file_name TEXT NOT NULL UNIQUE, "
-                   "start_us INTEGER NOT NULL, end_us INTEGER NOT NULL, updated_us INTEGER NOT NULL)",
+        catalog
+            << "CREATE TABLE IF NOT EXISTS shards ("
+               "hour_key TEXT PRIMARY KEY, file_name TEXT NOT NULL UNIQUE, "
+               "start_us INTEGER NOT NULL, end_us INTEGER NOT NULL, updated_us INTEGER NOT NULL)",
             now;
-        catalog << "CREATE INDEX IF NOT EXISTS idx_shards_range ON shards(start_us, end_us)",
-            now;
+        catalog << "CREATE INDEX IF NOT EXISTS idx_shards_range ON shards(start_us, end_us)", now;
         purgeExpired();
     }
 
@@ -55,11 +55,12 @@ public:
         initializeShard(shard);
 
         const std::string payload = serializeSpanSnapshot(span);
+        const Poco::Int64 startedUs = span.startedUnixMicroseconds;
+        const Poco::Int64 durationNs = span.durationNanoseconds;
         shard << "INSERT INTO spans(trace_id,span_id,started_us,payload) VALUES(?,?,?,?) "
                  "ON CONFLICT(trace_id,span_id) DO UPDATE SET "
                  "started_us=excluded.started_us,payload=excluded.payload",
-            useRef(span.traceId), useRef(span.spanId),
-            useRef(span.startedUnixMicroseconds), useRef(payload), now;
+            useRef(span.traceId), useRef(span.spanId), useRef(startedUs), useRef(payload), now;
 
         const std::string failedOperation =
             span.status == "failed" ? span.operation : std::string{};
@@ -75,20 +76,18 @@ public:
                  "step_count=(SELECT COUNT(*) FROM spans WHERE trace_id=excluded.trace_id),"
                  "failed_operation=CASE WHEN excluded.status='failed' "
                  "THEN excluded.failed_operation ELSE traces.failed_operation END",
-            useRef(span.traceId), useRef(span.businessName),
-            useRef(span.businessInstanceId), useRef(span.status),
-            useRef(span.startedUnixMicroseconds), useRef(span.durationNanoseconds),
-            useRef(failedOperation), now;
+            useRef(span.traceId), useRef(span.businessName), useRef(span.businessInstanceId),
+            useRef(span.status), useRef(startedUs), useRef(durationNs), useRef(failedOperation),
+            now;
 
-        const long long hourStart = hourStartMicroseconds(span.startedUnixMicroseconds);
-        const long long hourEnd = hourStart + 60LL * 60LL * 1000000LL - 1;
-        const long long updated = Poco::Timestamp().epochMicroseconds();
+        const Poco::Int64 hourStart = hourStartMicroseconds(span.startedUnixMicroseconds);
+        const Poco::Int64 hourEnd = hourStart + 60LL * 60LL * 1000000LL - 1;
+        const Poco::Int64 updated = Poco::Timestamp().epochMicroseconds();
         Poco::Data::Session catalog("SQLite", catalogPath());
         catalog << "INSERT INTO shards(hour_key,file_name,start_us,end_us,updated_us) "
                    "VALUES(?,?,?,?,?) ON CONFLICT(hour_key) DO UPDATE SET "
                    "file_name=excluded.file_name,updated_us=excluded.updated_us",
-            useRef(key), useRef(fileName), useRef(hourStart), useRef(hourEnd),
-            useRef(updated), now;
+            useRef(key), useRef(fileName), useRef(hourStart), useRef(hourEnd), useRef(updated), now;
 
         if (++_writesSincePurge >= 1000)
         {
@@ -101,38 +100,41 @@ public:
     {
         TraceHistoryQuery query = configured;
         query.limit = std::clamp<std::size_t>(query.limit, 1, 1000);
-        const long long nowUs = Poco::Timestamp().epochMicroseconds();
-        if (query.toUnixMicroseconds <= 0) query.toUnixMicroseconds = nowUs;
+        const Poco::Int64 nowUs = Poco::Timestamp().epochMicroseconds();
+        if (query.toUnixMicroseconds <= 0)
+            query.toUnixMicroseconds = nowUs;
         if (query.fromUnixMicroseconds <= 0)
             query.fromUnixMicroseconds = query.toUnixMicroseconds - _retentionMicroseconds;
 
         std::vector<std::string> files;
+        Poco::Int64 fromUs = query.fromUnixMicroseconds;
+        Poco::Int64 toUs = query.toUnixMicroseconds;
         Poco::Data::Session catalog("SQLite", catalogPath());
         catalog << "SELECT file_name FROM shards WHERE end_us>=? AND start_us<=? "
                    "ORDER BY start_us DESC",
-            use(query.fromUnixMicroseconds), use(query.toUnixMicroseconds), into(files), now;
+            use(fromUs), use(toUs), into(files), now;
 
         std::vector<TraceSummary> all;
         const std::string namePattern = "%" + query.businessName + "%";
-        const int perShardLimit = static_cast<int>(
-            std::min<std::size_t>(query.limit + query.offset + 1, 5000));
+        const int perShardLimit =
+            static_cast<int>(std::min<std::size_t>(query.limit + query.offset + 1, 5000));
         for (const auto& file : files)
         {
             const std::string path = shardPath(file);
-            if (!Poco::File(path).exists()) continue;
+            if (!Poco::File(path).exists())
+                continue;
             Poco::Data::Session shard("SQLite", path);
             std::vector<std::string> traceIds, names, instances, statuses, failedOperations;
-            std::vector<long long> starts, durations;
+            std::vector<Poco::Int64> starts, durations;
             std::vector<int> steps;
             shard << "SELECT trace_id,business_name,instance_id,status,started_us,duration_ns,"
                      "step_count,failed_operation FROM traces "
                      "WHERE started_us>=? AND started_us<=? "
                      "AND (?='' OR business_name LIKE ?) AND (?='' OR status=?) "
                      "ORDER BY started_us DESC LIMIT ?",
-                use(query.fromUnixMicroseconds), use(query.toUnixMicroseconds),
-                use(query.businessName), useRef(namePattern), use(query.status),
-                use(query.status), useRef(perShardLimit), into(traceIds), into(names),
-                into(instances), into(statuses), into(starts), into(durations),
+                use(fromUs), use(toUs), use(query.businessName), useRef(namePattern),
+                use(query.status), use(query.status), useRef(perShardLimit), into(traceIds),
+                into(names), into(instances), into(statuses), into(starts), into(durations),
                 into(steps), into(failedOperations), now;
             for (std::size_t index = 0; index < traceIds.size(); ++index)
             {
@@ -148,9 +150,8 @@ public:
                 all.push_back(std::move(summary));
             }
         }
-        std::sort(all.begin(), all.end(), [](const auto& left, const auto& right) {
-            return left.startedUnixMicroseconds > right.startedUnixMicroseconds;
-        });
+        std::sort(all.begin(), all.end(), [](const auto& left, const auto& right)
+                  { return left.startedUnixMicroseconds > right.startedUnixMicroseconds; });
         const std::size_t begin = std::min(query.offset, all.size());
         const std::size_t end = std::min(begin + query.limit, all.size());
         TraceHistoryResult result;
@@ -160,14 +161,14 @@ public:
         return result;
     }
 
-private:
-    static long long hourStartMicroseconds(long long value)
+  private:
+    static Poco::Int64 hourStartMicroseconds(Poco::Int64 value)
     {
-        constexpr long long hour = 60LL * 60LL * 1000000LL;
+        constexpr Poco::Int64 hour = 60LL * 60LL * 1000000LL;
         return (value / hour) * hour;
     }
 
-    static std::string hourKey(long long value)
+    static std::string hourKey(Poco::Int64 value)
     {
         const Poco::DateTime time(Poco::Timestamp(hourStartMicroseconds(value)));
         return Poco::DateTimeFormatter::format(time, "%Y%m%d-%H");
@@ -196,8 +197,7 @@ private:
                  "status TEXT NOT NULL,started_us INTEGER NOT NULL,duration_ns INTEGER NOT NULL,"
                  "step_count INTEGER NOT NULL,failed_operation TEXT NOT NULL)",
             now;
-        shard << "CREATE INDEX IF NOT EXISTS idx_traces_started ON traces(started_us DESC)",
-            now;
+        shard << "CREATE INDEX IF NOT EXISTS idx_traces_started ON traces(started_us DESC)", now;
         shard << "CREATE INDEX IF NOT EXISTS idx_traces_filter "
                  "ON traces(business_name,status,started_us DESC)",
             now;
@@ -205,25 +205,28 @@ private:
 
     void purgeExpired()
     {
-        const long long cutoff = Poco::Timestamp().epochMicroseconds() - _retentionMicroseconds;
+        const Poco::Int64 cutoff = Poco::Timestamp().epochMicroseconds() - _retentionMicroseconds;
         std::vector<std::string> expired;
         Poco::Data::Session catalog("SQLite", catalogPath());
-        catalog << "SELECT file_name FROM shards WHERE end_us<?", useRef(cutoff),
-            into(expired), now;
+        catalog << "SELECT file_name FROM shards WHERE end_us<?", useRef(cutoff), into(expired),
+            now;
         catalog << "DELETE FROM shards WHERE end_us<?", useRef(cutoff), now;
         for (const auto& file : expired)
         {
             Poco::File database(shardPath(file));
-            if (database.exists()) database.remove();
+            if (database.exists())
+                database.remove();
             Poco::File wal(shardPath(file) + "-wal");
-            if (wal.exists()) wal.remove();
+            if (wal.exists())
+                wal.remove();
             Poco::File shm(shardPath(file) + "-shm");
-            if (shm.exists()) shm.remove();
+            if (shm.exists())
+                shm.remove();
         }
     }
 
     std::string _directory;
-    long long _retentionMicroseconds;
+    Poco::Int64 _retentionMicroseconds;
     unsigned _writesSincePurge{0};
 };
 
@@ -238,9 +241,9 @@ TraceStore::~TraceStore() = default;
 void TraceStore::upsert(const SpanSnapshot& span)
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    const auto found = std::find_if(_spans.begin(), _spans.end(), [&](const auto& current) {
-        return current.traceId == span.traceId && current.spanId == span.spanId;
-    });
+    const auto found =
+        std::find_if(_spans.begin(), _spans.end(), [&](const auto& current)
+                     { return current.traceId == span.traceId && current.spanId == span.spanId; });
     if (found == _spans.end())
         _spans.push_back(span);
     else
@@ -280,9 +283,8 @@ std::vector<TraceSummary> TraceStore::recent(std::size_t limit) const
     std::vector<TraceSummary> result;
     for (auto& item : summaries)
         result.push_back(std::move(item.second));
-    std::sort(result.begin(), result.end(), [](const auto& left, const auto& right) {
-        return left.startedUnixMicroseconds > right.startedUnixMicroseconds;
-    });
+    std::sort(result.begin(), result.end(), [](const auto& left, const auto& right)
+              { return left.startedUnixMicroseconds > right.startedUnixMicroseconds; });
     if (result.size() > limit)
         result.resize(limit);
     return result;
@@ -294,9 +296,8 @@ std::vector<SpanSnapshot> TraceStore::trace(const std::string& traceId) const
     std::vector<SpanSnapshot> result;
     std::copy_if(_spans.begin(), _spans.end(), std::back_inserter(result),
                  [&](const auto& span) { return span.traceId == traceId; });
-    std::sort(result.begin(), result.end(), [](const auto& left, const auto& right) {
-        return left.startedUnixMicroseconds < right.startedUnixMicroseconds;
-    });
+    std::sort(result.begin(), result.end(), [](const auto& left, const auto& right)
+              { return left.startedUnixMicroseconds < right.startedUnixMicroseconds; });
     return result;
 }
 
@@ -304,14 +305,12 @@ std::optional<SpanSnapshot> TraceStore::span(const std::string& traceId,
                                              const std::string& spanId) const
 {
     std::lock_guard<std::mutex> lock(_mutex);
-    const auto found = std::find_if(_spans.begin(), _spans.end(), [&](const auto& span) {
-        return span.traceId == traceId && span.spanId == spanId;
-    });
+    const auto found = std::find_if(_spans.begin(), _spans.end(), [&](const auto& span)
+                                    { return span.traceId == traceId && span.spanId == spanId; });
     return found == _spans.end() ? std::optional<SpanSnapshot>{} : *found;
 }
 
-void TraceStore::configurePersistence(const std::string& directory,
-                                      unsigned retentionDays)
+void TraceStore::configurePersistence(const std::string& directory, unsigned retentionDays)
 {
     std::lock_guard<std::mutex> lock(_mutex);
     _persistence = std::make_unique<Persistence>(directory, retentionDays);
@@ -335,17 +334,16 @@ TraceStore& globalTraceStore()
     return store;
 }
 
-extern "C" PDR_OBSERVABILITY_API void pdrConfigureTracePersistence(
-    const char* directory, unsigned retentionDays)
+extern "C" PDR_OBSERVABILITY_API void pdrConfigureTracePersistence(const char* directory,
+                                                                   unsigned retentionDays)
 {
-    globalTraceStore().configurePersistence(directory ? directory : "",
-                                            retentionDays);
+    globalTraceStore().configurePersistence(directory ? directory : "", retentionDays);
 }
 
-extern "C" PDR_OBSERVABILITY_API bool pdrQueryTraceHistory(
-    long long fromUnixMicroseconds, long long toUnixMicroseconds,
-    const char* businessName, const char* status, std::size_t limit,
-    std::size_t offset, TraceHistoryCallback callback, void* context)
+extern "C" PDR_OBSERVABILITY_API bool
+pdrQueryTraceHistory(long long fromUnixMicroseconds, long long toUnixMicroseconds,
+                     const char* businessName, const char* status, std::size_t limit,
+                     std::size_t offset, TraceHistoryCallback callback, void* context)
 {
     TraceHistoryQuery query;
     query.fromUnixMicroseconds = fromUnixMicroseconds;
@@ -359,8 +357,8 @@ extern "C" PDR_OBSERVABILITY_API bool pdrQueryTraceHistory(
         for (const auto& record : result.records)
             callback(context, record.traceId.c_str(), record.businessName.c_str(),
                      record.businessInstanceId.c_str(), record.status.c_str(),
-                     record.startedUnixMicroseconds, record.durationNanoseconds,
-                     record.stepCount, record.failedOperation.c_str());
+                     record.startedUnixMicroseconds, record.durationNanoseconds, record.stepCount,
+                     record.failedOperation.c_str());
     return result.hasMore;
 }
 } // namespace PocoDDS::Observability
