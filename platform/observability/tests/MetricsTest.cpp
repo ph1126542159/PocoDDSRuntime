@@ -1,14 +1,14 @@
 #include "PocoDDS/Observability/Metrics.h"
 
-#include <Poco/Net/HTTPServer.h>
-#include <Poco/Net/HTTPServerParams.h>
+#include <Poco/File.h>
 #include <Poco/Net/HTTPRequestHandler.h>
 #include <Poco/Net/HTTPRequestHandlerFactory.h>
+#include <Poco/Net/HTTPServer.h>
+#include <Poco/Net/HTTPServerParams.h>
 #include <Poco/Net/HTTPServerRequest.h>
 #include <Poco/Net/HTTPServerResponse.h>
 #include <Poco/Net/ServerSocket.h>
 #include <Poco/StreamCopier.h>
-#include <Poco/File.h>
 #include <Poco/TemporaryFile.h>
 
 #include <iostream>
@@ -25,7 +25,7 @@ std::string receivedBody;
 
 class OtlpHandler final : public Poco::Net::HTTPRequestHandler
 {
-public:
+  public:
     void handleRequest(Poco::Net::HTTPServerRequest& request,
                        Poco::Net::HTTPServerResponse& response) override
     {
@@ -43,14 +43,14 @@ public:
 
 class OtlpFactory final : public Poco::Net::HTTPRequestHandlerFactory
 {
-public:
-    Poco::Net::HTTPRequestHandler* createRequestHandler(
-        const Poco::Net::HTTPServerRequest&) override
+  public:
+    Poco::Net::HTTPRequestHandler*
+    createRequestHandler(const Poco::Net::HTTPServerRequest&) override
     {
         return new OtlpHandler;
     }
 };
-}
+} // namespace
 
 int main()
 {
@@ -64,8 +64,7 @@ int main()
     options.maximumSeries = 4;
     Poco::Net::ServerSocket socket(0);
     const auto port = socket.address().port();
-    Poco::Net::HTTPServer collector(new OtlpFactory, socket,
-                                    new Poco::Net::HTTPServerParams);
+    Poco::Net::HTTPServer collector(new OtlpFactory, socket, new Poco::Net::HTTPServerParams);
     collector.start();
     options.otlpHttpEndpoint = "http://127.0.0.1:" + std::to_string(port);
     Metrics::global().initialize(options);
@@ -108,8 +107,7 @@ int main()
     Poco::Net::ServerSocket unavailableSocket(0);
     const auto unavailablePort = unavailableSocket.address().port();
     unavailableSocket.close();
-    outageOptions.otlpHttpEndpoint =
-        "http://127.0.0.1:" + std::to_string(unavailablePort);
+    outageOptions.otlpHttpEndpoint = "http://127.0.0.1:" + std::to_string(unavailablePort);
     outageOptions.offlineCachePath = cachePath;
     outageOptions.exportInterval = std::chrono::hours(1);
     outageOptions.exportTimeout = std::chrono::milliseconds(250);
@@ -134,27 +132,17 @@ int main()
     const bool replayed = replayedFiles.empty();
     Poco::File(cachePath).remove(true);
 
-    if (!counterOk || !queueOk || !histogramOk ||
-        !flushOk || !exportOk ||
-        !outageDetected || !cached || !recovered || !replayed ||
-        json.find("pdr.test.requests") == std::string::npos ||
+    if (!counterOk || !queueOk || !histogramOk || !flushOk || !exportOk || !outageDetected ||
+        !cached || !recovered || !replayed || json.find("pdr.test.requests") == std::string::npos ||
         json.find("metrics-test") == std::string::npos)
     {
         std::cerr << "METRICS_TEST_FAIL"
-                  << " counter=" << counterOk
-                  << " queue=" << queueOk
-                  << " histogram=" << histogramOk
-                  << " flush=" << flushOk
-                  << " export=" << exportOk
-                  << " outage=" << outageDetected
-                  << " cached=" << cached
-                  << " recovered=" << recovered
-                  << " replayed=" << replayed
-                  << " jsonMetric="
-                  << (json.find("pdr.test.requests") != std::string::npos)
-                  << " jsonService="
-                  << (json.find("metrics-test") != std::string::npos)
-                  << '\n';
+                  << " counter=" << counterOk << " queue=" << queueOk
+                  << " histogram=" << histogramOk << " flush=" << flushOk << " export=" << exportOk
+                  << " outage=" << outageDetected << " cached=" << cached
+                  << " recovered=" << recovered << " replayed=" << replayed
+                  << " jsonMetric=" << (json.find("pdr.test.requests") != std::string::npos)
+                  << " jsonService=" << (json.find("metrics-test") != std::string::npos) << '\n';
         return 1;
     }
     std::cout << "METRICS_TEST_PASS\n";
