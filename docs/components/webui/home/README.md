@@ -2,7 +2,9 @@
 
 ## 实现过程
 
-`webui/home` 提供进程、服务、模块、Bundle、受控配置、日志和生命周期操作界面。React 页面调用运行时 REST API；静态资源打包为 `pdr-webui-home` OSP Bundle。服务和模块清单是只读视图；页面把基础 `/api/v1/topology` 清单与 `/api/v1/process-detail` 返回的权威 `manageable` 标记合并，只有后端 allowlist 放行的 Bundle 才显示启动或重启操作，不会为不存在的后端能力显示配置或卸载按钮。
+`webui/home` 提供进程、服务、组件、Bundle、受控配置、日志和生命周期操作界面。React 页面调用运行时 REST API；静态资源打包为 `pdr-webui-home` OSP Bundle。平台侧栏只保留平台级入口；服务、组件、Bundle、日志、配置治理和业务执行统一放在“进程管理”的当前进程上下文中。选择主进程或子进程后，页内标签和数据会随当前进程一起切换。
+
+服务和组件清单是只读视图；页面把基础 `/api/v1/topology` 清单与 `/api/v1/process-detail` 返回的权威 `manageable` 标记合并，只有后端 allowlist 放行的 Bundle 才显示启动或重启操作，不会为不存在的后端能力显示配置或卸载按钮。当前拓扑 API 只为主进程返回 OSP 服务和组件清单，因此子进程页不会把主进程清单错误归属给子进程。
 
 ## 用法
 
@@ -24,7 +26,7 @@ npm run build
 | `POST /api/v1/process-config` | 事务式修改后端白名单中的 Runtime 配置项 |
 | `POST /api/v1/process-lifecycle` | 本机子进程生命周期操作 |
 | `POST /api/v1/bundle-lifecycle` | 可管理 Bundle 的启动、停止或重启 |
-| `GET /api/v1/logs?...` | 日志查询 |
+| `GET /api/v1/process-logs?id=...&name=...&limit=...` | 当前选中进程的日志查询 |
 | `GET /api/v1/diagnostic-events` | 最近结构化故障检测与恢复事件 |
 | `GET /api/v1/alerts` | 告警状态及生效的去抖、升级和静默策略 |
 | `GET /api/v1/alert-history?limit=20` | 最近持久化告警转换，当前进程无告警时用于跨重启展示 |

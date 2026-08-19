@@ -15,18 +15,14 @@ import "./bright-theme.css";
 const pageMeta = {
   overview: ["运行态势", "实时掌握运行时状态与资源"],
   processes: ["进程管理", "当前运行时挂载的进程"],
-  services: ["服务", "OSP 服务注册中心"],
   devices: ["设备", "当前运行时已装载的设备适配器"],
-  modules: ["组件与模块", "Bundle 提供的运行时模块"],
-  bundles: ["Bundles", "OSP Bundle 生命周期管理"],
   plugins: ["插件治理", "外部插件兼容性、依赖与生命周期"],
-  logs: ["日志中心", "快速定位运行时问题"],
   metrics: ["指标中心", "按运行域查看 OpenTelemetry Counter 与 Histogram"]
 };
 
 const navItems = [
-  ["overview", Activity], ["processes", AppWindow], ["services", Server], ["devices", Cpu],
-  ["modules", Layers3], ["bundles", Boxes], ["plugins", Boxes], ["metrics", Activity], ["logs", FileText]
+  ["overview", Activity], ["processes", AppWindow], ["devices", Cpu],
+  ["plugins", Boxes], ["metrics", Activity]
 ];
 
 async function request(path, options = {}) {
@@ -936,7 +932,56 @@ function ProcessWorkspace({ items }) {
   </section>;
 }
 
-function ProcessWorkbench({ mainProcess, onNotify }) {
+function ProcessScopedLogs({ process }) {
+  const [lines, setLines] = useState([]);
+  const [connected, setConnected] = useState(false);
+  const [filter, setFilter] = useState("");
+  const logRef = useRef(null);
+  const visibleLines = lines.filter(line => line.toLowerCase().includes(filter.trim().toLowerCase()));
+
+  useEffect(() => {
+    if (!process) return undefined;
+    let active = true;
+    const load = async () => {
+      try {
+        const query = new URLSearchParams({
+          id: process.pid ?? process.id,
+          name: process.name,
+          limit: "500"
+        });
+        const data = await request(`/api/v1/process-logs?${query}`);
+        if (active) { setLines(data.lines || []); setConnected(true); }
+      } catch {
+        if (active) setConnected(false);
+      }
+    };
+    setLines([]);
+    load();
+    const timer = setInterval(load, 1000);
+    return () => { active = false; clearInterval(timer); };
+  }, [process?.id, process?.name, process?.pid]);
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [lines]);
+
+  return <section className="process-log-panel process-scoped-log">
+    <header><div className="terminal-title"><span><Terminal size={18} /></span><div>
+      <h2>{process?.name || "当前进程"}</h2>
+      <p>PID {process?.pid || process?.id || "—"} · 仅显示该进程日志</p>
+    </div></div><div className={`live-indicator ${connected ? "online" : ""}`}><i />
+      {connected ? "实时连接" : "等待日志"}</div></header>
+    <label className="process-log-toolbar"><Search size={16} /><input value={filter}
+      onChange={event => setFilter(event.target.value)} placeholder="在当前进程日志中搜索" /></label>
+    <div className="terminal" ref={logRef}>{visibleLines.length
+      ? visibleLines.map((line, index) => <div className="terminal-line" key={`${index}-${line.slice(0, 20)}`}>
+        <span>{String(index + 1).padStart(3, "0")}</span><code>{line}</code></div>)
+      : <div className="terminal-empty"><Terminal size={28} /><p>{filter ? "没有匹配的日志" : "当前进程暂无日志输出"}</p></div>}</div>
+    <footer><span>每秒自动刷新</span><span>显示 {visibleLines.length} / {lines.length} 行</span></footer>
+  </section>;
+}
+
+function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSection, onSectionChange, onNotify }) {
   const [selected, setSelected] = useState(null);
   const [trail, setTrail] = useState([]);
   const [detail, setDetail] = useState(null);
@@ -1034,6 +1079,8 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
   }, [selected?.id, detail?.process?.main, revision]);
 
   const selectProcess = process => {
+    setDetail(null);
+    setHistory([]);
     setSelected(process);
     setTrail(current => {
       const existing = current.findIndex(item => String(item.id) === String(process.id));
@@ -1050,6 +1097,19 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
   const editable = new Set(detail?.editableConfiguration || []);
   const bundles = detail?.bundles || [];
   const children = detail?.children || [];
+  const selectedProcess = detail?.process || selected;
+  const isMainProcess = Boolean(detail?.process?.main ?? selected?.main ?? selected?.role === "main");
+  const processServices = isMainProcess ? services : [];
+  const processModules = isMainProcess ? modules : [];
+  const processSections = [
+    ["overview", Activity, "概览"],
+    ["services", Server, "服务", processServices.length],
+    ["components", Layers3, "组件", processModules.length],
+    ["bundles", Boxes, "Bundles", bundles.length],
+    ["logs", FileText, "日志"],
+    ["configuration", SlidersHorizontal, "配置与治理"],
+    ["business", GitBranch, "业务执行"]
+  ];
   const managementPermissions = new Set(configurationControl?.managementSession?.permissions || []);
   const canManageBundles = managementPermissions.has("bundle.manage");
   const canManageConfiguration = managementPermissions.has("configuration.manage");
@@ -1170,12 +1230,21 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
 
     <section className="selected-process-head">
       <div><span className="inventory-icon process"><AppWindow size={28} /></span><div>
-        <p>{detail?.process?.main ? "当前主进程" : "当前子进程"}</p>
+        <p>{isMainProcess ? "当前主进程" : "当前子进程"}</p>
         <h2>{detail?.process?.name || selected?.name || "加载中"}</h2>
         <small>PID {detail?.process?.pid || selected?.pid || selected?.id || "—"}</small>
-      </div></div><Status state={detail?.process?.state || "running"} />
+      </div></div><Status state={detail?.process?.state || selected?.state || "unknown"} />
     </section>
 
+    <nav className="process-section-tabs" aria-label="当前进程功能">
+      {processSections.map(([id, Icon, label, count]) => <button key={id}
+        className={activeSection === id ? "active" : ""}
+        onClick={() => onSectionChange(id)} aria-current={activeSection === id ? "page" : undefined}>
+        <Icon size={17} /><span>{label}</span>{count !== undefined && <small>{count}</small>}
+      </button>)}
+    </nav>
+
+    {activeSection === "overview" && <>
     <div className="workbench-grid">
       <section className="surface child-process-card">
         <div className="section-head"><div><h2>加载的子进程</h2><p>点击进入子进程工作台</p></div>
@@ -1219,7 +1288,9 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
         <ResourceCharts resources={detail?.resources || {}} history={history} />
       </section>
     </div>
+    </>}
 
+    {activeSection === "bundles" &&
     <div className="workbench-detail-grid">
       <div className="workbench-detail-stack">
         <section className="surface process-bundles-card">
@@ -1253,86 +1324,84 @@ function ProcessWorkbench({ mainProcess, onNotify }) {
           </small>}
         </div>)}{!bundles.length && <div className="workbench-empty">当前进程没有 Bundle 数据</div>}</div>}
         </section>
-        <section className="surface process-config-card">
-        <div className="section-head"><div><h2>当前进程配置信息</h2><p>敏感字段已自动隐藏</p></div>
-          <div className="section-head-actions">
-            {configurationControl && <span title={(configurationControl.managementSession?.permissions || []).join(", ")}
-              className={`management-auth ${!configurationControl.managementAuthenticationRequired || configurationControl.managementSession?.authenticated ? "enabled" : "disabled"}`}>
-              <ShieldCheck size={21} />{configurationControl.managementAuthenticationRequired ?
-                (configurationControl.managementSession?.authenticated ?
-                  `管理身份：${configurationControl.managementSession.principal}` : "管理身份未认证") :
-                "开发模式未认证"}
-            </span>}
-            {configurationControl?.rollback && <button className="config-rollback"
-              disabled={busy || !canManageConfiguration} onClick={rollbackConfiguration}
-              title={`回退事务 ${configurationControl.rollback.transactionId}`}>
-              <Undo2 size={22} />回退 {configurationControl.rollback.key}
-            </button>}
-            <span className="inventory-count">{configEntries.length} 项</span>
-            <button className={`section-collapse ${collapsedSections.configuration ? "collapsed" : ""}`}
-              onClick={() => toggleSection("configuration")} aria-expanded={!collapsedSections.configuration}
-              title={collapsedSections.configuration ? "展开配置信息" : "折叠配置信息"}>
-              <ChevronDown size={24} />
-            </button>
-          </div></div>
-        {!collapsedSections.configuration && <div className="config-detail-list">{configEntries.map(([key, value]) => <div key={key}>
-          <b>{key}</b><code>{String(value)}</code>
-          {editable.has(key) ? <div className="config-edit">
-            <input value={String(drafts[key] ?? value)}
-              className={validateConfigValue(key, drafts[key] ?? value) ? "invalid" : ""}
-              onChange={event => setDrafts(current => ({ ...current, [key]: event.target.value }))} />
-            {validateConfigValue(key, drafts[key] ?? value) &&
-              <small className="config-validation">{validateConfigValue(key, drafts[key] ?? value)}</small>}
-            <button disabled={busy || !canManageConfiguration || String(drafts[key] ?? value) === String(value) ||
-                Boolean(validateConfigValue(key, drafts[key] ?? value))}
-              onClick={() => applyConfiguration(key)}><Zap size={21} />立即生效</button>
-          </div> : <span className="readonly-config">只读</span>}
-        </div>)}{!configEntries.length && <div className="workbench-empty">当前进程没有可读取的配置</div>}</div>}
-        {!collapsedSections.configuration && configurationControl?.transactions?.length > 0 &&
-          <div className="config-transactions"><h3>最近配置事务</h3>
-            {configurationControl.transactions.slice(0, 5).map(item => <div key={item.transactionId}>
-              <code>{item.transactionId}</code><b>{item.key || "请求未解析"}</b>
-              <span>{item.action} · {item.status}</span>
-            </div>)}</div>}
-        {!collapsedSections.configuration && identitySnapshot &&
-          <div className="identity-snapshot"><div><ShieldCheck size={25} />
-            <span><b>管理身份快照</b><small>第 {identitySnapshot.generation} 代 · {identitySnapshot.principalCount} 个身份 ·
-              {identitySnapshot.required ? " 强制认证" : " 开发模式"} · 文件 {identitySnapshot.fileBackedPrincipalCount || 0} / 环境 {identitySnapshot.environmentBackedPrincipalCount || 0}
-              {identitySnapshot.insecureFileCount > 0 ? ` · ${identitySnapshot.insecureFileCount} 个文件 ACL 过宽` :
-                !identitySnapshot.filePermissionChecksComplete ? " · 文件权限未能完整核验" : " · 文件权限已核验"}</small></span></div>
-            <button disabled={busy || !canManageIdentity} onClick={reloadIdentity}>
-              <RefreshCw size={20} />{busy === "identity:reload" ? "正在重载" : "重载文件令牌"}
-            </button></div>}
-        {!collapsedSections.configuration && managementAudit.length > 0 &&
-          <div className="config-transactions"><h3>最近管理操作审计</h3>
-            {managementAudit.slice(0, 10).map(item => <div key={item.eventId}>
-              <code>{item.principal || "未认证"}</code><b>{item.operation} · {item.target || "—"}</b>
-              <span>{item.action || "—"} · {item.status} · HTTP {item.httpStatus} · {item.durationMicroseconds} μs</span>
-            </div>)}</div>}
-        {!collapsedSections.configuration && (managementTasks.length > 0 || managementTaskScheduler) &&
-          <div className="config-transactions"><h3>异步管理任务
-            {managementTaskPersistence && <small> · 任务快照 v{managementTaskPersistence.schemaVersion || 1}/{managementTaskPersistence.integrityAlgorithm || "无校验"} {managementTaskPersistence.healthy ? "正常" : managementTaskPersistence.recoveryRequired ? "异常，需运维恢复" : "异常"}{managementTaskPersistence.previousAvailable ? " · 上一版可用" : ""}</small>}
-            {managementIdempotency && <small> · 幂等账本 v{managementIdempotency.schemaVersion || 1}/{managementIdempotency.integrityAlgorithm || "无校验"} {managementIdempotency.healthy ? "正常" : managementIdempotency.recoveryRequired ? "异常，需运维恢复" : "异常"}{managementIdempotency.previousAvailable ? " · 上一版可用" : ""}（{managementIdempotency.completed} 完成 / {managementIdempotency.interrupted} 待核对）</small>}
-            {managementTaskScheduler && <small> · {managementTaskScheduler.running}/{managementTaskScheduler.workerCount} worker · 排队 {managementTaskScheduler.queued} · 等锁 {managementTaskScheduler.waitingResource}{managementTaskScheduler.degraded ? " · 调度降级" : ""}</small>}
-          </h3>
-            {(managementTaskPersistence?.recoveryRequired || managementIdempotency?.recoveryRequired) &&
-              <p className="persistence-recovery-guidance"><AlertTriangle /> 当前持久化文件需要人工恢复：
-                停止 Runtime，使用 <code>pdr persistence inspect</code> 校验当前文件和上一版，
-                核对真实目标状态后再执行带哈希保护的 <code>pdr persistence recover</code>。
-                Web 不会自动回退幂等账本。</p>}
-            {managementTasks.slice(0, 10).map(item => <div key={item.id}>
-              <code>{item.state}</code><b>{item.operation} · {item.target}</b>
-               <span>{item.action} · {item.principal} · {item.phase || "—"}{item.phase === "waiting-resource" ?
-                 ` · 等待 ${item.resourceKey}${item.blockingTaskId ? `（占用任务 ${item.blockingTaskId}）` : ""}` : ""}{item.state === "interrupted" ?
-                 " · 需核对目标真实状态后重新提交" : item.phase === "cancellation-requested" ?
-                 " · 等待底层操作到达协作取消点" : ""}</span>
-               {["queued", "running"].includes(item.state) && canCancelTasks && <button disabled={busy}
-                 onClick={() => cancelManagementTask(item)}>{item.state === "running" ? "请求停止" : "取消"}</button>}
-            </div>)}</div>}
-        </section>
       </div>
-    </div>
-    <BusinessExecutionList process={detail?.process || selected} />
+    </div>}
+    {activeSection === "services" && <section className="process-entity-section">
+      <div className="section-head"><div><h2>当前进程注册的服务</h2><p>服务随当前进程切换，不再作为平台级入口</p></div>
+        <span className="inventory-count">{processServices.length} 项</span></div>
+      <EntityTable items={processServices} onLife={() => {}} />
+    </section>}
+    {activeSection === "components" && <section className="process-entity-section">
+      <div className="section-head"><div><h2>当前进程提供的组件</h2><p>组件由当前进程内的 Bundle 提供</p></div>
+        <span className="inventory-count">{processModules.length} 项</span></div>
+      <EntityTable items={processModules} onLife={() => {}} />
+    </section>}
+    {activeSection === "logs" && <ProcessScopedLogs process={selectedProcess} />}
+    {activeSection === "configuration" && <section className="surface process-config-card">
+      <div className="section-head"><div><h2>当前进程配置信息</h2><p>配置、身份与管理审计均绑定当前进程</p></div>
+        <div className="section-head-actions">
+          {configurationControl && <span title={(configurationControl.managementSession?.permissions || []).join(", ")}
+            className={`management-auth ${!configurationControl.managementAuthenticationRequired || configurationControl.managementSession?.authenticated ? "enabled" : "disabled"}`}>
+            <ShieldCheck size={21} />{configurationControl.managementAuthenticationRequired ?
+              (configurationControl.managementSession?.authenticated ? `管理身份：${configurationControl.managementSession.principal}` : "管理身份未认证") :
+              "开发模式未认证"}
+          </span>}
+          {configurationControl?.rollback && <button className="config-rollback"
+            disabled={busy || !canManageConfiguration} onClick={rollbackConfiguration}
+            title={`回退事务 ${configurationControl.rollback.transactionId}`}>
+            <Undo2 size={22} />回退 {configurationControl.rollback.key}
+          </button>}
+          <span className="inventory-count">{configEntries.length} 项</span>
+        </div></div>
+      <div className="config-detail-list">{configEntries.map(([key, value]) => <div key={key}>
+        <b>{key}</b><code>{String(value)}</code>
+        {editable.has(key) ? <div className="config-edit">
+          <input value={String(drafts[key] ?? value)}
+            className={validateConfigValue(key, drafts[key] ?? value) ? "invalid" : ""}
+            onChange={event => setDrafts(current => ({ ...current, [key]: event.target.value }))} />
+          {validateConfigValue(key, drafts[key] ?? value) &&
+            <small className="config-validation">{validateConfigValue(key, drafts[key] ?? value)}</small>}
+          <button disabled={busy || !canManageConfiguration || String(drafts[key] ?? value) === String(value) ||
+              Boolean(validateConfigValue(key, drafts[key] ?? value))}
+            onClick={() => applyConfiguration(key)}><Zap size={21} />立即生效</button>
+        </div> : <span className="readonly-config">只读</span>}
+      </div>)}{!configEntries.length && <div className="workbench-empty">当前进程没有可读取的配置</div>}</div>
+      {configurationControl?.transactions?.length > 0 && <div className="config-transactions"><h3>最近配置事务</h3>
+        {configurationControl.transactions.slice(0, 5).map(item => <div key={item.transactionId}>
+          <code>{item.transactionId}</code><b>{item.key || "请求未解析"}</b><span>{item.action} · {item.status}</span>
+        </div>)}</div>}
+      {identitySnapshot && <div className="identity-snapshot"><div><ShieldCheck size={25} /><span><b>管理身份快照</b>
+        <small>第 {identitySnapshot.generation} 代 · {identitySnapshot.principalCount} 个身份 ·
+          {identitySnapshot.required ? " 强制认证" : " 开发模式"} · 文件 {identitySnapshot.fileBackedPrincipalCount || 0} / 环境 {identitySnapshot.environmentBackedPrincipalCount || 0}
+          {identitySnapshot.insecureFileCount > 0 ? ` · ${identitySnapshot.insecureFileCount} 个文件 ACL 过宽` :
+            !identitySnapshot.filePermissionChecksComplete ? " · 文件权限未能完整核验" : " · 文件权限已核验"}</small>
+      </span></div><button disabled={busy || !canManageIdentity} onClick={reloadIdentity}>
+        <RefreshCw size={20} />{busy === "identity:reload" ? "正在重载" : "重载文件令牌"}</button></div>}
+      {managementAudit.length > 0 && <div className="config-transactions"><h3>最近管理操作审计</h3>
+        {managementAudit.slice(0, 10).map(item => <div key={item.eventId}><code>{item.principal || "未认证"}</code>
+          <b>{item.operation} · {item.target || "—"}</b><span>{item.action || "—"} · {item.status} · HTTP {item.httpStatus} · {item.durationMicroseconds} μs</span>
+        </div>)}</div>}
+      {(managementTasks.length > 0 || managementTaskScheduler) && <div className="config-transactions"><h3>异步管理任务
+        {managementTaskPersistence && <small> · 任务快照 v{managementTaskPersistence.schemaVersion || 1}/{managementTaskPersistence.integrityAlgorithm || "无校验"} {managementTaskPersistence.healthy ? "正常" : managementTaskPersistence.recoveryRequired ? "异常，需运维恢复" : "异常"}{managementTaskPersistence.previousAvailable ? " · 上一版可用" : ""}</small>}
+        {managementIdempotency && <small> · 幂等账本 v{managementIdempotency.schemaVersion || 1}/{managementIdempotency.integrityAlgorithm || "无校验"} {managementIdempotency.healthy ? "正常" : managementIdempotency.recoveryRequired ? "异常，需运维恢复" : "异常"}{managementIdempotency.previousAvailable ? " · 上一版可用" : ""}（{managementIdempotency.completed} 完成 / {managementIdempotency.interrupted} 待核对）</small>}
+        {managementTaskScheduler && <small> · {managementTaskScheduler.running}/{managementTaskScheduler.workerCount} worker · 排队 {managementTaskScheduler.queued} · 等锁 {managementTaskScheduler.waitingResource}{managementTaskScheduler.degraded ? " · 调度降级" : ""}</small>}
+      </h3>
+        {(managementTaskPersistence?.recoveryRequired || managementIdempotency?.recoveryRequired) &&
+          <p className="persistence-recovery-guidance"><AlertTriangle /> 当前持久化文件需要人工恢复：
+            停止 Runtime，使用 <code>pdr persistence inspect</code> 校验当前文件和上一版，
+            核对真实目标状态后再执行带哈希保护的 <code>pdr persistence recover</code>。
+            Web 不会自动回退幂等账本。</p>}
+        {managementTasks.slice(0, 10).map(item => <div key={item.id}><code>{item.state}</code>
+          <b>{item.operation} · {item.target}</b>
+          <span>{item.action} · {item.principal} · {item.phase || "—"}{item.phase === "waiting-resource" ?
+            ` · 等待 ${item.resourceKey}${item.blockingTaskId ? `（占用任务 ${item.blockingTaskId}）` : ""}` : ""}{item.state === "interrupted" ?
+            " · 需核对目标真实状态后重新提交" : item.phase === "cancellation-requested" ?
+            " · 等待底层操作到达协作取消点" : ""}</span>
+          {["queued", "running"].includes(item.state) && canCancelTasks && <button disabled={busy}
+            onClick={() => cancelManagementTask(item)}>{item.state === "running" ? "请求停止" : "取消"}</button>}
+        </div>)}</div>}
+    </section>}
+    {activeSection === "business" && <BusinessExecutionList process={selectedProcess} />}
   </div>;
 }
 
@@ -1438,6 +1507,7 @@ function Logs() {
 
 function App() {
   const [page, setPage] = useState("overview");
+  const [processSection, setProcessSection] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
   const [topology, setTopology] = useState({ processes: [], services: [], modules: [], bundles: [] });
   const [resourceHistory, setResourceHistory] = useState([]);
@@ -1534,18 +1604,11 @@ function App() {
       await refresh();
     } catch (error) { notify(error.message, true); await refresh(); }
   };
-  const counts = useMemo(() => ({
-    process: (topology.mainProcess ? 1 : 0) +
-      topology.processes.filter(item => String(item.name).toLowerCase() !== "conhost.exe").length,
-    module: topology.modules.length, bundle: topology.bundles.length
-  }), [topology]);
-  const processItems = [
-    ...(topology.mainProcess ? [{ ...topology.mainProcess, name: `${topology.mainProcess.name}（主进程）` }] : []),
-    ...topology.processes.filter(item => String(item.name).toLowerCase() !== "conhost.exe")
-  ];
-  const currentItems = page === "processes" ? processItems : page === "services" ? topology.services :
-    page === "modules" ? topology.modules : page === "plugins" ?
-      topology.bundles.filter(item => item.plugin || String(item.id).startsWith("pdr.plugin.")) : topology.bundles;
+  const currentItems = (topology.bundles || []).filter(item => item.plugin || String(item.id).startsWith("pdr.plugin."));
+  const openProcessSection = section => {
+    setProcessSection(section);
+    setPage("processes");
+  };
 
   return <div className="app-shell precision-shell">
     <header className="command-bar">
@@ -1568,13 +1631,13 @@ function App() {
       <div className="content">
         {page === "overview" && <RuntimeTopologyOverview health={health} topology={topology}
           processDetail={processDetail} childProcessDetail={childProcessDetail} history={resourceHistory} alertInventory={alertInventory}
-          onOpenProcesses={() => setPage("processes")} onOpenLogs={() => setPage("logs")} />}
-        {page === "processes" && <ProcessWorkbench mainProcess={topology.mainProcess} onNotify={notify} />}
+          onOpenProcesses={() => openProcessSection("overview")} onOpenLogs={() => openProcessSection("logs")} />}
+        {page === "processes" && <ProcessWorkbench mainProcess={topology.mainProcess}
+          services={topology.services} modules={topology.modules} activeSection={processSection}
+          onSectionChange={setProcessSection} onNotify={notify} />}
         {page === "devices" && <DeviceInventory inventory={deviceInventory} />}
-        {["services", "modules", "bundles", "plugins"].includes(page) &&
-          <EntityTable items={currentItems} onLife={life} />}
+        {page === "plugins" && <EntityTable items={currentItems} onLife={life} />}
         {page === "metrics" && <MetricsCenter data={businessMetrics} />}
-        {page === "logs" && <Logs />}
       </div>
     </main>
     {menuOpen && <button className="mobile-overlay" onClick={() => setMenuOpen(false)} />}

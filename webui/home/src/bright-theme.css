@@ -380,3 +380,224 @@ button, input, select { font: inherit; }
   .precision-chart-grid article { border-right: 0; border-bottom: 1px solid #e0e7f0; }
   .precision-chart-grid article:last-child { border-bottom: 0; }
 }
+
+/* Cohesive application type scale and process-scoped information architecture. */
+.precision-shell {
+  --type-xs: 12px;
+  --type-sm: 13px;
+  --type-md: 14px;
+  --type-lg: 16px;
+  --type-xl: 20px;
+  --type-display: 24px;
+  font-size: var(--type-md);
+}
+
+.command-brand b { font-size: 18px; }
+.command-title { font-size: var(--type-lg); }
+.command-actions, .command-actions .last-update, .command-online { font-size: var(--type-sm) !important; }
+.precision-shell nav button { font-size: var(--type-md); }
+.precision-shell .runtime-state b { font-size: var(--type-sm); }
+.precision-shell .runtime-state small { font-size: var(--type-xs); }
+
+.precision-health-strip b { font-size: 17px; }
+.precision-health-strip small, .precision-health-strip em,
+.precision-topology header p, .precision-resources header p,
+.precision-topology header > span, .precision-process-head,
+.precision-worker-label, .precision-legend, .precision-attention > header span,
+.precision-attention small, .precision-range button,
+.precision-chart-grid article > div { font-size: var(--type-xs); }
+.precision-topology h2, .precision-attention h2, .precision-resources h2 { font-size: var(--type-lg); }
+.precision-process-row { font-size: var(--type-sm); }
+.precision-process-name b, .precision-attention b { font-size: var(--type-md); }
+.precision-process-name small, .precision-attention p { font-size: var(--type-xs); }
+.precision-state, .precision-chart-grid b, .precision-chart-grid strong { font-size: var(--type-sm); }
+
+.precision-shell .process-workbench { gap: 14px; }
+.precision-shell .process-guide { min-height: 58px; padding: 8px 14px; }
+.precision-shell .guide-label > span { font-size: var(--type-sm); }
+.precision-shell .guide-label > button, .precision-shell .guide-back {
+  min-height: 38px;
+  padding: 7px 11px;
+  border-radius: 7px;
+  font-size: var(--type-md);
+}
+.precision-shell .selected-process-head {
+  min-height: 88px;
+  padding: 15px 20px;
+  border-radius: 9px;
+}
+.precision-shell .selected-process-head .inventory-icon { width: 48px; height: 48px; }
+.precision-shell .selected-process-head p, .precision-shell .selected-process-head small { font-size: var(--type-sm); }
+.precision-shell .selected-process-head h2 { font-size: var(--type-display); }
+
+.process-section-tabs {
+  min-height: 54px;
+  display: flex !important;
+  grid-auto-flow: unset;
+  align-items: stretch;
+  gap: 2px !important;
+  padding: 0 10px;
+  overflow-x: auto;
+  color: #335273;
+  background: #fff;
+  border: 1px solid #d8e1ed;
+  border-radius: 9px;
+}
+.precision-shell .process-section-tabs button {
+  position: relative;
+  min-width: max-content;
+  min-height: 52px;
+  display: inline-flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #58708e;
+  background: transparent;
+  font-size: var(--type-md);
+  font-weight: 650;
+}
+.precision-shell .process-section-tabs button:hover { color: #0d62d9; background: #f6f9fd; }
+.precision-shell .process-section-tabs button.active {
+  color: #0d62d9;
+  background: #f1f6fd;
+  border-left-color: transparent;
+  border-bottom-color: #1674ef;
+  box-shadow: none;
+}
+.precision-shell .process-section-tabs button small {
+  min-width: 22px;
+  padding: 2px 6px;
+  color: #607795;
+  background: #edf2f8;
+  border-radius: 999px;
+  font-size: var(--type-xs);
+  text-align: center;
+}
+.precision-shell .process-section-tabs button.active small { color: #0d62d9; background: #dfeafe; }
+.precision-shell .process-section-tabs button svg:last-child { opacity: 1; }
+
+.precision-shell .section-head { padding: 15px 18px; }
+.precision-shell .section-head h2 { font-size: var(--type-lg); }
+.precision-shell .section-head p, .precision-shell .table-tools > span,
+.precision-shell .healthy, .precision-shell .inventory-count { font-size: var(--type-sm); }
+.precision-shell .workbench-grid, .precision-shell .workbench-detail-stack { gap: 14px; }
+.precision-shell .resource-charts { gap: 12px; padding: 14px; }
+.precision-shell .resource-chart { padding: 14px; }
+.precision-shell .resource-chart header small, .precision-shell .resource-chart footer { font-size: var(--type-xs); }
+.precision-shell .resource-chart header strong { font-size: var(--type-xl); }
+.precision-shell .resource-chart .sparkline { height: 72px; }
+
+.precision-shell .child-process-open { padding: 15px 18px; }
+.precision-shell .child-process-title { grid-template-columns: 40px minmax(0, 1fr) 24px; gap: 12px; }
+.precision-shell .child-process-title .inventory-icon { width: 38px; height: 38px; }
+.precision-shell .child-process-title b { font-size: var(--type-lg); }
+.precision-shell .child-process-title small { font-size: var(--type-xs); }
+.precision-shell .child-process-facts { gap: 10px 16px; margin: 14px 0 0 52px; padding: 13px 15px; border-radius: 8px; }
+.precision-shell .child-process-facts small { margin-bottom: 4px; font-size: var(--type-xs); }
+.precision-shell .child-process-facts strong, .precision-shell .location-badge { font-size: var(--type-md); }
+.precision-shell .process-life-actions { padding: 0 18px; }
+.precision-shell .process-life-actions button { width: 38px; height: 38px; }
+.precision-shell .workbench-empty { min-height: 160px; padding: 24px; font-size: var(--type-md); }
+
+.precision-shell .bundle-detail-list > div {
+  grid-template-columns: 40px minmax(0, 1fr) auto minmax(250px, auto);
+  gap: 12px;
+  padding: 14px 18px;
+}
+.precision-shell .bundle-detail-list .inventory-icon { width: 38px; height: 38px; }
+.precision-shell .bundle-detail-list b { font-size: var(--type-md); }
+.precision-shell .bundle-detail-list small { font-size: var(--type-xs); }
+.precision-shell .bundle-lifecycle button, .precision-shell .config-edit button {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: var(--type-sm);
+}
+.precision-shell .bundle-lifecycle button svg, .precision-shell .config-edit button svg { width: 16px; height: 16px; }
+.precision-shell .protected-bundle, .precision-shell .readonly-config { font-size: var(--type-xs); }
+
+.process-entity-section {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #d8e1ed;
+  border-radius: 9px;
+}
+.process-entity-section > .surface { border: 0; border-top: 1px solid #dfe7f0; border-radius: 0; }
+.process-entity-section > .surface .table-tools { border-top: 0; }
+
+.precision-shell .config-detail-list > div {
+  grid-template-columns: minmax(220px, 28%) minmax(0, 1fr) minmax(140px, auto);
+  gap: 14px;
+  padding: 13px 18px;
+}
+.precision-shell .config-detail-list b, .precision-shell .config-detail-list code,
+.precision-shell .config-edit input { font-size: var(--type-sm); }
+.precision-shell .config-edit input { min-width: 180px; padding: 8px 10px; }
+.precision-shell .management-auth, .precision-shell .config-rollback { height: 38px; font-size: var(--type-sm); }
+.precision-shell .identity-snapshot b { font-size: var(--type-md); }
+.precision-shell .identity-snapshot small, .precision-shell .identity-snapshot button { font-size: var(--type-xs); }
+.precision-shell .config-transactions h3 { font-size: var(--type-lg); }
+.precision-shell .config-transactions > div,
+.precision-shell .persistence-recovery-guidance { font-size: var(--type-sm); }
+
+.precision-shell .process-scoped-log { height: calc(100vh - 320px); min-height: 480px; border-radius: 9px; }
+.precision-shell .process-log-panel > header { min-height: 70px; padding: 14px 18px; }
+.precision-shell .process-log-panel h2 { font-size: var(--type-lg); }
+.precision-shell .process-log-panel p, .precision-shell .live-indicator { font-size: var(--type-sm); }
+.process-log-toolbar {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px;
+  color: #7a8da6;
+  background: #f6f9fd;
+  border-bottom: 1px solid #d8e1ed;
+}
+.process-log-toolbar input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #18375f;
+  background: transparent;
+  font-size: var(--type-sm);
+}
+.precision-shell .terminal { font-size: var(--type-sm); }
+.precision-shell .terminal-empty p { font-size: var(--type-md); }
+.precision-shell .process-log-panel > footer { height: 36px; font-size: var(--type-xs); }
+
+.precision-shell .business-execution-columns,
+.precision-shell .business-execution-list > article { font-size: var(--type-sm); }
+.precision-shell .business-execution-columns { padding: 11px 18px; }
+.precision-shell .business-execution-list > article { min-height: 68px; padding: 11px 18px; }
+.precision-shell .business-execution-list b { font-size: var(--type-md); }
+.precision-shell .business-execution-list small { font-size: var(--type-xs); }
+.precision-shell .business-execution-list > article > strong { font-size: var(--type-sm); }
+.precision-shell .business-link, .precision-shell .business-history-query { font-size: var(--type-sm); }
+
+.precision-shell .flow-page-tabs > button { font-size: var(--type-md) !important; }
+.precision-shell .business-modal > header h2 { font-size: 22px !important; }
+.precision-shell .business-modal > header p { font-size: var(--type-sm) !important; }
+.precision-shell .flow-canvas-title h3 { font-size: var(--type-xl) !important; }
+.precision-shell .flow-canvas-title p, .precision-shell .flow-canvas-actions > button,
+.precision-shell .flow-canvas-actions > span { font-size: var(--type-md) !important; }
+.precision-shell .flow-row > button b { font-size: var(--type-lg) !important; }
+.precision-shell .flow-row > button small, .precision-shell .flow-row > button span,
+.precision-shell .flow-row > button em, .precision-shell .flow-inspector .step-head small,
+.precision-shell .flow-inspector dt, .precision-shell .flow-inspector dd,
+.precision-shell .flow-parameters h4, .precision-shell .flow-parameters pre { font-size: var(--type-sm) !important; }
+
+@media (max-width: 900px) {
+  .process-section-tabs { border-radius: 8px; }
+  .precision-shell .bundle-detail-list > div { grid-template-columns: 40px minmax(0, 1fr) auto; }
+  .precision-shell .bundle-lifecycle { grid-column: 2 / 4; justify-content: flex-start; }
+  .precision-shell .config-detail-list > div { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 680px) {
+  .precision-shell .selected-process-head h2 { font-size: var(--type-xl); }
+  .precision-shell .child-process-facts { grid-template-columns: 1fr 1fr; margin-left: 0; }
+  .precision-shell .process-scoped-log { height: 560px; min-height: 0; }
+}
