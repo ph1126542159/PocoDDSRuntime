@@ -11,9 +11,9 @@
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>lifecycle_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
-  <exec_depend>pdr_robot_runtime_ros2</exec_depend>
-  <exec_depend>pdr_robot_msgs</exec_depend>
-  <exec_depend>pdr_sim_bridge_ros2</exec_depend>
+  <depend>pdr_robot_runtime_ros2</depend>
+  <depend>pdr_robot_msgs</depend>
+  <depend>pdr_sim_bridge_ros2</depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>
