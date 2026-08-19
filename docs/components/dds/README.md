@@ -8,6 +8,11 @@
 
 `Envelope` 保存关联 ID、操作、载荷和追踪上下文；`EnvelopeTopicDataType` 完成序列化；`Runtime` 管理 DomainParticipant、Reader 和 Writer；`ServiceEndpoint` 将请求放入工作队列并发布响应/事件；`DeviceBridge` 将设备状态和命令映射到 DDS Topic。
 
+`PDRFastDDS` 必须作为进程内唯一的共享库部署。主程序与可热装卸 OSP Bundle
+不得各自静态链接一份 Fast DDS，否则 Linux 下的进程级 participant/factory 状态会在
+Bundle 卸载和进程退出阶段发生重复析构。机器人路径不加载此兼容库，而由 ROS 2/RMW
+独立管理通信实现。
+
 ## 用法
 
 创建 `Runtime(domainId, participantName)`，调用 `start()`，再使用 `subscribe()` 和 `publish()`。服务 Bundle 通常直接创建 `ServiceEndpoint`，传入 request、response 和 event Topic 及处理函数。
