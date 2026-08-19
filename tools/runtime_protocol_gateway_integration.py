@@ -295,6 +295,7 @@ def main() -> int:
     timeout = args.timeout if args.timeout is not None else max(20.0, minimum_timeout)
     alert_history = args.report.with_suffix(".alerts.jsonl").resolve()
     management_audit = args.report.with_suffix(".management-audit.jsonl").resolve()
+    management_audit_maximum_bytes = 32 * 1024
     management_tasks_path = args.report.with_suffix(".management-tasks.json").resolve()
     management_idempotency_path = args.report.with_suffix(
         ".management-idempotency.json").resolve()
@@ -380,7 +381,7 @@ def main() -> int:
         "--set", "pdr.management.idempotency.requireRequestId=true",
         "--set", f"pdr.management.idempotency.persistence.path={management_idempotency_path.as_posix()}",
         "--set", f"pdr.management.audit.path={management_audit.as_posix()}",
-        "--set", "pdr.management.audit.maximumBytes=16384",
+        "--set", f"pdr.management.audit.maximumBytes={management_audit_maximum_bytes}",
         "--set", "pdr.management.tasks.workerCount=2",
         "--set", "pdr.management.tasks.health.degradedWaitMilliseconds=1",
         "--set", f"pdr.management.tasks.persistence.path={management_tasks_path.as_posix()}",
@@ -1025,7 +1026,8 @@ def main() -> int:
             event.get("status") == "denied" and event.get("httpStatus") == 403
             for event in management_audit_events)
         and management_audit_archive.exists()
-        and management_audit.exists() and management_audit.stat().st_size <= 16384
+        and management_audit.exists() and
+        management_audit.stat().st_size <= management_audit_maximum_bytes
     )
     sink_hot_reload_passed = (
         sink_registration_count >= 2 and core_protection_passed and
@@ -1107,7 +1109,7 @@ def main() -> int:
             f"mqttConnections={mqtt.connections} rosConnections={ros.connections} "
             f"resourceSamples={observed_resource_samples}/{expected_resource_samples} "
             f"webhook={webhook_passed} managementTasks={management_tasks_passed} "
-            f"taskRecovery={management_task_recovery_passed}",
+            f"taskRecovery={management_task_recovery_passed} audit={management_audit_passed}",
             file=sys.stderr,
         )
         return 1
