@@ -152,6 +152,12 @@ jobs:
         run: |
           cmake -S cmake -B build/dependencies
           cmake --build build/dependencies --config Release --parallel 2
+      - name: Save native dependency cache
+        if: steps.native-dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build/install
+          key: native-dependencies-${{ runner.os }}-${{ hashFiles('cmake/*.cmake') }}
       - name: Configure full stack
         run: >-
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
