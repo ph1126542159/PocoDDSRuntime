@@ -87,7 +87,7 @@ jobs:
         run: |
           source /opt/ros/jazzy/setup.bash
           cd robotics/ros2_ws
-          colcon test --event-handlers console_direct+
+          colcon test --merge-install --event-handlers console_direct+
           colcon test-result --verbose
 
   gazebo-sil:
