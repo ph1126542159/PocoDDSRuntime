@@ -153,7 +153,7 @@ jobs:
         run: >-
           cmake -S . -B build/asan -DCMAKE_BUILD_TYPE=Debug
           -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
-          -DPDR_ENABLE_OBSERVABILITY=OFF
+          -DPDR_ENABLE_OBSERVABILITY=ON
           -DPDR_BUILD_QT3D=OFF
           -DMYIOT_ENABLE_DATA_MODULES=OFF
           -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer"
@@ -171,7 +171,7 @@ jobs:
         run: >-
           cmake -S . -B build/lifecycle-debug -DCMAKE_BUILD_TYPE=Release
           -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
-          -DPDR_ENABLE_OBSERVABILITY=OFF
+          -DPDR_ENABLE_OBSERVABILITY=ON
           -DPDR_BUILD_QT3D=OFF
           -DMYIOT_ENABLE_DATA_MODULES=OFF
           -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -g"
