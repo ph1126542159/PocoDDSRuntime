@@ -116,9 +116,10 @@ jobs:
       - name: Run Gazebo closed-loop SIL acceptance
         shell: bash
         run: |
-          set -euo pipefail
+          set -eo pipefail
           source /opt/ros/jazzy/setup.bash
           source robotics/ros2_ws/install/setup.bash
+          set -u
           ros2 launch pdr_robot_bringup gazebo_sil.launch.py \
             >/tmp/pdr-gazebo-sil.log 2>&1 &
           launch_pid=$!
