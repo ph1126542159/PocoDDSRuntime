@@ -37,7 +37,7 @@ class SimulationBridgeNode final : public rclcpp::Node
         declare_parameter("joint_state_topic", "joint_states");
         declare_parameter("joint_command_topic", "joint_controller/commands");
         declare_parameter("joint_command_mode", "position");
-        declare_parameter<std::vector<std::string>>("joint_names", {});
+        declare_parameter("joint_names", std::vector<std::string>{});
 
         _simulatorName = get_parameter("simulator_name").as_string();
         _frameId = get_parameter("frame_id").as_string();

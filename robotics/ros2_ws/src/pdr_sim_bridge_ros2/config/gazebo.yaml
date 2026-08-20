@@ -10,4 +10,4 @@ pdr_sim_bridge:
     joint_state_topic: joint_states
     joint_command_topic: joint_controller/commands
     joint_command_mode: position
-    joint_names: []
+    # Omit joint_names for a base-only model.

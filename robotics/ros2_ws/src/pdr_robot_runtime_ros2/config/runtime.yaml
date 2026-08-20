@@ -9,13 +9,9 @@ pdr_robot_runtime:
     maximum_linear_speed: 1.0
     maximum_angular_speed: 1.0
     command_timeout_ms: 250
-    joint_names: []
-    joint_min_positions: []
-    joint_max_positions: []
-    joint_max_velocities: []
-    joint_max_efforts: []
+    # Omit all joint arrays for a jointless robot; otherwise provide every array together.
     # Optional reference modules: warehouse, inspection, pick_place.
     # Custom modules implement RobotBusinessModule and register without changing the runtime.
-    business_modules: []
+    # Omit business_modules when no business mission should be installed.
     # Explicit trusted DLL/SO paths only; directories are never scanned automatically.
-    business_plugins: []
+    # Omit business_plugins when no external plugin should be loaded.
