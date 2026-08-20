@@ -1,5 +1,6 @@
 #include "PocoDDS/Robotics/Action.h"
 #include "PocoDDS/Robotics/Behavior.h"
+#include "PocoDDS/Robotics/Business.h"
 #include "PocoDDS/Robotics/ExternalHardware.h"
 #include "PocoDDS/Robotics/MockHardware.h"
 #include "PocoDDS/Robotics/RobotRuntime.h"
@@ -104,6 +105,28 @@ class SlowShutdownLifecycle final : public LifecycleComponent
 
   private:
     std::atomic<unsigned int>& _shutdowns;
+};
+
+class CustomTestBusinessModule final : public RobotBusinessModule
+{
+  public:
+    std::string name() const override { return "custom_test"; }
+    std::vector<std::string> missions() const override { return {"run"}; }
+    std::unique_ptr<Behavior> createMission(const std::string& mission,
+                                            BusinessContext& context) const override
+    {
+        if (mission != "run")
+            return {};
+        return makeTracedBusinessStep(
+            context, name(), mission, "custom_logic", "input=test",
+            std::make_unique<BehaviorTask>(
+                [&context](BehaviorBlackboard&)
+                {
+                    context.setSignal("custom.result", "done");
+                    return BehaviorStatus::succeeded;
+                }),
+            [&context] { return "result=" + context.signalOr("custom.result", "missing"); });
+    }
 };
 
 void expect(bool condition, const char* message)
@@ -236,7 +259,8 @@ void testActionCancellation()
            "action executor exception did not become failed feedback");
 
     expect(actions.submit({"goal-3", "invalid-progress", {}},
-                          [](const ActionGoal&, bool) {
+                          [](const ActionGoal&, bool)
+                          {
                               return ActionFeedback{ActionStatus::running,
                                                     std::numeric_limits<double>::quiet_NaN(),
                                                     {}};
@@ -473,7 +497,8 @@ void testBehaviorSequence()
             return BehaviorStatus::succeeded;
         }));
     sequence.add(std::make_unique<BehaviorTask>(
-        [](BehaviorBlackboard& board) {
+        [](BehaviorBlackboard& board)
+        {
             return board["localized"] == "true" ? BehaviorStatus::succeeded
                                                 : BehaviorStatus::failed;
         }));
@@ -586,6 +611,86 @@ void testBehaviorOrchestration()
     expect(orchestrator.cancel("execution-3"), "haltable behavior cancel failed");
     expect(halted, "behavior cancellation did not halt the active task");
 }
+
+void testReplaceableBusinessModule()
+{
+    auto now = std::chrono::steady_clock::time_point{};
+    RobotRuntime runtime(std::make_unique<InMemorySimulator>(), SafetyLimits{},
+                         [&now] { return now; });
+    expect(runtime.configure(), "business runtime configure failed");
+    expect(runtime.activate(), "business runtime activate failed");
+    runtime.setEmergencyStop(false);
+    BusinessContext context(runtime, 10ms, [&now] { return now; });
+    BusinessModuleRegistry registry;
+    expect(registry.registerModule(std::make_shared<CustomTestBusinessModule>()),
+           "custom business module registration failed");
+    expect(!registry.registerModule(std::make_shared<CustomTestBusinessModule>()),
+           "duplicate business module was accepted");
+    expect(registry.contains("custom_test"), "custom business module is missing");
+
+    BehaviorOrchestrator orchestrator;
+    expect(registry.install("custom_test", orchestrator, context),
+           "custom business module install failed");
+    const auto behavior = BusinessModuleRegistry::qualifiedBehaviorName("custom_test", "run");
+    expect(orchestrator.start("custom-execution", behavior),
+           "custom business mission did not start");
+    const auto completed = orchestrator.tick("custom-execution");
+    expect(completed && completed->status == BehaviorExecutionStatus::succeeded,
+           "custom business mission did not succeed");
+    const auto records = context.records();
+    expect(records.size() == 1 && records.front().step == "custom_logic" &&
+               records.front().output == "result=done",
+           "custom business trace is incomplete");
+    expect(orchestrator.unregisterBehavior(behavior), "custom business behavior unregister failed");
+    expect(!orchestrator.hasBehavior(behavior), "custom business behavior remained registered");
+
+    expect(orchestrator.registerBehavior(
+               "custom/cancel",
+               [&context]
+               {
+                   return makeTracedBusinessStep(
+                       context, "custom", "cancel", "wait", "request=wait",
+                       std::make_unique<BehaviorTask>([](BehaviorBlackboard&)
+                                                      { return BehaviorStatus::running; }));
+               }),
+           "cancel trace behavior registration failed");
+    expect(orchestrator.start("cancel-execution", "custom/cancel"),
+           "cancel trace behavior did not start");
+    const auto running = orchestrator.tick("cancel-execution");
+    expect(running && running->status == BehaviorExecutionStatus::running,
+           "cancel trace behavior did not run");
+    expect(orchestrator.cancel("cancel-execution"), "cancel trace behavior did not cancel");
+    const auto canceledRecords = context.records();
+    expect(canceledRecords.size() == 2 &&
+               canceledRecords.back().status == BusinessStepStatus::canceled,
+           "business cancellation was not traced");
+
+    expect(orchestrator.registerBehavior(
+               "custom/fail",
+               [&context]
+               {
+                   return makeTracedBusinessStep(
+                       context, "custom", "fail", "reject", "request=invalid",
+                       std::make_unique<BehaviorTask>([](BehaviorBlackboard&)
+                                                      { return BehaviorStatus::failed; }));
+               }),
+           "failure trace behavior registration failed");
+    expect(orchestrator.start("failure-execution", "custom/fail"),
+           "failure trace behavior did not start");
+    const auto failed = orchestrator.tick("failure-execution");
+    expect(failed && failed->status == BehaviorExecutionStatus::failed,
+           "failure trace behavior did not fail");
+    const auto failedRecords = context.records();
+    expect(failedRecords.size() == 3 && failedRecords.back().status == BusinessStepStatus::failed,
+           "business failure was not traced");
+
+    expect(orchestrator.registerBehavior("throwing-factory", []() -> std::unique_ptr<Behavior>
+                                         { throw std::runtime_error("injected factory failure"); }),
+           "throwing behavior factory registration failed");
+    expect(!orchestrator.start("throwing-execution", "throwing-factory"),
+           "behavior factory exception escaped start");
+    runtime.shutdown();
+}
 } // namespace
 
 int main()
@@ -601,6 +706,7 @@ int main()
         testExternalHardwareBoundary();
         testBehaviorSequence();
         testBehaviorOrchestration();
+        testReplaceableBusinessModule();
         std::cout << "ROBOTICS_RUNTIME_TEST_PASS\n";
         return 0;
     }

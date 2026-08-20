@@ -244,6 +244,12 @@ bool BehaviorOrchestrator::hasBehavior(const std::string& name) const
     return _factories.count(name) != 0;
 }
 
+bool BehaviorOrchestrator::unregisterBehavior(const std::string& name)
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    return _factories.erase(name) == 1;
+}
+
 bool BehaviorOrchestrator::start(std::string executionId, const std::string& behavior,
                                  BehaviorBlackboard blackboard)
 {
@@ -257,7 +263,15 @@ bool BehaviorOrchestrator::start(std::string executionId, const std::string& beh
             return false;
         factory = found->second;
     }
-    auto root = factory();
+    std::unique_ptr<Behavior> root;
+    try
+    {
+        root = factory();
+    }
+    catch (...)
+    {
+        return false;
+    }
     if (!root)
         return false;
     auto execution = std::make_shared<Execution>();

@@ -1,12 +1,16 @@
 #include "PocoDDS/Robotics/Behavior.h"
+#include "PocoDDS/Robotics/Business.h"
+#include "PocoDDS/Robotics/BusinessPlugin.h"
 #include "PocoDDS/Robotics/ExternalHardware.h"
 #include "PocoDDS/Robotics/MockHardware.h"
+#include "PocoDDS/Robotics/ReferenceBusinessModules.h"
 #include "PocoDDS/Robotics/RobotRuntime.h"
 #include "PocoDDS/Robotics/SimulationAdapter.h"
 
 #include "geometry_msgs/msg/twist.hpp"
 #include "lifecycle_msgs/msg/state.hpp"
 #include "pdr_robot_msgs/action/execute_behavior.hpp"
+#include "pdr_robot_msgs/msg/business_step.hpp"
 #include "pdr_robot_msgs/msg/robot_command.hpp"
 #include "pdr_robot_msgs/msg/robot_frame.hpp"
 #include "pdr_robot_msgs/msg/robot_state.hpp"
@@ -25,6 +29,7 @@
 #include <mutex>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -57,6 +62,10 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
         declare_parameter<std::vector<double>>("joint_max_positions", {});
         declare_parameter<std::vector<double>>("joint_max_velocities", {});
         declare_parameter<std::vector<double>>("joint_max_efforts", {});
+        declare_parameter<std::vector<std::string>>("business_modules", {});
+        declare_parameter<std::vector<std::string>>("business_plugins", {});
+        if (!PocoDDS::Robotics::registerReferenceBusinessModules(_businessModules))
+            throw std::logic_error("reference business module registration failed");
         _orchestrator.registerBehavior(
             "self_test",
             []
@@ -83,6 +92,7 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
 
     CallbackReturn on_configure(const rclcpp_lifecycle::State&) override
     {
+        clearBusinessRuntime();
         _runtimeFaulted = false;
         PocoDDS::Robotics::SafetyLimits limits;
         limits.maximumLinearSpeed = get_parameter("maximum_linear_speed").as_double();
@@ -187,6 +197,51 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
         if (!_runtime->configure())
             return CallbackReturn::FAILURE;
 
+        _tickPeriod = std::chrono::milliseconds(
+            std::max<std::int64_t>(1, get_parameter("tick_period_ms").as_int()));
+        _businessContext =
+            std::make_unique<PocoDDS::Robotics::BusinessContext>(*_runtime, _tickPeriod);
+        _businessBehaviorNames.clear();
+        for (const auto& plugin : get_parameter("business_plugins").as_string_array())
+        {
+            try
+            {
+                auto loaded = PocoDDS::Robotics::BusinessPluginLoader::load(plugin);
+                if (!_businessModules.contains(loaded->name()) &&
+                    !_businessModules.registerModule(std::move(loaded)))
+                {
+                    RCLCPP_ERROR(get_logger(), "Business plugin could not be registered: %s",
+                                 plugin.c_str());
+                    clearBusinessRuntime();
+                    return CallbackReturn::FAILURE;
+                }
+            }
+            catch (const std::exception& exception)
+            {
+                RCLCPP_ERROR(get_logger(), "Business plugin load failed: %s: %s", plugin.c_str(),
+                             exception.what());
+                clearBusinessRuntime();
+                return CallbackReturn::FAILURE;
+            }
+        }
+        for (const auto& module : get_parameter("business_modules").as_string_array())
+        {
+            if (!_businessModules.contains(module) ||
+                !_businessModules.install(module, _orchestrator, *_businessContext))
+            {
+                RCLCPP_ERROR(get_logger(), "Business module could not be installed: %s",
+                             module.c_str());
+                clearBusinessRuntime();
+                return CallbackReturn::FAILURE;
+            }
+            for (const auto& mission : _businessModules.missionNames(module))
+            {
+                _businessBehaviorNames.push_back(
+                    PocoDDS::Robotics::BusinessModuleRegistry::qualifiedBehaviorName(module,
+                                                                                     mission));
+            }
+        }
+
         if (_externalSimulator || _externalHardware)
         {
             const auto frameTopic = _externalHardware ? "robot/hardware/frame" : "robot/sim/frame";
@@ -199,6 +254,8 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
             "robot/state", rclcpp::SensorDataQoS());
         _safetyPublisher = create_publisher<pdr_robot_msgs::msg::SafetyState>(
             "robot/safety_state", rclcpp::QoS(1).transient_local().reliable());
+        _businessStepPublisher = create_publisher<pdr_robot_msgs::msg::BusinessStep>(
+            "robot/business_steps", rclcpp::QoS(100).reliable());
         _commandSubscription = create_subscription<geometry_msgs::msg::Twist>(
             "robot/cmd_vel", rclcpp::QoS(10),
             std::bind(&RobotRuntimeNode::onVelocity, this, std::placeholders::_1));
@@ -215,9 +272,7 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
             std::bind(&RobotRuntimeNode::onCancel, this, std::placeholders::_1),
             std::bind(&RobotRuntimeNode::onAccepted, this, std::placeholders::_1));
 
-        const auto tickMs = std::max<std::int64_t>(1, get_parameter("tick_period_ms").as_int());
-        _timer = create_wall_timer(std::chrono::milliseconds(tickMs),
-                                   std::bind(&RobotRuntimeNode::tick, this));
+        _timer = create_wall_timer(_tickPeriod, std::bind(&RobotRuntimeNode::tick, this));
         return CallbackReturn::SUCCESS;
     }
 
@@ -252,6 +307,7 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
     {
         if (_runtime)
             _runtime->cleanup();
+        clearBusinessRuntime();
         _runtime.reset();
         _timer.reset();
         _actionServer.reset();
@@ -263,6 +319,7 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
         _externalSimulator = nullptr;
         _externalHardware = nullptr;
         _safetyPublisher.reset();
+        _businessStepPublisher.reset();
         _statePublisher.reset();
         _runtimeFaulted = false;
         return CallbackReturn::SUCCESS;
@@ -277,6 +334,15 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
     }
 
   private:
+    void clearBusinessRuntime()
+    {
+        for (const auto& behavior : _businessBehaviorNames)
+            _orchestrator.unregisterBehavior(behavior);
+        _businessBehaviorNames.clear();
+        _businessContext.reset();
+        _publishedBusinessRecords = 0;
+    }
+
     rclcpp_action::GoalResponse onGoal(const rclcpp_action::GoalUUID&,
                                        std::shared_ptr<const Behavior::Goal> goal)
     {
@@ -441,12 +507,13 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
     {
         if (!_runtime || _runtime->state() != PocoDDS::Robotics::LifecycleState::active)
             return;
-        const auto tickMs = std::max<std::int64_t>(1, get_parameter("tick_period_ms").as_int());
         if (_runtimeFaulted)
             return;
         try
         {
-            publishState(_runtime->step(std::chrono::milliseconds(tickMs)).state);
+            publishState(
+                (_businessContext ? _businessContext->advance() : _runtime->step(_tickPeriod))
+                    .state);
         }
         catch (const std::exception& exception)
         {
@@ -467,6 +534,48 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
             return;
         }
         tickAction();
+        publishBusinessSteps();
+    }
+
+    void publishBusinessSteps()
+    {
+        if (!_businessContext || !_businessStepPublisher)
+            return;
+        const auto records = _businessContext->records();
+        while (_publishedBusinessRecords < records.size())
+        {
+            const auto& record = records[_publishedBusinessRecords++];
+            pdr_robot_msgs::msg::BusinessStep message;
+            message.header.stamp = now();
+            message.module = record.module;
+            message.mission = record.mission;
+            message.step = record.step;
+            message.status = businessStepStatus(record.status);
+            message.input = record.input;
+            message.output = record.output;
+            message.detail = record.detail;
+            message.start_tick = record.startTick;
+            message.finish_tick = record.finishTick;
+            message.start_time_nanoseconds = record.startTimeNanoseconds;
+            message.duration_nanoseconds = record.durationNanoseconds;
+            _businessStepPublisher->publish(message);
+        }
+    }
+
+    static std::uint8_t businessStepStatus(PocoDDS::Robotics::BusinessStepStatus status)
+    {
+        using CoreStatus = PocoDDS::Robotics::BusinessStepStatus;
+        using Message = pdr_robot_msgs::msg::BusinessStep;
+        switch (status)
+        {
+        case CoreStatus::succeeded:
+            return Message::SUCCEEDED;
+        case CoreStatus::failed:
+            return Message::FAILED;
+        case CoreStatus::canceled:
+            return Message::CANCELED;
+        }
+        return Message::FAILED;
     }
 
     static std::optional<PocoDDS::Robotics::SensorType> sensorType(std::uint8_t type)
@@ -641,7 +750,12 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
     }
 
     std::unique_ptr<PocoDDS::Robotics::RobotRuntime> _runtime;
+    std::unique_ptr<PocoDDS::Robotics::BusinessContext> _businessContext;
+    PocoDDS::Robotics::BusinessModuleRegistry _businessModules;
     PocoDDS::Robotics::BehaviorOrchestrator _orchestrator;
+    std::vector<std::string> _businessBehaviorNames;
+    std::size_t _publishedBusinessRecords{0};
+    std::chrono::milliseconds _tickPeriod{20};
     std::string _backendName{"unconfigured"};
     bool _simulated{true};
     bool _runtimeFaulted{false};
@@ -651,6 +765,7 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
         _statePublisher;
     rclcpp_lifecycle::LifecyclePublisher<pdr_robot_msgs::msg::SafetyState>::SharedPtr
         _safetyPublisher;
+    rclcpp::Publisher<pdr_robot_msgs::msg::BusinessStep>::SharedPtr _businessStepPublisher;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr _commandSubscription;
     rclcpp::Subscription<pdr_robot_msgs::msg::RobotCommand>::SharedPtr _robotCommandSubscription;
     rclcpp::Subscription<pdr_robot_msgs::msg::RobotFrame>::SharedPtr _backendFrameSubscription;

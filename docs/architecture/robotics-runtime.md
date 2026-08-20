@@ -45,6 +45,43 @@ The same scenario is registered as the `robotics-local-simulation` CTest. It
 uses virtual time and normally finishes much faster than wall-clock time; it is
 intended for repeatable framework testing, not performance or real-time claims.
 
+## Replaceable business modules
+
+Robot-specific workflows are isolated behind `RobotBusinessModule`. A module
+publishes one or more named missions, builds them from reusable Behavior steps,
+and receives hardware-independent state and command access through
+`BusinessContext`. The core qualifies each Action as `module/mission`, so a new
+robot can replace its business module without changing Lifecycle, safety,
+hardware, simulation, ROS 2, or observability code.
+
+The reference SDK includes three end-to-end examples:
+
+| Module/mission | Simulated workflow |
+|---|---|
+| `warehouse/deliver` | Localize, avoid an obstacle, drive to pickup, acquire payload, survive command-source dropout, deliver, release |
+| `inspection/patrol` | Sensor self-check, obstacle-aware patrol, anomaly analysis, return home |
+| `pick_place/transfer` | Arm approach, close gripper, transfer, open gripper |
+
+Run every workflow in the deterministic no-Qt simulator, or select one:
+
+```powershell
+build\robotics\bin\pdr-business-sim.exe --module all
+build\robotics\bin\pdr-business-sim.exe --module warehouse
+build\robotics\bin\pdr-business-sim.exe --module inspection
+build\robotics\bin\pdr-business-sim.exe --module pick_place
+```
+
+Every step records its module, mission, status, input, output, tick range and
+duration. ROS 2 republishes these records on `robot/business_steps` and accepts
+missions through the existing `robot/execute_behavior` Action.
+
+Modules can be compiled into the application or loaded from an explicit
+`business_plugins` path. The host never scans a directory automatically. Treat
+plugins as trusted native code and build them with the exact same SDK version,
+compiler ABI, C++ runtime, architecture and build configuration as the host.
+See `robotics/examples/SampleBusinessPlugin.cpp` and
+`robotics/examples/README.md` for the minimal replacement pattern.
+
 ## Build the ROS 2 adapter
 
 After installing and sourcing a supported ROS 2 distribution:
@@ -61,7 +98,13 @@ standard lifecycle services to configure and activate it. The node exposes:
 - `robot/state` and `robot/safety_state` typed topics;
 - `robot/command` for base and joint commands, plus `robot/cmd_vel` convenience input;
 - `robot/set_emergency_stop` fail-safe service;
-- `robot/execute_behavior` cancellable action.
+- `robot/execute_behavior` cancellable action;
+- `robot/business_steps` durable business-step result stream.
+
+Set `business_modules` to the built-in modules that should be exposed by the
+node. Set `business_plugins` to explicit trusted DLL or shared-library paths;
+then list those module names in `business_modules`. Empty lists preserve the
+framework-only runtime with no robot-specific mission installed.
 
 The node supports four backends:
 
@@ -105,8 +148,10 @@ measured control-loop timing.
 3. Integration boundary implemented: standard ROS odometry, joint state,
    velocity, and joint-command mappings for Gazebo, Webots, Isaac Sim, and
    MuJoCo adapters.
-4. Robot-specific extension: select Nav2, MoveIt 2, or another behavior-tree
-   layer and bind a concrete hardware gateway for the target robot.
+4. Implemented extension seam: compiled or dynamically loaded business modules,
+   reference warehouse/inspection/pick-place missions, and per-step traces.
+   A product can additionally bind Nav2, MoveIt 2, or another behavior-tree
+   layer behind its module and hardware gateway.
 5. Promotion gate: pass SIL regression, HIL, tethered tests, independent
    physical e-stop validation, and measured control-loop timing.
 
@@ -121,9 +166,10 @@ ros2 run pdr_robot_bringup gazebo_sil_check.py
 ```
 
 The checker waits for active Lifecycle state, releases the startup software
-interlock, commands forward motion through the runtime, verifies at least
-5 cm of displacement from `robot/state`, sends zero velocity, and prints
-`PDR_GAZEBO_SIL_PASS`. The same check runs in the `gazebo-sil` CI job.
+interlock, executes the `inspection/patrol` business Action, verifies its four
+step records, confirms the Gazebo robot drives to the asset and returns home,
+then prints `PDR_GAZEBO_BUSINESS_TRACE` and `PDR_GAZEBO_SIL_PASS`. The same
+closed-loop acceptance check runs in the `gazebo-sil` CI job.
 
 ## External integration references
 

@@ -58,7 +58,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
-          find robotics/src robotics/apps robotics/tests -name '*.cpp' -print0 |
+          find robotics/src robotics/apps robotics/tests robotics/examples -name '*.cpp' -print0 |
             xargs -0 clang-tidy -p build/robotics --quiet \
               --checks='-*,clang-analyzer-*,bugprone-*,performance-*,-bugprone-easily-swappable-parameters,-bugprone-exception-escape' \
               --warnings-as-errors='clang-analyzer-*,bugprone-*,-bugprone-exception-escape'

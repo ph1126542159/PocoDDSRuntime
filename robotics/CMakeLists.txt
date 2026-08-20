@@ -1,11 +1,14 @@
 add_library(PDRRoboticsRuntime
     src/Action.cpp
     src/Behavior.cpp
+    src/Business.cpp
+    src/BusinessPlugin.cpp
     src/ExternalHardware.cpp
     src/ExternalSimulator.cpp
     src/InMemorySimulator.cpp
     src/Lifecycle.cpp
     src/MockHardware.cpp
+    src/ReferenceBusinessModules.cpp
     src/RobotRuntime.cpp
     src/SafetyBoundary.cpp)
 add_library(PocoDDS::RoboticsRuntime ALIAS PDRRoboticsRuntime)
@@ -16,17 +19,23 @@ target_include_directories(PDRRoboticsRuntime
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 target_compile_features(PDRRoboticsRuntime PUBLIC cxx_std_17)
+target_link_libraries(PDRRoboticsRuntime PRIVATE ${CMAKE_DL_LIBS})
 pdr_set_warnings(PDRRoboticsRuntime)
 
 add_executable(pdr-robot-sim apps/RobotSimulation.cpp)
 target_link_libraries(pdr-robot-sim PRIVATE PocoDDS::RoboticsRuntime)
 pdr_set_warnings(pdr-robot-sim)
 
+add_executable(pdr-business-sim apps/BusinessSimulation.cpp)
+target_link_libraries(pdr-business-sim PRIVATE PocoDDS::RoboticsRuntime)
+pdr_set_warnings(pdr-business-sim)
+
 install(TARGETS PDRRoboticsRuntime EXPORT PDRRoboticsRuntimeTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(TARGETS pdr-robot-sim RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(TARGETS pdr-business-sim RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 install(EXPORT PDRRoboticsRuntimeTargets
     FILE PDRRoboticsRuntimeTargets.cmake
@@ -47,6 +56,11 @@ install(FILES
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/PDRRoboticsRuntime")
 
 if(BUILD_TESTING)
+    add_library(pdr-sample-business-plugin MODULE examples/SampleBusinessPlugin.cpp)
+    target_link_libraries(pdr-sample-business-plugin PRIVATE PocoDDS::RoboticsRuntime)
+    pdr_set_warnings(pdr-sample-business-plugin)
+    set_target_properties(pdr-sample-business-plugin PROPERTIES PREFIX "")
+
     add_executable(pdr-robotics-runtime-test tests/RoboticsRuntimeTest.cpp)
     target_link_libraries(pdr-robotics-runtime-test PRIVATE PocoDDS::RoboticsRuntime)
     pdr_set_warnings(pdr-robotics-runtime-test)
@@ -56,5 +70,21 @@ if(BUILD_TESTING)
     set_tests_properties(robotics-local-simulation PROPERTIES
         LABELS "robotics;simulation;safety;sil"
         PASS_REGULAR_EXPRESSION "PDR_ROBOT_SIM_PASS"
+        TIMEOUT 30)
+    foreach(module warehouse inspection pick_place)
+        add_test(NAME robotics-business-${module}
+            COMMAND pdr-business-sim --module ${module} --period-ms 10 --max-steps 5000)
+        set_tests_properties(robotics-business-${module} PROPERTIES
+            LABELS "robotics;business;simulation;safety;sil"
+            PASS_REGULAR_EXPRESSION "PDR_BUSINESS_SIM_PASS module=${module}"
+            TIMEOUT 30)
+    endforeach()
+    add_test(NAME robotics-business-plugin
+        COMMAND pdr-business-sim
+            --plugin $<TARGET_FILE:pdr-sample-business-plugin>
+            --module custom_cleaning --period-ms 10 --max-steps 5000)
+    set_tests_properties(robotics-business-plugin PROPERTIES
+        LABELS "robotics;business;plugin;simulation;safety;sil"
+        PASS_REGULAR_EXPRESSION "PDR_BUSINESS_SIM_PASS module=custom_cleaning"
         TIMEOUT 30)
 endif()

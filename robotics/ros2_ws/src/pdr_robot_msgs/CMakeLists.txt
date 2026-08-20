@@ -9,6 +9,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/BusinessStep.msg"
   "msg/RobotState.msg"
   "msg/JointCommand.msg"
   "msg/RobotCommand.msg"

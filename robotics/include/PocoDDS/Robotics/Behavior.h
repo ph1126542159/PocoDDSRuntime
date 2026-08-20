@@ -144,6 +144,7 @@ class BehaviorOrchestrator
     using Factory = std::function<std::unique_ptr<Behavior>()>;
 
     bool registerBehavior(std::string name, Factory factory);
+    bool unregisterBehavior(const std::string& name);
     bool hasBehavior(const std::string& name) const;
     bool start(std::string executionId, const std::string& behavior,
                BehaviorBlackboard blackboard = {});

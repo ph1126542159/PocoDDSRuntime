@@ -14,3 +14,8 @@ pdr_robot_runtime:
     joint_max_positions: []
     joint_max_velocities: []
     joint_max_efforts: []
+    # Optional reference modules: warehouse, inspection, pick_place.
+    # Custom modules implement RobotBusinessModule and register without changing the runtime.
+    business_modules: []
+    # Explicit trusted DLL/SO paths only; directories are never scanned automatically.
+    business_plugins: []

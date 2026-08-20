@@ -9,6 +9,9 @@ pdr_robot_runtime:
     maximum_linear_speed: 1.0
     maximum_angular_speed: 1.5
     command_timeout_ms: 250
+    # The Gazebo acceptance test executes this replaceable business mission end to end.
+    business_modules: [inspection]
+    business_plugins: []
     joint_names: [left_wheel_joint, right_wheel_joint]
     joint_min_positions: [-1000000.0, -1000000.0]
     joint_max_positions: [1000000.0, 1000000.0]
