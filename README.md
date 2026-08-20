@@ -23,6 +23,14 @@ warehouse, inspection and pick/place workflows; run
 `python robotics/tools/robotics_web_server.py` and open the runtime's existing
 `/tracing/` page to execute those real C++ workflows alongside the original
 runtime traces and inspect every node's parameters, status, duration and logs.
+On Windows, the checked-in launcher starts whichever of the runtime and
+simulation services is missing, waits for all health probes and optionally
+opens the integrated page:
+
+```powershell
+.\robotics\tools\start_robotics_webui.ps1 -OpenBrowser
+```
+
 The standalone page on port 9096 remains a diagnostic fallback. Each mission is
 also shown as an OpenTelemetry trace
 with standard Trace/Span IDs, parentage, a timing waterfall, W3C `traceparent`

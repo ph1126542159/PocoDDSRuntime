@@ -105,6 +105,18 @@ virtual duration and associated fault or lifecycle logs. The control service
 keeps a bounded in-memory run history. `http://127.0.0.1:9096/` remains a
 standalone diagnostic fallback when the OSP runtime is not running.
 
+For Windows development, start and verify both processes with one idempotent
+command. It starts only missing services and reports success only after the
+runtime health endpoint, integrated tracing page and simulation health endpoint
+all return HTTP 200:
+
+```powershell
+.\robotics\tools\start_robotics_webui.ps1 -OpenBrowser
+```
+
+The script keeps the processes alive after the launching terminal exits, but it
+does not register a Windows service or an operating-system startup task.
+
 The service allows the loopback Portal origins on ports 9080, 5173 and 4173.
 For a different local development origin, pass `--webui-origin` explicitly;
 external origins are rejected by default.
