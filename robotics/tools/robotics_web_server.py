@@ -54,9 +54,9 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         "mission": "transfer",
         "description": "机械臂接近、夹爪闭合、转运和释放",
         "steps": [
-            ("approach_payload", "接近物料", "joint=arm_joint,target=0.600"),
+            ("approach_object", "接近物料", "joint=arm_joint,target=0.600"),
             ("close_gripper", "闭合夹爪", "joint=gripper_joint,target=0.300"),
-            ("transfer_payload", "转运物料", "joint=arm_joint,target=-0.500"),
+            ("move_to_place", "转运物料", "joint=arm_joint,target=-0.400"),
             ("open_gripper", "打开夹爪", "joint=gripper_joint,target=-0.200"),
         ],
     },
@@ -642,10 +642,17 @@ class SimulationManager:
 class RoboticsWebServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address: tuple[str, int], manager: SimulationManager, static_dir: Path) -> None:
+    def __init__(
+        self,
+        address: tuple[str, int],
+        manager: SimulationManager,
+        static_dir: Path,
+        allowed_origins: set[str] | None = None,
+    ) -> None:
         super().__init__(address, RoboticsRequestHandler)
         self.manager = manager
         self.static_dir = static_dir.resolve()
+        self.allowed_origins = allowed_origins or set()
 
 
 class RoboticsRequestHandler(BaseHTTPRequestHandler):
@@ -669,6 +676,24 @@ class RoboticsRequestHandler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'")
+        origin = self.headers.get("Origin", "")
+        if origin in self.server.allowed_origins:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+        self.end_headers()
+
+    def do_OPTIONS(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
+        origin = self.headers.get("Origin", "")
+        if origin not in self.server.allowed_origins:
+            self._error(HTTPStatus.FORBIDDEN, "WebUI origin is not allowed")
+            return
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Content-Length", "0")
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Vary", "Origin")
         self.end_headers()
 
     def _json(self, value: Any, status: HTTPStatus = HTTPStatus.OK) -> None:
@@ -782,6 +807,12 @@ def parse_arguments() -> argparse.Namespace:
     if not default_otlp_endpoint and os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
         default_otlp_endpoint = os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"].rstrip("/") + "/v1/traces"
     parser.add_argument("--otlp-http-endpoint", default=default_otlp_endpoint)
+    parser.add_argument(
+        "--webui-origin",
+        action="append",
+        default=[],
+        help="additional trusted WebUI origin allowed to call the local simulation API",
+    )
     parser.add_argument("--open-browser", action="store_true")
     return parser.parse_args()
 
@@ -791,7 +822,18 @@ def main() -> int:
     if not 0 <= arguments.port <= 65_535:
         raise SystemExit("--port must be in [0, 65535]")
     manager = SimulationManager(arguments.binary, otlp_http_endpoint=arguments.otlp_http_endpoint)
-    server = RoboticsWebServer((arguments.host, arguments.port), manager, arguments.static_dir)
+    allowed_origins = {
+        "http://127.0.0.1:9080",
+        "http://localhost:9080",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:4173",
+        "http://localhost:4173",
+        *arguments.webui_origin,
+    }
+    server = RoboticsWebServer(
+        (arguments.host, arguments.port), manager, arguments.static_dir, allowed_origins
+    )
     host, port = server.server_address[:2]
     url = f"http://{host}:{port}/"
     print(f"PDR_ROBOTICS_WEB_READY {url} binary={manager.binary}", flush=True)

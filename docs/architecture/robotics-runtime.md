@@ -88,18 +88,26 @@ The local Web simulation centre starts the real `pdr-business-sim` executable;
 it does not reimplement a mock workflow in JavaScript. The C++ process streams
 step-start, step-finish, fault-injection, watchdog and final safety events as
 JSON Lines. A dependency-free Python control service exposes those events as a
-read-only trace model plus start/cancel operations, and serves the same-origin
-Web page:
+read-only trace model plus start/cancel operations. Start it beside the legacy
+runtime:
 
 ```powershell
-python robotics\tools\robotics_web_server.py --port 9096 --open-browser
+python robotics\tools\robotics_web_server.py --port 9096
 ```
 
-Open `http://127.0.0.1:9096/` manually when `--open-browser` is omitted. The
-page can select warehouse, inspection or pick/place, start and stop one local
-simulation, follow every node from pending through running to its terminal
-state, and inspect each node's inputs, outputs, virtual duration and associated
-fault or lifecycle logs. It also keeps a bounded in-memory run history.
+The primary operator entry is the existing PocoDDSRuntime page
+`http://127.0.0.1:9080/tracing/`. It keeps the original runtime trace list,
+flow graph and node inspector, merges robot runs into the same list, and adds a
+simulation control panel. Operators can select warehouse, inspection or
+pick/place, start and stop one local simulation, follow every node from pending
+through running to its terminal state, and inspect each node's inputs, outputs,
+virtual duration and associated fault or lifecycle logs. The control service
+keeps a bounded in-memory run history. `http://127.0.0.1:9096/` remains a
+standalone diagnostic fallback when the OSP runtime is not running.
+
+The service allows the loopback Portal origins on ports 9080, 5173 and 4173.
+For a different local development origin, pass `--webui-origin` explicitly;
+external origins are rejected by default.
 
 Every run is represented as an OpenTelemetry-compatible trace: a 32-hex-digit
 Trace ID identifies the mission root span, every business node has a

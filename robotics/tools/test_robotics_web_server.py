@@ -38,6 +38,11 @@ def request(url: str, method: str = "GET", value: dict | None = None) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def cors_request(url: str, origin: str, method: str = "GET") -> tuple[int, str | None]:
+    with urlopen(Request(url, headers={"Origin": origin}, method=method), timeout=5) as response:
+        return response.status, response.headers.get("Access-Control-Allow-Origin")
+
+
 def wait_for_run(base_url: str, run_id: str, terminal: set[str], timeout: float = 30.0) -> dict:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -97,6 +102,10 @@ def main() -> int:
             "inspection",
             "pick_place",
         }
+        cors_status, cors_origin = cors_request(
+            f"{base_url}/api/v1/robotics-simulation/catalog", "http://127.0.0.1:9080"
+        )
+        assert cors_status == 200 and cors_origin == "http://127.0.0.1:9080"
         with urlopen(f"{base_url}/", timeout=5) as response:
             page = response.read().decode("utf-8")
             assert response.status == 200 and "机器人仿真中心" in page
@@ -147,6 +156,18 @@ def main() -> int:
         assert any(log["fields"].get("event") == "obstacle-injected" for log in navigation["logs"])
         assert completed["result"]["watchdogStop"] is True
         assert abs(float(completed["result"]["x"]) - 2.0) < 1e-9
+
+        pick_place = request(
+            f"{base_url}/api/v1/robotics-simulation/runs",
+            "POST",
+            {"module": "pick_place", "periodMs": 10, "streamDelayMs": 1, "maxSteps": 5000},
+        )
+        pick_place = wait_for_run(base_url, pick_place["runId"], {"success", "failed"})
+        assert pick_place["status"] == "success"
+        assert [node["operation"] for node in pick_place["nodes"]] == [
+            "approach_object", "close_gripper", "move_to_place", "open_gripper"
+        ]
+        assert all(node["status"] == "success" for node in pick_place["nodes"])
 
         cancellable = request(
             f"{base_url}/api/v1/robotics-simulation/runs",
