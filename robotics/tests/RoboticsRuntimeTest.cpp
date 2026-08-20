@@ -236,8 +236,7 @@ void testActionCancellation()
            "action executor exception did not become failed feedback");
 
     expect(actions.submit({"goal-3", "invalid-progress", {}},
-                          [](const ActionGoal&, bool)
-                          {
+                          [](const ActionGoal&, bool) {
                               return ActionFeedback{ActionStatus::running,
                                                     std::numeric_limits<double>::quiet_NaN(),
                                                     {}};
@@ -474,8 +473,7 @@ void testBehaviorSequence()
             return BehaviorStatus::succeeded;
         }));
     sequence.add(std::make_unique<BehaviorTask>(
-        [](BehaviorBlackboard& board)
-        {
+        [](BehaviorBlackboard& board) {
             return board["localized"] == "true" ? BehaviorStatus::succeeded
                                                 : BehaviorStatus::failed;
         }));
