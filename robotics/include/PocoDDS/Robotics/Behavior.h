@@ -102,6 +102,7 @@ class BehaviorTimeout final : public Behavior
     std::chrono::steady_clock::duration _timeout;
     Clock _clock;
     std::optional<std::chrono::steady_clock::time_point> _started;
+    bool _timedOut{false};
 };
 
 class BehaviorParallel final : public Behavior

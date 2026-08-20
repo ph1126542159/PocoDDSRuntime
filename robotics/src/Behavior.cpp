@@ -131,23 +131,31 @@ BehaviorTimeout::BehaviorTimeout(std::unique_ptr<Behavior> child,
 
 BehaviorStatus BehaviorTimeout::tick(BehaviorBlackboard& blackboard)
 {
+    if (_timedOut)
+        return BehaviorStatus::failed;
     const auto now = _clock();
     if (!_started)
         _started = now;
     if (now - *_started >= _timeout)
+    {
+        _child->halt();
+        _timedOut = true;
         return BehaviorStatus::failed;
+    }
     return _child->tick(blackboard);
 }
 
 void BehaviorTimeout::reset()
 {
     _started.reset();
+    _timedOut = false;
     _child->reset();
 }
 
 void BehaviorTimeout::halt()
 {
     _started.reset();
+    _timedOut = false;
     _child->halt();
 }
 
@@ -182,9 +190,29 @@ BehaviorStatus BehaviorParallel::tick(BehaviorBlackboard& blackboard)
         failures += _states[index] == BehaviorStatus::failed ? 1U : 0U;
     }
     if (successes >= required)
+    {
+        for (std::size_t index = 0; index < _children.size(); ++index)
+        {
+            if (_states[index] == BehaviorStatus::running)
+            {
+                _children[index]->halt();
+                _states[index] = BehaviorStatus::failed;
+            }
+        }
         return BehaviorStatus::succeeded;
+    }
     if (_children.size() - failures < required)
+    {
+        for (std::size_t index = 0; index < _children.size(); ++index)
+        {
+            if (_states[index] == BehaviorStatus::running)
+            {
+                _children[index]->halt();
+                _states[index] = BehaviorStatus::failed;
+            }
+        }
         return BehaviorStatus::failed;
+    }
     return BehaviorStatus::running;
 }
 

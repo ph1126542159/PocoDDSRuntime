@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <unordered_set>
 #include <utility>
 
 namespace PocoDDS::Robotics
@@ -13,6 +14,23 @@ double clampMagnitude(double value, double maximum)
 {
     return std::max(-maximum, std::min(value, maximum));
 }
+
+void clampNorm(Vector3& value, double maximum)
+{
+    const auto largest = std::max({std::abs(value.x), std::abs(value.y), std::abs(value.z)});
+    if (largest == 0.0)
+        return;
+    const auto normalizedNorm = std::hypot(value.x / largest, value.y / largest, value.z / largest);
+    const auto maximumLargest = maximum / normalizedNorm;
+    if (largest <= maximumLargest)
+        return;
+    const auto scale = maximumLargest / largest;
+    value.x *= scale;
+    value.y *= scale;
+    value.z *= scale;
+}
+
+bool positiveFinite(double value) { return std::isfinite(value) && value > 0.0; }
 
 bool finite(const Twist& command)
 {
@@ -30,11 +48,19 @@ bool finite(const RobotCommand& command)
 }
 } // namespace
 
-SafetyBoundary::SafetyBoundary(SafetyLimits limits) : _limits(limits)
+SafetyBoundary::SafetyBoundary(SafetyLimits limits) : _limits(std::move(limits))
 {
-    if (limits.maximumLinearSpeed <= 0.0 || limits.maximumAngularSpeed <= 0.0 ||
-        limits.commandTimeout.count() <= 0)
+    if (!positiveFinite(_limits.maximumLinearSpeed) ||
+        !positiveFinite(_limits.maximumAngularSpeed) || _limits.commandTimeout.count() <= 0)
         throw std::invalid_argument("safety limits must be positive");
+    for (const auto& [name, limit] : _limits.joints)
+    {
+        if (name.empty() || !std::isfinite(limit.minimumPosition) ||
+            !std::isfinite(limit.maximumPosition) ||
+            limit.minimumPosition > limit.maximumPosition ||
+            !positiveFinite(limit.maximumVelocity) || !positiveFinite(limit.maximumEffort))
+            throw std::invalid_argument("invalid joint safety limit: " + name);
+    }
 }
 
 void SafetyBoundary::setEmergencyStop(bool engaged, std::string reason)
@@ -62,23 +88,23 @@ SafetyDecision SafetyBoundary::evaluate(const RobotCommand& requested,
     if (!finite(requested))
         return {false, {}, "non-finite command"};
 
+    std::unordered_set<std::string> commandedJoints;
+    for (const auto& joint : requested.joints)
+    {
+        if (!commandedJoints.emplace(joint.name).second)
+            return {false, {}, "duplicate joint command: " + joint.name};
+    }
+
     auto limited = requested;
     auto& velocity = limited.baseVelocity;
-    velocity.linear.x = clampMagnitude(velocity.linear.x, _limits.maximumLinearSpeed);
-    velocity.linear.y = clampMagnitude(velocity.linear.y, _limits.maximumLinearSpeed);
-    velocity.linear.z = clampMagnitude(velocity.linear.z, _limits.maximumLinearSpeed);
-    velocity.angular.x = clampMagnitude(velocity.angular.x, _limits.maximumAngularSpeed);
-    velocity.angular.y = clampMagnitude(velocity.angular.y, _limits.maximumAngularSpeed);
-    velocity.angular.z = clampMagnitude(velocity.angular.z, _limits.maximumAngularSpeed);
+    clampNorm(velocity.linear, _limits.maximumLinearSpeed);
+    clampNorm(velocity.angular, _limits.maximumAngularSpeed);
     for (auto& joint : limited.joints)
     {
         const auto found = _limits.joints.find(joint.name);
         if (found == _limits.joints.end())
             return {false, {}, "joint safety limit missing: " + joint.name};
         const auto& limit = found->second;
-        if (limit.minimumPosition > limit.maximumPosition || limit.maximumVelocity <= 0.0 ||
-            limit.maximumEffort <= 0.0)
-            return {false, {}, "invalid joint safety limit: " + joint.name};
         if (joint.mode == JointCommandMode::position)
             joint.value =
                 std::max(limit.minimumPosition, std::min(joint.value, limit.maximumPosition));

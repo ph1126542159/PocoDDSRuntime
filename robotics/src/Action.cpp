@@ -1,5 +1,8 @@
 #include "PocoDDS/Robotics/Action.h"
 
+#include <algorithm>
+#include <cmath>
+#include <exception>
 #include <utility>
 
 namespace PocoDDS::Robotics
@@ -44,23 +47,49 @@ std::optional<ActionFeedback> ActionCoordinator::tick(const std::string& goalId)
         if (status == ActionStatus::succeeded || status == ActionStatus::failed ||
             status == ActionStatus::canceled)
             return found->second.feedback;
+        if (found->second.executing)
+            return found->second.feedback;
+        found->second.executing = true;
         goal = found->second.goal;
         executor = found->second.executor;
         cancelRequested = found->second.cancelRequested;
     }
 
-    auto next = executor(goal, cancelRequested);
-    if (cancelRequested && next.status != ActionStatus::succeeded &&
-        next.status != ActionStatus::failed)
+    ActionFeedback next;
+    try
     {
-        next.status = ActionStatus::canceled;
-        next.detail = "canceled";
+        next = executor(goal, cancelRequested);
+        if (!std::isfinite(next.progress))
+            next = {ActionStatus::failed, 0.0, "executor returned non-finite progress"};
+        else
+        {
+            next.progress = std::clamp(next.progress, 0.0, 1.0);
+            if (next.status == ActionStatus::accepted)
+                next.status = ActionStatus::running;
+            if (next.status == ActionStatus::succeeded)
+                next.progress = 1.0;
+        }
+    }
+    catch (const std::exception& exception)
+    {
+        next = {ActionStatus::failed, 0.0, exception.what()};
+    }
+    catch (...)
+    {
+        next = {ActionStatus::failed, 0.0, "unknown action executor failure"};
     }
 
     std::lock_guard<std::mutex> lock(_mutex);
     const auto found = _entries.find(goalId);
     if (found == _entries.end())
         return std::nullopt;
+    found->second.executing = false;
+    if (found->second.cancelRequested && next.status != ActionStatus::succeeded &&
+        next.status != ActionStatus::failed)
+    {
+        next.status = ActionStatus::canceled;
+        next.detail = "canceled";
+    }
     found->second.feedback = next;
     return found->second.feedback;
 }

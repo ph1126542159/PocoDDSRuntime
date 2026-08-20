@@ -18,10 +18,15 @@ target_include_directories(PDRRoboticsRuntime
 target_compile_features(PDRRoboticsRuntime PUBLIC cxx_std_17)
 pdr_set_warnings(PDRRoboticsRuntime)
 
+add_executable(pdr-robot-sim apps/RobotSimulation.cpp)
+target_link_libraries(pdr-robot-sim PRIVATE PocoDDS::RoboticsRuntime)
+pdr_set_warnings(pdr-robot-sim)
+
 install(TARGETS PDRRoboticsRuntime EXPORT PDRRoboticsRuntimeTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(TARGETS pdr-robot-sim RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 install(EXPORT PDRRoboticsRuntimeTargets
     FILE PDRRoboticsRuntimeTargets.cmake
@@ -47,4 +52,9 @@ if(BUILD_TESTING)
     pdr_set_warnings(pdr-robotics-runtime-test)
     add_test(NAME robotics-runtime COMMAND pdr-robotics-runtime-test)
     set_tests_properties(robotics-runtime PROPERTIES LABELS "robotics;simulation;safety")
+    add_test(NAME robotics-local-simulation COMMAND pdr-robot-sim --steps 200 --period-ms 5)
+    set_tests_properties(robotics-local-simulation PROPERTIES
+        LABELS "robotics;simulation;safety;sil"
+        PASS_REGULAR_EXPRESSION "PDR_ROBOT_SIM_PASS"
+        TIMEOUT 30)
 endif()

@@ -51,9 +51,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: lukka/get-cmake@latest
       - name: Configure robotics core
-        run: cmake --preset robotics
+        run: cmake --preset robotics -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Build robotics core
         run: cmake --build --preset robotics
+      - name: Analyze robotics core
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          find robotics/src robotics/apps robotics/tests -name '*.cpp' -print0 |
+            xargs -0 clang-tidy -p build/robotics --quiet \
+              --checks='-*,clang-analyzer-*,bugprone-*,performance-*,-bugprone-easily-swappable-parameters,-bugprone-exception-escape' \
+              --warnings-as-errors='clang-analyzer-*,bugprone-*,-bugprone-exception-escape'
       - name: Test robotics core
         run: ctest --preset robotics -C Release --output-on-failure
       - name: Install robotics SDK

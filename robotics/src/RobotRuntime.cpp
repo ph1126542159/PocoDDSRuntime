@@ -5,11 +5,15 @@
 
 namespace PocoDDS::Robotics
 {
-RobotRuntime::RobotRuntime(std::unique_ptr<RobotBackend> backend, SafetyLimits safetyLimits)
-    : _backend(std::move(backend)), _safety(safetyLimits)
+RobotRuntime::RobotRuntime(std::unique_ptr<RobotBackend> backend, SafetyLimits safetyLimits,
+                           Clock clock)
+    : _backend(std::move(backend)), _commandTimeout(safetyLimits.commandTimeout),
+      _safety(std::move(safetyLimits)), _clock(std::move(clock))
 {
     if (!_backend)
         throw std::invalid_argument("robot backend is required");
+    if (!_clock)
+        throw std::invalid_argument("robot runtime clock is required");
 }
 
 void RobotRuntime::setWorld(std::string world) { setBackendDescription(std::move(world)); }
@@ -25,11 +29,14 @@ void RobotRuntime::setEmergencyStop(bool engaged, std::string reason)
 {
     std::lock_guard<std::mutex> lock(_operationMutex);
     _safety.setEmergencyStop(engaged, std::move(reason));
+    if (engaged)
+        _lastCommandTime.reset();
     if (engaged && _backend->health().active)
     {
         try
         {
-            _backend->write({}, std::chrono::nanoseconds::zero());
+            if (!_backend->write({}, std::chrono::nanoseconds::zero()))
+                _acceptCommands = false;
         }
         catch (...)
         {
@@ -54,7 +61,8 @@ SafetyDecision RobotRuntime::command(const RobotCommand& command,
     std::lock_guard<std::mutex> lock(_operationMutex);
     if (!_acceptCommands)
         return {false, {}, "runtime is not active"};
-    auto decision = _safety.evaluate(command, timestamp, std::chrono::steady_clock::now());
+    const auto now = _clock();
+    auto decision = _safety.evaluate(command, timestamp, now);
     bool written = false;
     try
     {
@@ -67,8 +75,19 @@ SafetyDecision RobotRuntime::command(const RobotCommand& command,
         _safety.setEmergencyStop(true, "backend write failure");
         return {false, {}, "backend write failure"};
     }
-    if (decision.permitted && !written)
-        return {false, {}, "backend rejected command"};
+    if (!written)
+    {
+        _acceptCommands = false;
+        _safety.setEmergencyStop(true, decision.permitted ? "backend rejected command"
+                                                          : "backend rejected safety stop");
+        return {false,
+                {},
+                decision.permitted ? "backend rejected command" : "backend rejected safety stop"};
+    }
+    if (decision.permitted)
+        _lastCommandTime = now;
+    else
+        _lastCommandTime.reset();
     return decision;
 }
 
@@ -77,6 +96,22 @@ RobotFrame RobotRuntime::step(std::chrono::nanoseconds duration)
     std::lock_guard<std::mutex> lock(_operationMutex);
     if (!_acceptCommands)
         throw std::logic_error("runtime is not active");
+    const auto now = _clock();
+    if (_lastCommandTime && now >= *_lastCommandTime && now - *_lastCommandTime > _commandTimeout)
+    {
+        try
+        {
+            if (!_backend->write({}, std::chrono::nanoseconds::zero()))
+                throw std::runtime_error("backend rejected watchdog stop");
+            _lastCommandTime.reset();
+        }
+        catch (...)
+        {
+            _acceptCommands = false;
+            _safety.setEmergencyStop(true, "backend watchdog stop failure");
+            throw;
+        }
+    }
     try
     {
         return _backend->read(duration);
@@ -105,6 +140,7 @@ bool RobotRuntime::onActivate()
 {
     std::lock_guard<std::mutex> lock(_operationMutex);
     _acceptCommands = _backend->activate();
+    _lastCommandTime.reset();
     return _acceptCommands;
 }
 
@@ -112,21 +148,25 @@ bool RobotRuntime::onDeactivate()
 {
     std::lock_guard<std::mutex> lock(_operationMutex);
     _acceptCommands = false;
+    _lastCommandTime.reset();
+    bool stopped = false;
     try
     {
-        _backend->write({}, std::chrono::nanoseconds::zero());
+        stopped = _backend->write({}, std::chrono::nanoseconds::zero());
     }
     catch (...)
     {
+        stopped = false;
     }
     _backend->deactivate();
-    return true;
+    return stopped;
 }
 
 bool RobotRuntime::onCleanup()
 {
     std::lock_guard<std::mutex> lock(_operationMutex);
     _acceptCommands = false;
+    _lastCommandTime.reset();
     _backend->reset();
     return true;
 }
@@ -135,13 +175,16 @@ void RobotRuntime::onShutdown() noexcept
 {
     std::lock_guard<std::mutex> lock(_operationMutex);
     _acceptCommands = false;
+    _lastCommandTime.reset();
     try
     {
         _backend->write({}, std::chrono::nanoseconds::zero());
-        _backend->deactivate();
     }
     catch (...)
     {
+        _backend->deactivate();
+        return;
     }
+    _backend->deactivate();
 }
 } // namespace PocoDDS::Robotics

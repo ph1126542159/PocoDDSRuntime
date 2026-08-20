@@ -48,6 +48,7 @@ class ActionCoordinator
         Executor executor;
         ActionFeedback feedback;
         bool cancelRequested{false};
+        bool executing{false};
     };
 
     mutable std::mutex _mutex;

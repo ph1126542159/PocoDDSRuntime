@@ -5,11 +5,16 @@
 #include "PocoDDS/Robotics/RobotRuntime.h"
 #include "PocoDDS/Robotics/SimulationAdapter.h"
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
+#include <future>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
+#include <thread>
+#include <vector>
 
 using namespace std::chrono_literals;
 using namespace PocoDDS::Robotics;
@@ -55,6 +60,52 @@ class ThrowingStopBackend final : public RobotBackend
     bool _active{false};
 };
 
+class RejectingWriteBackend final : public RobotBackend
+{
+  public:
+    std::string name() const override { return "rejecting-write"; }
+    BackendKind kind() const noexcept override { return BackendKind::hardware; }
+    bool configure(const std::string&) override
+    {
+        _configured = true;
+        return true;
+    }
+    bool activate() override
+    {
+        _active = _configured;
+        return _active;
+    }
+    void deactivate() noexcept override { _active = false; }
+    void reset() override
+    {
+        _configured = false;
+        _active = false;
+    }
+    RobotFrame read(std::chrono::nanoseconds) override { return {}; }
+    bool write(const RobotCommand&, std::chrono::nanoseconds) override { return false; }
+    BackendHealth health() const override { return {_configured, _active, false, 0, 0, "test"}; }
+
+  private:
+    bool _configured{false};
+    bool _active{false};
+};
+
+class SlowShutdownLifecycle final : public LifecycleComponent
+{
+  public:
+    explicit SlowShutdownLifecycle(std::atomic<unsigned int>& shutdowns) : _shutdowns(shutdowns) {}
+
+  protected:
+    void onShutdown() noexcept override
+    {
+        ++_shutdowns;
+        std::this_thread::sleep_for(20ms);
+    }
+
+  private:
+    std::atomic<unsigned int>& _shutdowns;
+};
+
 void expect(bool condition, const char* message)
 {
     if (!condition)
@@ -87,6 +138,17 @@ void testLifecycleSimulationAndSafety()
     expect(permitted.permitted, "released interlock should permit motion");
     expect(permitted.command.baseVelocity.linear.x == 1.0, "linear command was not limited");
 
+    Twist diagonal;
+    diagonal.linear.x = 1.0;
+    diagonal.linear.y = 1.0;
+    const auto diagonalDecision = runtime.commandVelocity(diagonal);
+    expect(diagonalDecision.permitted, "finite diagonal velocity was rejected");
+    expect(std::abs(std::hypot(diagonalDecision.command.baseVelocity.linear.x,
+                               diagonalDecision.command.baseVelocity.linear.y) -
+                    1.0) < 1e-12,
+           "linear vector norm exceeded the safety limit");
+    expect(runtime.commandVelocity(requested).permitted, "straight command restore failed");
+
     const auto frame = runtime.step(1s);
     expect(std::abs(frame.state.pose.position.x - 1.0) < 1e-9,
            "simulation did not integrate the limited command");
@@ -104,12 +166,49 @@ void testLifecycleSimulationAndSafety()
     expect(jointFrame.state.joints.front().position == 1.0,
            "simulation did not apply the joint command");
 
+    RobotCommand duplicateJoint;
+    duplicateJoint.joints.push_back({"joint1", JointCommandMode::position, 0.1});
+    duplicateJoint.joints.push_back({"joint1", JointCommandMode::velocity, 0.1});
+    expect(!runtime.command(duplicateJoint).permitted, "duplicate joint command was accepted");
+
     auto expired = runtime.commandVelocity(requested, std::chrono::steady_clock::now() - 1s);
     expect(!expired.permitted, "watchdog must reject an expired command");
     expect(runtime.deactivate(), "deactivate failed");
     expect(runtime.cleanup(), "cleanup failed");
     runtime.shutdown();
     expect(runtime.state() == LifecycleState::finalized, "shutdown failed");
+}
+
+void testLifecycleConcurrencyAndLimitValidation()
+{
+    std::atomic<unsigned int> shutdowns{0};
+    SlowShutdownLifecycle lifecycle(shutdowns);
+    std::vector<std::future<void>> callers;
+    callers.reserve(4);
+    for (int index = 0; index < 4; ++index)
+        callers.emplace_back(
+            std::async(std::launch::async, [&lifecycle] { lifecycle.shutdown(); }));
+    for (auto& caller : callers)
+    {
+        expect(caller.wait_for(1s) == std::future_status::ready,
+               "concurrent lifecycle shutdown deadlocked");
+        caller.get();
+    }
+    expect(shutdowns == 1, "shutdown callback ran more than once");
+    expect(lifecycle.state() == LifecycleState::finalized, "concurrent shutdown did not finalize");
+
+    SafetyLimits invalid;
+    invalid.maximumLinearSpeed = std::numeric_limits<double>::quiet_NaN();
+    bool rejectedInvalidLimits = false;
+    try
+    {
+        SafetyBoundary boundary(invalid);
+    }
+    catch (const std::invalid_argument&)
+    {
+        rejectedInvalidLimits = true;
+    }
+    expect(rejectedInvalidLimits, "non-finite safety configuration was accepted");
 }
 
 void testActionCancellation()
@@ -123,9 +222,30 @@ void testActionCancellation()
                                   canceled ? 0.25 : 0.1, canceled ? "stopped" : "moving"};
                           }),
            "action submit failed");
-    expect(actions.tick("goal-1")->status == ActionStatus::running, "action did not start");
+    const auto running = actions.tick("goal-1");
+    expect(running && running->status == ActionStatus::running, "action did not start");
     expect(actions.cancel("goal-1"), "action cancel request failed");
-    expect(actions.tick("goal-1")->status == ActionStatus::canceled, "action was not canceled");
+    const auto canceled = actions.tick("goal-1");
+    expect(canceled && canceled->status == ActionStatus::canceled, "action was not canceled");
+
+    expect(actions.submit({"goal-2", "failing", {}}, [](const ActionGoal&, bool) -> ActionFeedback
+                          { throw std::runtime_error("injected executor failure"); }),
+           "throwing action submit failed");
+    const auto failed = actions.tick("goal-2");
+    expect(failed && failed->status == ActionStatus::failed,
+           "action executor exception did not become failed feedback");
+
+    expect(actions.submit({"goal-3", "invalid-progress", {}},
+                          [](const ActionGoal&, bool)
+                          {
+                              return ActionFeedback{ActionStatus::running,
+                                                    std::numeric_limits<double>::quiet_NaN(),
+                                                    {}};
+                          }),
+           "invalid progress action submit failed");
+    const auto invalidProgress = actions.tick("goal-3");
+    expect(invalidProgress && invalidProgress->status == ActionStatus::failed,
+           "non-finite action progress was accepted");
 }
 
 void testHardwareBackendAndFaults()
@@ -150,19 +270,29 @@ void testHardwareBackendAndFaults()
 
     hardwareProbe->injectFault(MockHardwareFault::writeFailure);
     expect(!runtime.command(command).permitted, "write failure was not propagated");
-    hardwareProbe->injectFault(MockHardwareFault::readFailure);
+    expect(runtime.emergencyStop(), "backend write failure did not engage interlock");
+    runtime.shutdown();
+
+    auto readHardware = std::make_unique<MockHardware>(std::vector<std::string>{"joint1"});
+    auto* readHardwareProbe = readHardware.get();
+    RobotRuntime readRuntime(std::move(readHardware), limits);
+    readRuntime.setBackendDescription("mock://read-failure");
+    expect(readRuntime.configure(), "read failure runtime configure failed");
+    expect(readRuntime.activate(), "read failure runtime activate failed");
+    readRuntime.setEmergencyStop(false);
+    readHardwareProbe->injectFault(MockHardwareFault::readFailure);
     bool readFailed = false;
     try
     {
-        runtime.step(10ms);
+        readRuntime.step(10ms);
     }
     catch (const std::runtime_error&)
     {
         readFailed = true;
     }
     expect(readFailed, "read failure was not propagated");
-    expect(runtime.emergencyStop(), "backend read failure did not engage interlock");
-    runtime.shutdown();
+    expect(readRuntime.emergencyStop(), "backend read failure did not engage interlock");
+    readRuntime.shutdown();
 
     MockHardware atomicHardware({"joint1"});
     expect(atomicHardware.configure("mock://atomic"), "atomic hardware configure failed");
@@ -184,6 +314,91 @@ void testHardwareBackendAndFaults()
     throwingRuntime.setEmergencyStop(true, "test stop");
     expect(throwingRuntime.emergencyStop(), "stop exception escaped the safety latch");
     throwingRuntime.shutdown();
+
+    RobotRuntime rejectingRuntime(std::make_unique<RejectingWriteBackend>());
+    rejectingRuntime.setBackendDescription("test://reject-write");
+    expect(rejectingRuntime.configure(), "rejecting backend configure failed");
+    expect(rejectingRuntime.activate(), "rejecting backend activate failed");
+    rejectingRuntime.setEmergencyStop(false);
+    expect(!rejectingRuntime.command({}).permitted, "rejected backend write was hidden");
+    expect(rejectingRuntime.emergencyStop(), "rejected backend write did not latch safety stop");
+    rejectingRuntime.shutdown();
+}
+
+void testDeterministicPlanarSimulation()
+{
+    InMemorySimulator simulator;
+    expect(simulator.connect("local://planar"), "local simulator connect failed");
+    expect(!simulator.write({}, 10ms), "inactive simulator accepted a command");
+    bool inactiveReadRejected = false;
+    try
+    {
+        simulator.read(10ms);
+    }
+    catch (const std::logic_error&)
+    {
+        inactiveReadRejected = true;
+    }
+    expect(inactiveReadRejected, "inactive simulator returned feedback");
+    expect(simulator.activate(), "local simulator activate failed");
+
+    RobotCommand command;
+    command.baseVelocity.linear.x = 1.0;
+    command.baseVelocity.angular.z = std::acos(-1.0) / 2.0;
+    expect(simulator.write(command, 1s), "local simulator command failed");
+    const auto frame = simulator.read(1s);
+    const auto expected = 2.0 / std::acos(-1.0);
+    expect(std::abs(frame.state.pose.position.x - expected) < 1e-12,
+           "planar simulator body-frame x integration failed");
+    expect(std::abs(frame.state.pose.position.y - expected) < 1e-12,
+           "planar simulator body-frame y integration failed");
+    simulator.deactivate();
+
+    auto now = std::chrono::steady_clock::time_point{};
+    SafetyLimits watchdogLimits;
+    watchdogLimits.commandTimeout = 100ms;
+    RobotRuntime watchdogRuntime(std::make_unique<InMemorySimulator>(), watchdogLimits,
+                                 [&now] { return now; });
+    expect(watchdogRuntime.configure(), "watchdog runtime configure failed");
+    expect(watchdogRuntime.activate(), "watchdog runtime activate failed");
+    watchdogRuntime.setEmergencyStop(false);
+    Twist velocity;
+    velocity.linear.x = 0.5;
+    expect(watchdogRuntime.commandVelocity(velocity, now).permitted,
+           "watchdog runtime command failed");
+    const auto moving = watchdogRuntime.step(100ms);
+    now += 101ms;
+    const auto stopped = watchdogRuntime.step(1s);
+    expect(std::abs(stopped.state.pose.position.x - moving.state.pose.position.x) < 1e-12,
+           "command watchdog did not stop a disconnected controller");
+    watchdogRuntime.shutdown();
+
+    now = std::chrono::steady_clock::time_point{};
+    auto failingWatchdogHardware = std::make_unique<MockHardware>();
+    auto* failingWatchdogProbe = failingWatchdogHardware.get();
+    RobotRuntime failingWatchdogRuntime(std::move(failingWatchdogHardware), watchdogLimits,
+                                        [&now] { return now; });
+    failingWatchdogRuntime.setBackendDescription("mock://watchdog-failure");
+    expect(failingWatchdogRuntime.configure(), "failing watchdog configure failed");
+    expect(failingWatchdogRuntime.activate(), "failing watchdog activate failed");
+    failingWatchdogRuntime.setEmergencyStop(false);
+    expect(failingWatchdogRuntime.commandVelocity(velocity, now).permitted,
+           "failing watchdog initial command failed");
+    failingWatchdogProbe->injectFault(MockHardwareFault::writeFailure);
+    now += 101ms;
+    bool watchdogStopFailed = false;
+    try
+    {
+        failingWatchdogRuntime.step(1ms);
+    }
+    catch (const std::runtime_error&)
+    {
+        watchdogStopFailed = true;
+    }
+    expect(watchdogStopFailed, "watchdog stop rejection was hidden");
+    expect(failingWatchdogRuntime.emergencyStop(),
+           "watchdog stop rejection did not latch emergency stop");
+    failingWatchdogRuntime.shutdown();
 }
 
 void testExternalSimulationBoundary()
@@ -259,7 +474,8 @@ void testBehaviorSequence()
             return BehaviorStatus::succeeded;
         }));
     sequence.add(std::make_unique<BehaviorTask>(
-        [](BehaviorBlackboard& board) {
+        [](BehaviorBlackboard& board)
+        {
             return board["localized"] == "true" ? BehaviorStatus::succeeded
                                                 : BehaviorStatus::failed;
         }));
@@ -300,13 +516,27 @@ void testBehaviorOrchestration()
     expect(timeout.tick(blackboard) == BehaviorStatus::failed,
            "timeout did not fail an overdue behavior");
 
+    bool timeoutHalted = false;
+    BehaviorTimeout haltingTimeout(
+        std::make_unique<BehaviorTask>([](BehaviorBlackboard&) { return BehaviorStatus::running; },
+                                       [&timeoutHalted] { timeoutHalted = true; }),
+        100ms, [&now] { return now; });
+    expect(haltingTimeout.tick(blackboard) == BehaviorStatus::running,
+           "halting timeout child did not start");
+    now += 101ms;
+    expect(haltingTimeout.tick(blackboard) == BehaviorStatus::failed && timeoutHalted,
+           "timed-out behavior was not halted");
+
+    bool parallelHalted = false;
     BehaviorParallel parallel(1);
     parallel.add(std::make_unique<BehaviorTask>([](BehaviorBlackboard&)
                                                 { return BehaviorStatus::succeeded; }));
     parallel.add(std::make_unique<BehaviorTask>([](BehaviorBlackboard&)
-                                                { return BehaviorStatus::running; }));
+                                                { return BehaviorStatus::running; },
+                                                [&parallelHalted] { parallelHalted = true; }));
     expect(parallel.tick(blackboard) == BehaviorStatus::succeeded,
            "parallel success threshold failed");
+    expect(parallelHalted, "parallel completion did not halt unfinished work");
 
     BehaviorOrchestrator orchestrator;
     expect(orchestrator.registerBehavior("inspect",
@@ -340,7 +570,8 @@ void testBehaviorOrchestration()
            "wait behavior registration failed");
     expect(orchestrator.start("execution-2", "wait"), "wait behavior did not start");
     expect(orchestrator.cancel("execution-2"), "behavior cancellation failed");
-    expect(orchestrator.snapshot("execution-2")->status == BehaviorExecutionStatus::canceled,
+    const auto canceledExecution = orchestrator.snapshot("execution-2");
+    expect(canceledExecution && canceledExecution->status == BehaviorExecutionStatus::canceled,
            "behavior was not marked canceled");
 
     bool halted = false;
@@ -364,8 +595,10 @@ int main()
     try
     {
         testLifecycleSimulationAndSafety();
+        testLifecycleConcurrencyAndLimitValidation();
         testActionCancellation();
         testHardwareBackendAndFaults();
+        testDeterministicPlanarSimulation();
         testExternalSimulationBoundary();
         testExternalHardwareBoundary();
         testBehaviorSequence();

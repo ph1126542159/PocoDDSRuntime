@@ -24,7 +24,7 @@ class SimulationAdapter : public RobotBackend
         return _backendActive;
     }
     void deactivate() noexcept final;
-    RobotFrame read(std::chrono::nanoseconds period) final { return step(period); }
+    RobotFrame read(std::chrono::nanoseconds period) final;
     bool write(const RobotCommand& command, std::chrono::nanoseconds period) final;
     virtual std::string backendName() const = 0;
     virtual bool connect(const std::string& world) = 0;

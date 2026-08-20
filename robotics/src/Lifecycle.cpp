@@ -86,16 +86,11 @@ void LifecycleComponent::shutdown() noexcept
             return;
         _transitioning = true;
     }
-    try
-    {
-        onShutdown();
-    }
-    catch (...)
-    {
-    }
+    onShutdown();
     std::lock_guard<std::mutex> lock(_mutex);
     _state = LifecycleState::finalized;
     _transitioning = false;
+    _stateChanged.notify_all();
 }
 
 bool LifecycleComponent::onConfigure() { return true; }

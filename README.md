@@ -17,6 +17,8 @@ the `robotics` CMake preset to build Lifecycle, Action, behavior orchestration,
 simulation/hardware ports and fail-closed safety logic with Qt, WebUI, Poco/OSP
 and direct Fast-DDS integrations disabled. See
 [docs/architecture/robotics-runtime.md](docs/architecture/robotics-runtime.md).
+The preset also builds `pdr-robot-sim`, a no-Qt deterministic local robot SIL
+scenario that is included in CTest.
 
 ## Directory layout
 

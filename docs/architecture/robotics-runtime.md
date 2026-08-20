@@ -17,14 +17,33 @@ Fast-DDS API into the same process.
 ## Build and test the portable core
 
 ```powershell
-C:\Qt\Tools\CMake_64\bin\cmake.exe --preset robotics
-C:\Qt\Tools\CMake_64\bin\cmake.exe --build --preset robotics
-C:\Qt\Tools\CMake_64\bin\ctest.exe --preset robotics -C Release -V
-C:\Qt\Tools\CMake_64\bin\cmake.exe --install build/robotics --config Release
+cmake --preset robotics
+cmake --build --preset robotics
+ctest --preset robotics -C Release -V
+cmake --install build/robotics --config Release
 ```
 
 The same preset is valid on Linux with an available C++17 compiler. Generator
-selection is intentionally left to CMake.
+selection is intentionally left to CMake. Qt is neither discovered nor built by
+this preset. A `cmake.exe` shipped beside an existing Qt installation may be
+used as a CMake executable, but no Qt library is required.
+
+## Run the local robot simulation
+
+The portable build produces `pdr-robot-sim`, a deterministic, no-Qt software-
+in-the-loop scenario. It exercises the startup interlock, Lifecycle runtime,
+behavior orchestration, Action progress, planar base motion, joint feedback,
+continuous command watchdog, emergency stop, and backend health in one process:
+
+```powershell
+build\robotics\bin\pdr-robot-sim.exe
+build\robotics\bin\pdr-robot-sim.exe --steps 1000 --period-ms 2
+```
+
+A successful run ends with `PDR_ROBOT_SIM_PASS` and reports the simulated pose.
+The same scenario is registered as the `robotics-local-simulation` CTest. It
+uses virtual time and normally finishes much faster than wall-clock time; it is
+intended for repeatable framework testing, not performance or real-time claims.
 
 ## Build the ROS 2 adapter
 
@@ -79,7 +98,8 @@ measured control-loop timing.
 ## Migration stages
 
 1. Implemented: portable core, deterministic simulation, hardware abstraction,
-   watchdogs, limits, behavior orchestration, cancellation, and fault injection.
+   continuous command watchdogs, vector/joint limits, behavior orchestration,
+   cancellation, concurrent shutdown handling, and fault injection.
 2. Implemented: ROS 2 messages, Lifecycle, Action, simulation/hardware topic
    backends, and a Gazebo differential-drive closed-loop model.
 3. Integration boundary implemented: standard ROS odometry, joint state,
