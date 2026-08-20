@@ -202,7 +202,8 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
         _businessContext =
             std::make_unique<PocoDDS::Robotics::BusinessContext>(*_runtime, _tickPeriod);
         _businessBehaviorNames.clear();
-        for (const auto& plugin : get_parameter("business_plugins").as_string_array())
+        const auto businessPlugins = get_parameter("business_plugins").as_string_array();
+        for (const auto& plugin : businessPlugins)
         {
             try
             {
@@ -224,7 +225,8 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
                 return CallbackReturn::FAILURE;
             }
         }
-        for (const auto& module : get_parameter("business_modules").as_string_array())
+        const auto businessModules = get_parameter("business_modules").as_string_array();
+        for (const auto& module : businessModules)
         {
             if (!_businessModules.contains(module) ||
                 !_businessModules.install(module, _orchestrator, *_businessContext))
