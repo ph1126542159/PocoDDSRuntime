@@ -7,7 +7,9 @@ import argparse
 import copy
 import json
 import os
+import secrets
 import shutil
+import socket
 import subprocess
 import threading
 import time
@@ -18,6 +20,8 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from urllib.parse import unquote, urlsplit
 
 
@@ -58,9 +62,27 @@ SCENARIOS: dict[str, dict[str, Any]] = {
     },
 }
 
+SENSITIVE_ATTRIBUTE_FRAGMENTS = (
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "authorization",
+    "cookie",
+    "privatekey",
+)
+
 
 def now_microseconds() -> int:
     return time.time_ns() // 1_000
+
+
+def new_otel_id(byte_count: int) -> str:
+    """Return a non-zero lowercase OpenTelemetry trace or span identifier."""
+    while True:
+        value = secrets.token_hex(byte_count)
+        if any(character != "0" for character in value):
+            return value
 
 
 def parse_fields(value: str) -> dict[str, str]:
@@ -90,9 +112,14 @@ def make_log(level: str, message: str, fields: dict[str, Any] | None = None) -> 
 
 
 class SimulationManager:
-    def __init__(self, binary: Path, maximum_history: int = 30) -> None:
+    def __init__(self, binary: Path, maximum_history: int = 30, otlp_http_endpoint: str = "") -> None:
         self._binary = binary.resolve()
         self._maximum_history = maximum_history
+        self._otlp_http_endpoint = otlp_http_endpoint.strip()
+        if self._otlp_http_endpoint:
+            parsed_endpoint = urlsplit(self._otlp_http_endpoint)
+            if parsed_endpoint.scheme not in {"http", "https"} or not parsed_endpoint.netloc:
+                raise ValueError("OTLP HTTP endpoint must be an absolute http(s) URL")
         self._lock = threading.RLock()
         self._runs: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._processes: dict[str, subprocess.Popen[str]] = {}
@@ -105,6 +132,12 @@ class SimulationManager:
         return {
             "simulator": "PocoDDS deterministic robotics SIL",
             "binary": str(self._binary),
+            "telemetry": {
+                "model": "OpenTelemetry Trace/Span",
+                "protocol": "OTLP/HTTP JSON",
+                "instrumentationScope": "PocoDDS.Robotics.BusinessSimulation",
+                "exportEndpoint": self._otlp_http_endpoint,
+            },
             "scenarios": [
                 {
                     "module": module,
@@ -143,12 +176,13 @@ class SimulationManager:
             if any(run["status"] in {"queued", "running"} for run in self._runs.values()):
                 raise RuntimeError("another simulation is already running")
             run_id = f"robotics-{module}-{int(time.time())}-{uuid.uuid4().hex[:8]}"
+            trace_id = new_otel_id(16)
+            root_span_id = new_otel_id(8)
             definition = SCENARIOS[module]
             started = now_microseconds()
             nodes = []
-            previous = ""
             for index, (step, title, inputs) in enumerate(definition["steps"]):
-                span_id = f"{index + 1:02d}-{step}"
+                span_id = new_otel_id(8)
                 nodes.append(
                     {
                         "businessName": definition["title"],
@@ -159,9 +193,13 @@ class SimulationManager:
                         "bundleName": f"robotics.business.{module}",
                         "hostName": os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "localhost",
                         "processId": 0,
-                        "traceId": run_id,
+                        "traceId": trace_id,
                         "spanId": span_id,
-                        "parentSpanId": previous,
+                        "parentSpanId": root_span_id,
+                        "traceParent": f"00-{trace_id}-{span_id}-01",
+                        "spanKind": "INTERNAL",
+                        "otelStatusCode": "STATUS_CODE_UNSET",
+                        "sequence": index + 1,
                         "status": "pending",
                         "errorCode": "",
                         "errorMessage": "",
@@ -173,10 +211,11 @@ class SimulationManager:
                         "logs": [],
                     }
                 )
-                previous = span_id
             run = {
                 "runId": run_id,
-                "traceId": run_id,
+                "traceId": trace_id,
+                "rootSpanId": root_span_id,
+                "traceParent": f"00-{trace_id}-{root_span_id}-01",
                 "module": module,
                 "mission": definition["mission"],
                 "title": definition["title"],
@@ -189,6 +228,25 @@ class SimulationManager:
                     "periodMs": period_ms,
                     "streamDelayMs": stream_delay_ms,
                     "maxSteps": maximum_steps,
+                },
+                "telemetry": {
+                    "model": "OpenTelemetry Trace/Span",
+                    "protocol": "OTLP/HTTP JSON",
+                    "instrumentationScope": {
+                        "name": "PocoDDS.Robotics.BusinessSimulation",
+                        "version": "1.0.0",
+                    },
+                    "resourceAttributes": {
+                        "service.name": "pdr-business-sim",
+                        "service.namespace": "PocoDDS.Robotics",
+                        "host.name": socket.gethostname(),
+                        "robotics.simulation.type": "SIL",
+                    },
+                    "export": {
+                        "endpoint": self._otlp_http_endpoint,
+                        "status": "pending" if self._otlp_http_endpoint else "local-only",
+                        "error": "",
+                    },
                 },
                 "nodes": nodes,
                 "events": [make_log("info", "仿真任务已进入执行队列", {"module": module})],
@@ -231,6 +289,7 @@ class SimulationManager:
                 process.terminate()
 
     def _execute(self, run_id: str, period_ms: int, stream_delay_ms: int, maximum_steps: int) -> None:
+        cancelled_before_start = False
         with self._lock:
             if self._runs[run_id]["cancelRequested"]:
                 run = self._runs[run_id]
@@ -241,10 +300,15 @@ class SimulationManager:
                 )
                 for node in run["nodes"]:
                     node["status"] = "cancelled"
+                    node["otelStatusCode"] = "STATUS_CODE_ERROR"
+                    node["startedUnixMicroseconds"] = run["startedUnixMicroseconds"]
                     node["endedUnixMicroseconds"] = run["endedUnixMicroseconds"]
                     node["errorCode"] = "SIMULATION_CANCELLED"
                     node["errorMessage"] = "simulation cancelled before process start"
-                return
+                cancelled_before_start = True
+        if cancelled_before_start:
+            self._export_trace(run_id)
+            return
         command = [
             str(self._binary),
             "--module",
@@ -294,7 +358,18 @@ class SimulationManager:
                 run["durationNanoseconds"] = max(
                     0, (run["endedUnixMicroseconds"] - run["startedUnixMicroseconds"]) * 1000
                 )
+                for node in run["nodes"]:
+                    if node["status"] in {"pending", "running"}:
+                        node["status"] = "failed"
+                        node["otelStatusCode"] = "STATUS_CODE_ERROR"
+                        node["startedUnixMicroseconds"] = node["startedUnixMicroseconds"] or run[
+                            "startedUnixMicroseconds"
+                        ]
+                        node["endedUnixMicroseconds"] = run["endedUnixMicroseconds"]
+                        node["errorCode"] = "SIMULATOR_START_FAILED"
+                        node["errorMessage"] = str(exception)
                 run["events"].append(make_log("error", "仿真进程启动或读取失败", {"error": exception}))
+            self._export_trace(run_id)
         finally:
             with self._lock:
                 self._processes.pop(run_id, None)
@@ -323,6 +398,11 @@ class SimulationManager:
                     message.get("status"), message.get("status", "failed")
                 )
                 node["status"] = status
+                node["otelStatusCode"] = {
+                    "success": "STATUS_CODE_OK",
+                    "failed": "STATUS_CODE_ERROR",
+                    "cancelled": "STATUS_CODE_ERROR",
+                }.get(status, "STATUS_CODE_UNSET")
                 node["inputs"] = parse_fields(message.get("input", "")) or node["inputs"]
                 if status == "running":
                     node["startedUnixMicroseconds"] = now_microseconds()
@@ -375,6 +455,10 @@ class SimulationManager:
             for node in run["nodes"]:
                 if node["status"] in {"pending", "running"}:
                     node["status"] = "cancelled" if cancelled else "failed"
+                    node["otelStatusCode"] = "STATUS_CODE_ERROR"
+                    node["startedUnixMicroseconds"] = node["startedUnixMicroseconds"] or run[
+                        "startedUnixMicroseconds"
+                    ]
                     node["endedUnixMicroseconds"] = run["endedUnixMicroseconds"]
                     node["errorCode"] = "SIMULATION_CANCELLED" if cancelled else "SIMULATOR_EXITED"
                     node["errorMessage"] = "simulation cancelled" if cancelled else f"simulator exited with code {return_code}"
@@ -385,6 +469,153 @@ class SimulationManager:
                     {"status": run["status"], "exitCode": return_code},
                 )
             )
+        self._export_trace(run_id)
+
+    @staticmethod
+    def _otlp_value(value: Any) -> dict[str, Any]:
+        if isinstance(value, bool):
+            return {"boolValue": value}
+        if isinstance(value, int):
+            return {"intValue": str(value)}
+        if isinstance(value, float):
+            return {"doubleValue": value}
+        return {"stringValue": str(value)}
+
+    @classmethod
+    def _otlp_attributes(cls, values: dict[str, Any]) -> list[dict[str, Any]]:
+        attributes = []
+        for key, value in list(values.items())[:64]:
+            attribute_key = str(key)
+            if any(fragment in attribute_key.lower() for fragment in SENSITIVE_ATTRIBUTE_FRAGMENTS):
+                value = "[REDACTED]"
+            elif isinstance(value, str):
+                value = value[:4096]
+            attributes.append({"key": attribute_key, "value": cls._otlp_value(value)})
+        return attributes
+
+    @classmethod
+    def _otlp_span(cls, run: dict[str, Any], node: dict[str, Any]) -> dict[str, Any]:
+        status_code = {"STATUS_CODE_OK": 1, "STATUS_CODE_ERROR": 2}.get(
+            node.get("otelStatusCode"), 0
+        )
+        attributes = {
+            "business.name": node["businessName"],
+            "business.instance.id": node["businessInstanceId"],
+            "robotics.module": run["module"],
+            "robotics.mission": run["mission"],
+            "robotics.step.sequence": node["sequence"],
+            **{f"business.input.{key}": value for key, value in node.get("inputs", {}).items()},
+            **{f"business.output.{key}": value for key, value in node.get("outputs", {}).items()},
+        }
+        return {
+            "traceId": node["traceId"],
+            "spanId": node["spanId"],
+            "parentSpanId": node["parentSpanId"],
+            "name": f"{run['module']}.{node['operation']}",
+            "kind": 1,
+            "flags": 1,
+            "startTimeUnixNano": str(node["startedUnixMicroseconds"] * 1000),
+            "endTimeUnixNano": str(node["endedUnixMicroseconds"] * 1000),
+            "attributes": cls._otlp_attributes(attributes),
+            "events": [
+                {
+                    "timeUnixNano": str(log["timestampUnixMicroseconds"] * 1000),
+                    "name": log["message"],
+                    "attributes": cls._otlp_attributes(
+                        {"log.severity": log["level"], **log.get("fields", {})}
+                    ),
+                }
+                for log in node.get("logs", [])
+            ],
+            "status": {"code": status_code, "message": node.get("errorMessage", "")},
+        }
+
+    @classmethod
+    def _otlp_payload(cls, run: dict[str, Any]) -> dict[str, Any]:
+        root_status = 1 if run["status"] == "success" else 2 if run["status"] in {"failed", "cancelled"} else 0
+        root = {
+            "traceId": run["traceId"],
+            "spanId": run["rootSpanId"],
+            "name": f"robotics.{run['module']}.{run['mission']}",
+            "kind": 1,
+            "flags": 1,
+            "startTimeUnixNano": str(run["startedUnixMicroseconds"] * 1000),
+            "endTimeUnixNano": str(run["endedUnixMicroseconds"] * 1000),
+            "attributes": cls._otlp_attributes(
+                {
+                    "business.name": run["title"],
+                    "business.instance.id": run["runId"],
+                    "robotics.module": run["module"],
+                    "robotics.mission": run["mission"],
+                    "robotics.simulated": True,
+                }
+            ),
+            "events": [],
+            "status": {"code": root_status},
+        }
+        scope = run["telemetry"]["instrumentationScope"]
+        return {
+            "resourceSpans": [
+                {
+                    "resource": {
+                        "attributes": cls._otlp_attributes(run["telemetry"]["resourceAttributes"])
+                    },
+                    "scopeSpans": [
+                        {
+                            "scope": {"name": scope["name"], "version": scope["version"]},
+                            "spans": [root, *(cls._otlp_span(run, node) for node in run["nodes"])],
+                        }
+                    ],
+                }
+            ]
+        }
+
+    def _export_trace(self, run_id: str) -> None:
+        if not self._otlp_http_endpoint:
+            return
+        with self._lock:
+            run = copy.deepcopy(self._runs[run_id])
+            self._runs[run_id]["telemetry"]["export"]["status"] = "exporting"
+        payload = json.dumps(self._otlp_payload(run), separators=(",", ":")).encode("utf-8")
+        try:
+            request = Request(
+                self._otlp_http_endpoint,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urlopen(request, timeout=5) as response:
+                if not 200 <= response.status < 300:
+                    raise RuntimeError(f"OTLP collector returned HTTP {response.status}")
+            status = "exported"
+            error = ""
+        except (HTTPError, URLError, OSError, RuntimeError) as exception:
+            status = "failed"
+            error = str(exception)
+        with self._lock:
+            stored = self._runs.get(run_id)
+            if not stored:
+                return
+            export = stored["telemetry"]["export"]
+            export["status"] = status
+            export["error"] = error
+
+    def trace(self, trace_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            run = next((value for value in self._runs.values() if value["traceId"] == trace_id), None)
+            if not run:
+                return None
+            return {
+                "traceId": run["traceId"],
+                "rootSpanId": run["rootSpanId"],
+                "traceParent": run["traceParent"],
+                "status": run["status"],
+                "startedUnixMicroseconds": run["startedUnixMicroseconds"],
+                "endedUnixMicroseconds": run["endedUnixMicroseconds"],
+                "durationNanoseconds": run["durationNanoseconds"],
+                "telemetry": copy.deepcopy(run["telemetry"]),
+                "spans": copy.deepcopy(run["nodes"]),
+            }
 
     @staticmethod
     def _summary(run: dict[str, Any]) -> dict[str, Any]:
@@ -465,6 +696,13 @@ class RoboticsRequestHandler(BaseHTTPRequestHandler):
             self._json(self.server.manager.catalog())
         elif path == "/api/v1/robotics-simulation/runs":
             self._json({"runs": self.server.manager.summaries()})
+        elif path.startswith("/api/v1/robotics-simulation/traces/"):
+            trace_id = path.removeprefix("/api/v1/robotics-simulation/traces/").strip("/")
+            trace = self.server.manager.trace(trace_id)
+            if trace:
+                self._json(trace)
+            else:
+                self._error(HTTPStatus.NOT_FOUND, "OpenTelemetry trace not found")
         elif path.startswith("/api/v1/robotics-simulation/runs/"):
             run_id = path.removeprefix("/api/v1/robotics-simulation/runs/").strip("/")
             detail = self.server.manager.detail(run_id)
@@ -540,6 +778,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=9096)
     parser.add_argument("--binary", type=Path, default=default_binary)
     parser.add_argument("--static-dir", type=Path, default=default_static)
+    default_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
+    if not default_otlp_endpoint and os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+        default_otlp_endpoint = os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"].rstrip("/") + "/v1/traces"
+    parser.add_argument("--otlp-http-endpoint", default=default_otlp_endpoint)
     parser.add_argument("--open-browser", action="store_true")
     return parser.parse_args()
 
@@ -548,7 +790,7 @@ def main() -> int:
     arguments = parse_arguments()
     if not 0 <= arguments.port <= 65_535:
         raise SystemExit("--port must be in [0, 65535]")
-    manager = SimulationManager(arguments.binary)
+    manager = SimulationManager(arguments.binary, otlp_http_endpoint=arguments.otlp_http_endpoint)
     server = RoboticsWebServer((arguments.host, arguments.port), manager, arguments.static_dir)
     host, port = server.server_address[:2]
     url = f"http://{host}:{port}/"

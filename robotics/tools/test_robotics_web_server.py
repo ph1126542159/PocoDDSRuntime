@@ -7,10 +7,28 @@ import argparse
 import json
 import subprocess
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+
+
+class OtlpCaptureHandler(BaseHTTPRequestHandler):
+    payloads: list[dict] = []
+    received = threading.Event()
+
+    def do_POST(self) -> None:  # noqa: N802 - HTTP server callback
+        length = int(self.headers.get("Content-Length", "0"))
+        OtlpCaptureHandler.payloads.append(json.loads(self.rfile.read(length).decode("utf-8")))
+        OtlpCaptureHandler.received.set()
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, format_string: str, *args: object) -> None:
+        del format_string, args
 
 
 def request(url: str, method: str = "GET", value: dict | None = None) -> dict:
@@ -40,6 +58,12 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> int:
     options = parse_arguments()
+    OtlpCaptureHandler.payloads.clear()
+    OtlpCaptureHandler.received.clear()
+    collector = ThreadingHTTPServer(("127.0.0.1", 0), OtlpCaptureHandler)
+    collector_thread = threading.Thread(target=collector.serve_forever, daemon=True)
+    collector_thread.start()
+    collector_url = f"http://127.0.0.1:{collector.server_address[1]}/v1/traces"
     process = subprocess.Popen(
         [
             sys.executable,
@@ -50,6 +74,8 @@ def main() -> int:
             str(options.binary),
             "--static-dir",
             str(options.static_dir),
+            "--otlp-http-endpoint",
+            collector_url,
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -74,6 +100,7 @@ def main() -> int:
         with urlopen(f"{base_url}/", timeout=5) as response:
             page = response.read().decode("utf-8")
             assert response.status == 200 and "机器人仿真中心" in page
+            assert "OPENTELEMETRY TRACE" in page and "OpenTelemetry Span 详情" in page
 
         started = request(
             f"{base_url}/api/v1/robotics-simulation/runs",
@@ -84,6 +111,36 @@ def main() -> int:
         assert completed["status"] == "success"
         assert len(completed["nodes"]) == 5
         assert all(node["status"] == "success" for node in completed["nodes"])
+        assert len(completed["traceId"]) == 32
+        assert len(completed["rootSpanId"]) == 16
+        assert completed["traceParent"] == (
+            f"00-{completed['traceId']}-{completed['rootSpanId']}-01"
+        )
+        assert all(len(node["spanId"]) == 16 for node in completed["nodes"])
+        assert all(node["traceId"] == completed["traceId"] for node in completed["nodes"])
+        assert all(node["parentSpanId"] == completed["rootSpanId"] for node in completed["nodes"])
+        assert all(node["otelStatusCode"] == "STATUS_CODE_OK" for node in completed["nodes"])
+        trace = request(
+            f"{base_url}/api/v1/robotics-simulation/traces/{completed['traceId']}"
+        )
+        assert trace["rootSpanId"] == completed["rootSpanId"]
+        assert len(trace["spans"]) == 5
+        assert OtlpCaptureHandler.received.wait(timeout=5)
+        payload = OtlpCaptureHandler.payloads[0]
+        exported_spans = payload["resourceSpans"][0]["scopeSpans"][0]["spans"]
+        assert len(exported_spans) == 6
+        assert exported_spans[0]["traceId"] == completed["traceId"]
+        assert exported_spans[0]["flags"] == 1 and exported_spans[0]["kind"] == 1
+        assert exported_spans[1]["parentSpanId"] == completed["rootSpanId"]
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            trace = request(
+                f"{base_url}/api/v1/robotics-simulation/traces/{completed['traceId']}"
+            )
+            if trace["telemetry"]["export"]["status"] == "exported":
+                break
+            time.sleep(0.05)
+        assert trace["telemetry"]["export"]["status"] == "exported"
         navigation = next(node for node in completed["nodes"] if node["operation"] == "navigate_to_pickup")
         assert navigation["inputs"]["target_x"] == "1.000"
         assert navigation["outputs"]["replans"] == "1"
@@ -119,7 +176,8 @@ def main() -> int:
         print(
             "PDR_ROBOTICS_WEB_TEST_PASS "
             f"run={completed['runId']} nodes={len(completed['nodes'])} "
-            f"events={len(completed['events'])} cancelled={cancelled['runId']}"
+            f"events={len(completed['events'])} trace={completed['traceId']} "
+            f"otlpSpans={len(exported_spans)} cancelled={cancelled['runId']}"
         )
         return 0
     finally:
@@ -129,6 +187,9 @@ def main() -> int:
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=5)
+        collector.shutdown()
+        collector.server_close()
+        collector_thread.join(timeout=5)
 
 
 if __name__ == "__main__":

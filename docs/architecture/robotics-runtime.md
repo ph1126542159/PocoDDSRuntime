@@ -101,11 +101,38 @@ simulation, follow every node from pending through running to its terminal
 state, and inspect each node's inputs, outputs, virtual duration and associated
 fault or lifecycle logs. It also keeps a bounded in-memory run history.
 
+Every run is represented as an OpenTelemetry-compatible trace: a 32-hex-digit
+Trace ID identifies the mission root span, every business node has a
+16-hex-digit Span ID, all nodes reference the mission Root Span ID, and the
+inspector exposes the W3C `traceparent`, Span kind and OpenTelemetry status.
+The page includes a span waterfall so node timing and parent/child structure can
+be read independently from the business execution graph.
+
+No Collector is required for local inspection. To export the completed root
+and business spans as OTLP/HTTP JSON to an OpenTelemetry Collector, set the
+standard traces endpoint or pass it explicitly:
+
+```powershell
+$env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "http://127.0.0.1:4318/v1/traces"
+python robotics\tools\robotics_web_server.py --port 9096 --open-browser
+
+# Equivalent explicit form:
+python robotics\tools\robotics_web_server.py --port 9096 `
+  --otlp-http-endpoint "http://127.0.0.1:4318/v1/traces"
+```
+
+Collector export failure never changes the robot task result; the WebUI reports
+the export status and error separately. This preserves the safety rule that
+telemetry cannot control or fail the robot behavior. OTLP attributes are capped
+at 64 fields and 4096 characters per string value, and keys containing password,
+token, authorization, cookie, secret or private-key fragments are redacted.
+
 The service binds to loopback by default and sends no commands to physical
 hardware. Only one scenario runs at a time. The Web result is deterministic
 software-in-the-loop evidence; it is not Gazebo sensor-physics, HIL or physical
 robot acceptance. Run `ctest --preset robotics -C Release -R robotics-business-webui`
-to verify the page, API, complete warehouse flow, parameters, logs, watchdog and
+to verify the page, API, complete warehouse flow, OpenTelemetry identifiers and
+parentage, a captured six-span OTLP payload, parameters, logs, watchdog and
 cancellation contract.
 
 ## Build the ROS 2 adapter

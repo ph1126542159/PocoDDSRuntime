@@ -46,9 +46,23 @@
             <div><span>运行耗时</span><strong id="metric-duration">0.00 s</strong></div>
           </div>
 
+          <section class="trace-panel panel">
+            <div class="section-title compact">
+              <div><span>02 / OPENTELEMETRY TRACE</span><h2>业务链路追踪</h2></div>
+              <span id="otel-export-status" class="otel-export local-only">本地追踪</span>
+            </div>
+            <div class="trace-meta">
+              <div><span>Trace ID</span><code id="trace-id">—</code></div>
+              <div><span>Root Span</span><code id="root-span-id">—</code></div>
+              <div><span>Instrumentation Scope</span><code id="instrumentation-scope">—</code></div>
+              <div><span>Span 数量</span><strong id="trace-span-count">0</strong></div>
+            </div>
+            <div id="trace-waterfall" class="trace-waterfall empty-state">启动业务仿真后显示 OpenTelemetry Span 瀑布图</div>
+          </section>
+
           <div class="visual-grid">
             <section class="world-panel panel">
-              <div class="section-title compact"><div><span>02 / DIGITAL TWIN</span><h2>机器人状态</h2></div></div>
+              <div class="section-title compact"><div><span>03 / DIGITAL TWIN</span><h2>机器人状态</h2></div></div>
               <div class="world-view">
                 <div class="grid-floor"></div>
                 <div class="route-line"></div>
@@ -62,21 +76,26 @@
             </section>
 
             <section class="flow-panel panel">
-              <div class="section-title compact"><div><span>03 / EXECUTION GRAPH</span><h2>业务流程执行</h2></div><small>点击节点查看详细参数与日志</small></div>
+              <div class="section-title compact"><div><span>04 / EXECUTION GRAPH</span><h2>业务流程执行</h2></div><small>点击节点查看详细参数与日志</small></div>
               <div id="flow" class="flow empty-state">启动业务仿真后显示执行节点</div>
             </section>
           </div>
         </section>
 
         <aside class="inspector panel">
-          <div class="section-title compact"><div><span>04 / NODE INSPECTOR</span><h2>节点执行详情</h2></div></div>
+          <div class="section-title compact"><div><span>05 / SPAN INSPECTOR</span><h2>OpenTelemetry Span 详情</h2></div></div>
           <div id="node-empty" class="inspector-empty"><div>NODE</div><p>选择业务流程节点</p></div>
           <div id="node-detail" class="node-detail hidden">
             <div class="node-heading"><span id="node-status" class="status pending">待执行</span><h2 id="node-title">—</h2><code id="node-operation">—</code></div>
             <dl>
               <div><dt>执行服务</dt><dd id="node-service">—</dd></div>
               <div><dt>执行耗时</dt><dd id="node-duration">—</dd></div>
+              <div><dt>Trace ID</dt><dd id="node-trace">—</dd></div>
               <div><dt>Span ID</dt><dd id="node-span">—</dd></div>
+              <div><dt>Parent Span</dt><dd id="node-parent-span">—</dd></div>
+              <div><dt>Traceparent</dt><dd id="node-traceparent">—</dd></div>
+              <div><dt>Span Kind</dt><dd id="node-span-kind">—</dd></div>
+              <div><dt>OTel 状态</dt><dd id="node-otel-status">—</dd></div>
             </dl>
             <section><h3>传入参数</h3><div id="node-inputs" class="fields"></div></section>
             <section><h3>传出参数</h3><div id="node-outputs" class="fields"></div></section>
@@ -86,7 +105,7 @@
       </main>
 
       <section class="history-panel panel">
-        <div class="section-title compact"><div><span>05 / RUN HISTORY</span><h2>最近仿真任务</h2></div></div>
+        <div class="section-title compact"><div><span>06 / TRACE HISTORY</span><h2>最近 OpenTelemetry 业务链路</h2></div></div>
         <div id="run-history" class="run-history"></div>
       </section>
     </div>

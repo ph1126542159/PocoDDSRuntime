@@ -22,7 +22,9 @@ scenario that is included in CTest. `pdr-business-sim` provides replaceable
 warehouse, inspection and pick/place workflows; run
 `python robotics/tools/robotics_web_server.py --open-browser` to execute those
 real C++ workflows from a local WebUI and inspect every node's parameters,
-status, duration and logs.
+status, duration and logs. Each mission is also shown as an OpenTelemetry trace
+with standard Trace/Span IDs, parentage, a timing waterfall, W3C `traceparent`
+and optional OTLP/HTTP JSON export to a Collector.
 
 ## Directory layout
 

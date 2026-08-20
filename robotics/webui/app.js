@@ -3,6 +3,7 @@ const state = { catalog: null, runs: [], activeRun: null, selectedNode: "", modu
 
 const $ = id => document.getElementById(id);
 const statusText = { queued: "排队中", pending: "待执行", running: "执行中", success: "成功", failed: "失败", cancelled: "已取消" };
+const exportStatusText = { "local-only": "本地 Trace", pending: "等待导出", exporting: "正在导出", exported: "OTLP 已导出", failed: "OTLP 导出失败" };
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -140,7 +141,12 @@ function renderInspector(node) {
   $("node-operation").textContent = node.operation;
   $("node-service").textContent = `${node.serviceName} · PID ${node.processId || "—"}`;
   $("node-duration").textContent = node.status === "running" ? "执行中" : formatDuration(node.durationNanoseconds);
+  $("node-trace").textContent = node.traceId;
   $("node-span").textContent = node.spanId;
+  $("node-parent-span").textContent = node.parentSpanId;
+  $("node-traceparent").textContent = node.traceParent;
+  $("node-span-kind").textContent = node.spanKind || "INTERNAL";
+  $("node-otel-status").textContent = node.otelStatusCode || "STATUS_CODE_UNSET";
   renderFields($("node-inputs"), node.inputs);
   renderFields($("node-outputs"), node.outputs);
   const logs = $("node-logs");
@@ -172,6 +178,63 @@ function renderInspector(node) {
       logs.append(item);
     });
   }
+}
+
+function renderTrace(run) {
+  $("trace-id").textContent = run?.traceId || "—";
+  $("root-span-id").textContent = run?.rootSpanId || "—";
+  $("instrumentation-scope").textContent = run?.telemetry?.instrumentationScope?.name || "—";
+  $("trace-span-count").textContent = run?.nodes?.length ? String(run.nodes.length + 1) : "0";
+
+  const exportState = run?.telemetry?.export?.status || "local-only";
+  const exportBadge = $("otel-export-status");
+  exportBadge.className = `otel-export ${exportState}`;
+  exportBadge.textContent = exportStatusText[exportState] || exportState;
+  exportBadge.title = run?.telemetry?.export?.error || run?.telemetry?.export?.endpoint || "未配置 Collector，Trace 保存在本机内存";
+
+  const waterfall = $("trace-waterfall");
+  waterfall.replaceChildren();
+  waterfall.className = "trace-waterfall";
+  if (!run?.nodes?.length) {
+    waterfall.className = "trace-waterfall empty-state";
+    waterfall.textContent = "启动业务仿真后显示 OpenTelemetry Span 瀑布图";
+    return;
+  }
+
+  const traceStart = run.startedUnixMicroseconds;
+  const liveEnd = run.endedUnixMicroseconds || Date.now() * 1000;
+  const traceDuration = Math.max(1, liveEnd - traceStart);
+  run.nodes.forEach((node, index) => {
+    const row = document.createElement("button");
+    row.className = `waterfall-row ${node.status}${state.selectedNode === node.spanId ? " selected" : ""}`;
+    const identity = document.createElement("div");
+    identity.className = "waterfall-identity";
+    const name = document.createElement("strong");
+    name.textContent = `${String(index + 1).padStart(2, "0")} ${node.displayName || node.operation}`;
+    const span = document.createElement("code");
+    span.textContent = node.spanId;
+    identity.append(name, span);
+
+    const lane = document.createElement("div");
+    lane.className = "waterfall-lane";
+    const bar = document.createElement("i");
+    const start = node.startedUnixMicroseconds || traceStart;
+    const end = node.endedUnixMicroseconds || (node.status === "running" ? liveEnd : start);
+    const left = Math.max(0, Math.min(96, ((start - traceStart) / traceDuration) * 100));
+    const width = node.status === "pending" ? 0 : Math.max(2.5, Math.min(100 - left, ((end - start) / traceDuration) * 100));
+    bar.style.left = `${left}%`;
+    bar.style.width = `${width}%`;
+    lane.append(bar);
+
+    const duration = document.createElement("span");
+    duration.textContent = node.status === "running" ? "执行中" : node.status === "pending" ? "待执行" : formatDuration(node.durationNanoseconds);
+    row.append(identity, lane, duration);
+    row.addEventListener("click", () => {
+      state.selectedNode = node.spanId;
+      renderAll();
+    });
+    waterfall.append(row);
+  });
 }
 
 function renderWorld(run) {
@@ -231,7 +294,7 @@ function renderHistory() {
     const title = document.createElement("strong");
     title.textContent = run.businessName;
     const meta = document.createElement("small");
-    meta.textContent = `${run.module}/${run.mission} · ${run.completedStepCount}/${run.stepCount} 节点 · ${new Date(run.startedUnixMicroseconds / 1000).toLocaleString()}`;
+    meta.textContent = `${run.module}/${run.mission} · ${run.completedStepCount}/${run.stepCount} Span · Trace ${run.traceId.slice(0, 8)}… · ${new Date(run.startedUnixMicroseconds / 1000).toLocaleString()}`;
     copy.append(title, meta);
     button.append(status, copy);
     button.addEventListener("click", async () => {
@@ -251,6 +314,7 @@ function renderAll() {
   $("cancel-button").disabled = !active;
   document.querySelectorAll(".scenario-card").forEach(button => { button.disabled = active; });
   renderMetrics(run);
+  renderTrace(run);
   renderWorld(run);
   renderFlow(run);
   renderHistory();
@@ -263,7 +327,12 @@ async function refresh() {
     if (state.activeRun) {
       const latest = state.runs.find(run => run.runId === state.activeRun.runId);
       if (latest) state.activeRun = await request(`${apiRoot}/runs/${encodeURIComponent(latest.runId)}`);
-    } else if (state.runs.length) {
+      else {
+        state.activeRun = null;
+        state.selectedNode = "";
+      }
+    }
+    if (!state.activeRun && state.runs.length) {
       state.activeRun = await request(`${apiRoot}/runs/${encodeURIComponent(state.runs[0].runId)}`);
     }
     $("connection-text").textContent = "仿真服务在线";
