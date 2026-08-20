@@ -57,13 +57,13 @@ class RobotRuntimeNode final : public rclcpp_lifecycle::LifecycleNode
         declare_parameter("maximum_linear_speed", 1.0);
         declare_parameter("maximum_angular_speed", 1.0);
         declare_parameter("command_timeout_ms", 250);
-        declare_parameter<std::vector<std::string>>("joint_names", {});
-        declare_parameter<std::vector<double>>("joint_min_positions", {});
-        declare_parameter<std::vector<double>>("joint_max_positions", {});
-        declare_parameter<std::vector<double>>("joint_max_velocities", {});
-        declare_parameter<std::vector<double>>("joint_max_efforts", {});
-        declare_parameter<std::vector<std::string>>("business_modules", {});
-        declare_parameter<std::vector<std::string>>("business_plugins", {});
+        declare_parameter("joint_names", std::vector<std::string>{});
+        declare_parameter("joint_min_positions", std::vector<double>{});
+        declare_parameter("joint_max_positions", std::vector<double>{});
+        declare_parameter("joint_max_velocities", std::vector<double>{});
+        declare_parameter("joint_max_efforts", std::vector<double>{});
+        declare_parameter("business_modules", std::vector<std::string>{});
+        declare_parameter("business_plugins", std::vector<std::string>{});
         if (!PocoDDS::Robotics::registerReferenceBusinessModules(_businessModules))
             throw std::logic_error("reference business module registration failed");
         _orchestrator.registerBehavior(

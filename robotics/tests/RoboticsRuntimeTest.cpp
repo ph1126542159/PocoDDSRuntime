@@ -490,13 +490,13 @@ void testBehaviorSequence()
     BehaviorBlackboard blackboard;
     BehaviorSequence sequence;
     sequence.add(std::make_unique<BehaviorTask>(
-        [](BehaviorBlackboard& board) {
+        [](BehaviorBlackboard& board)
+        {
             board["localized"] = "true";
             return BehaviorStatus::succeeded;
         }));
     sequence.add(std::make_unique<BehaviorTask>(
-        [](BehaviorBlackboard& board)
-        {
+        [](BehaviorBlackboard& board) {
             return board["localized"] == "true" ? BehaviorStatus::succeeded
                                                 : BehaviorStatus::failed;
         }));
