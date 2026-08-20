@@ -82,6 +82,32 @@ compiler ABI, C++ runtime, architecture and build configuration as the host.
 See `robotics/examples/SampleBusinessPlugin.cpp` and
 `robotics/examples/README.md` for the minimal replacement pattern.
 
+## Run and inspect a business simulation in WebUI
+
+The local Web simulation centre starts the real `pdr-business-sim` executable;
+it does not reimplement a mock workflow in JavaScript. The C++ process streams
+step-start, step-finish, fault-injection, watchdog and final safety events as
+JSON Lines. A dependency-free Python control service exposes those events as a
+read-only trace model plus start/cancel operations, and serves the same-origin
+Web page:
+
+```powershell
+python robotics\tools\robotics_web_server.py --port 9096 --open-browser
+```
+
+Open `http://127.0.0.1:9096/` manually when `--open-browser` is omitted. The
+page can select warehouse, inspection or pick/place, start and stop one local
+simulation, follow every node from pending through running to its terminal
+state, and inspect each node's inputs, outputs, virtual duration and associated
+fault or lifecycle logs. It also keeps a bounded in-memory run history.
+
+The service binds to loopback by default and sends no commands to physical
+hardware. Only one scenario runs at a time. The Web result is deterministic
+software-in-the-loop evidence; it is not Gazebo sensor-physics, HIL or physical
+robot acceptance. Run `ctest --preset robotics -C Release -R robotics-business-webui`
+to verify the page, API, complete warehouse flow, parameters, logs, watchdog and
+cancellation contract.
+
 ## Build the ROS 2 adapter
 
 After installing and sourcing a supported ROS 2 distribution:

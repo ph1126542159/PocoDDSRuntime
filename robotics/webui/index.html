@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PocoDDS 机器人仿真中心</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="command-bar">
+        <div class="brand-mark">PDR</div>
+        <div class="brand-copy">
+          <strong>机器人仿真中心</strong>
+          <span>DETERMINISTIC SOFTWARE-IN-THE-LOOP</span>
+        </div>
+        <div class="connection"><i></i><span id="connection-text">正在连接仿真服务</span></div>
+        <button id="refresh-button" class="quiet-button">刷新</button>
+      </header>
+
+      <main>
+        <section class="launch-panel panel">
+          <div class="section-title">
+            <div><span>01 / MISSION</span><h1>业务场景控制</h1></div>
+            <span id="run-status" class="status pending">待命</span>
+          </div>
+          <div id="scenario-list" class="scenario-list"></div>
+          <div class="parameter-grid">
+            <label>控制周期<input id="period-ms" type="number" min="1" max="1000" value="10" /><small>ms</small></label>
+            <label>展示节拍<input id="stream-delay-ms" type="number" min="1" max="1000" value="8" /><small>ms</small></label>
+            <label>最大步数<input id="max-steps" type="number" min="1" max="1000000" value="5000" /></label>
+          </div>
+          <div class="launch-actions">
+            <button id="start-button" class="primary-button">启动完整业务仿真</button>
+            <button id="cancel-button" class="danger-button" disabled>停止任务</button>
+          </div>
+          <div class="safety-note"><i></i><p><b>软件在环安全边界</b><span>页面驱动真实 C++ 仿真器；不向物理硬件发送命令。</span></p></div>
+        </section>
+
+        <section class="workspace">
+          <div class="telemetry-strip panel">
+            <div><span>当前场景</span><strong id="metric-scene">—</strong></div>
+            <div><span>执行进度</span><strong id="metric-progress">0 / 0</strong></div>
+            <div><span>虚拟位置 X</span><strong id="metric-position">—</strong></div>
+            <div><span>安全看门狗</span><strong id="metric-watchdog">待验证</strong></div>
+            <div><span>运行耗时</span><strong id="metric-duration">0.00 s</strong></div>
+          </div>
+
+          <div class="visual-grid">
+            <section class="world-panel panel">
+              <div class="section-title compact"><div><span>02 / DIGITAL TWIN</span><h2>机器人状态</h2></div></div>
+              <div class="world-view">
+                <div class="grid-floor"></div>
+                <div class="route-line"></div>
+                <div class="station start-station"><i></i><span>起点</span></div>
+                <div class="station pickup-station"><i></i><span>取货点</span></div>
+                <div class="station target-station"><i></i><span>目标点</span></div>
+                <div id="obstacle" class="obstacle"><i></i><span>动态障碍</span></div>
+                <div id="robot" class="robot"><span class="robot-core"></span><b>AMR-01</b></div>
+              </div>
+              <div id="world-events" class="world-events"><span>等待仿真事件</span></div>
+            </section>
+
+            <section class="flow-panel panel">
+              <div class="section-title compact"><div><span>03 / EXECUTION GRAPH</span><h2>业务流程执行</h2></div><small>点击节点查看详细参数与日志</small></div>
+              <div id="flow" class="flow empty-state">启动业务仿真后显示执行节点</div>
+            </section>
+          </div>
+        </section>
+
+        <aside class="inspector panel">
+          <div class="section-title compact"><div><span>04 / NODE INSPECTOR</span><h2>节点执行详情</h2></div></div>
+          <div id="node-empty" class="inspector-empty"><div>NODE</div><p>选择业务流程节点</p></div>
+          <div id="node-detail" class="node-detail hidden">
+            <div class="node-heading"><span id="node-status" class="status pending">待执行</span><h2 id="node-title">—</h2><code id="node-operation">—</code></div>
+            <dl>
+              <div><dt>执行服务</dt><dd id="node-service">—</dd></div>
+              <div><dt>执行耗时</dt><dd id="node-duration">—</dd></div>
+              <div><dt>Span ID</dt><dd id="node-span">—</dd></div>
+            </dl>
+            <section><h3>传入参数</h3><div id="node-inputs" class="fields"></div></section>
+            <section><h3>传出参数</h3><div id="node-outputs" class="fields"></div></section>
+            <section><h3>节点日志</h3><div id="node-logs" class="logs"></div></section>
+          </div>
+        </aside>
+      </main>
+
+      <section class="history-panel panel">
+        <div class="section-title compact"><div><span>05 / RUN HISTORY</span><h2>最近仿真任务</h2></div></div>
+        <div id="run-history" class="run-history"></div>
+      </section>
+    </div>
+    <div id="toast" class="toast"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

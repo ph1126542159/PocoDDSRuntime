@@ -13,6 +13,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace std::chrono_literals;
@@ -24,8 +25,10 @@ struct Options
 {
     std::string module{"all"};
     std::chrono::milliseconds period{10};
+    std::chrono::milliseconds streamDelay{0};
     std::size_t maximumSteps{5000};
     std::vector<std::string> plugins;
+    bool jsonLines{false};
 };
 
 std::size_t positiveNumber(const char* text, const char* option)
@@ -46,8 +49,14 @@ Options parseOptions(int argc, char** argv)
         if (argument == "--help")
         {
             std::cout << "Usage: pdr-business-sim [--module NAME] [--plugin PATH] "
-                         "[--period-ms N] [--max-steps N]\n";
+                         "[--period-ms N] [--max-steps N] [--json-lines] "
+                         "[--stream-delay-ms N]\n";
             std::exit(0);
+        }
+        if (argument == "--json-lines")
+        {
+            options.jsonLines = true;
+            continue;
         }
         if (index + 1 >= argc)
             throw std::invalid_argument("missing value for " + argument);
@@ -60,10 +69,88 @@ Options parseOptions(int argc, char** argv)
                 std::chrono::milliseconds(positiveNumber(argv[++index], "--period-ms"));
         else if (argument == "--max-steps")
             options.maximumSteps = positiveNumber(argv[++index], "--max-steps");
+        else if (argument == "--stream-delay-ms")
+            options.streamDelay =
+                std::chrono::milliseconds(positiveNumber(argv[++index], "--stream-delay-ms"));
         else
             throw std::invalid_argument("unknown option: " + argument);
     }
     return options;
+}
+
+std::string jsonEscape(const std::string& value)
+{
+    std::string result;
+    result.reserve(value.size() + 8);
+    constexpr char digits[] = "0123456789abcdef";
+    for (const unsigned char character : value)
+    {
+        switch (character)
+        {
+        case '\"':
+            result += "\\\"";
+            break;
+        case '\\':
+            result += "\\\\";
+            break;
+        case '\b':
+            result += "\\b";
+            break;
+        case '\f':
+            result += "\\f";
+            break;
+        case '\n':
+            result += "\\n";
+            break;
+        case '\r':
+            result += "\\r";
+            break;
+        case '\t':
+            result += "\\t";
+            break;
+        default:
+            if (character < 0x20)
+            {
+                result += "\\u00";
+                result += digits[(character >> 4U) & 0x0fU];
+                result += digits[character & 0x0fU];
+            }
+            else
+                result += static_cast<char>(character);
+        }
+    }
+    return result;
+}
+
+void printJsonStep(const BusinessStepRecord& record)
+{
+    std::cout << "{\"type\":\"step\",\"module\":\"" << jsonEscape(record.module)
+              << "\",\"mission\":\"" << jsonEscape(record.mission) << "\",\"step\":\""
+              << jsonEscape(record.step) << "\",\"status\":\""
+              << businessStepStatusName(record.status) << "\",\"input\":\""
+              << jsonEscape(record.input) << "\",\"output\":\"" << jsonEscape(record.output)
+              << "\",\"detail\":\"" << jsonEscape(record.detail)
+              << "\",\"startTick\":" << record.startTick << ",\"finishTick\":" << record.finishTick
+              << ",\"startTimeNanoseconds\":" << record.startTimeNanoseconds
+              << ",\"durationNanoseconds\":" << record.durationNanoseconds << "}\n"
+              << std::flush;
+}
+
+void printJsonEvent(const Options& options, const std::string& module, const std::string& event,
+                    const std::string& level, const std::string& message, std::uint64_t tick)
+{
+    if (!options.jsonLines)
+        return;
+    std::cout << "{\"type\":\"event\",\"module\":\"" << jsonEscape(module) << "\",\"event\":\""
+              << jsonEscape(event) << "\",\"level\":\"" << jsonEscape(level) << "\",\"message\":\""
+              << jsonEscape(message) << "\",\"tick\":" << tick << "}\n"
+              << std::flush;
+}
+
+void delayStream(const Options& options)
+{
+    if (options.streamDelay > std::chrono::milliseconds::zero())
+        std::this_thread::sleep_for(options.streamDelay);
 }
 
 void require(bool condition, const std::string& message)
@@ -117,6 +204,8 @@ void runScenario(const std::string& module, const Options& options)
     runtime.setEmergencyStop(false);
 
     BusinessContext context(runtime, options.period, [&virtualNow] { return virtualNow; });
+    if (options.jsonLines)
+        context.setStepObserver(printJsonStep);
     context.advance();
     virtualNow += options.period;
     if (module == "inspection")
@@ -147,14 +236,24 @@ void runScenario(const std::string& module, const Options& options)
             const auto obstacleStart = module == "warehouse" ? 30U : 20U;
             const auto obstacleFinish = module == "warehouse" ? 45U : 32U;
             if (tick == obstacleStart)
+            {
                 context.setSignal(module + ".obstacle", "true");
+                printJsonEvent(options, module, "obstacle-injected", "warning",
+                               "virtual obstacle entered the safety path", tick);
+            }
             else if (tick == obstacleFinish)
+            {
                 context.setSignal(module + ".obstacle", "false");
+                printJsonEvent(options, module, "obstacle-cleared", "info",
+                               "virtual obstacle left the safety path", tick);
+            }
         }
 
         if (module == "warehouse" && !dropoutInjected && tick >= 70)
         {
             dropoutInjected = true;
+            printJsonEvent(options, module, "command-source-dropout", "warning",
+                           "command source paused to validate the motion watchdog", tick);
             RobotFrame settled;
             const auto dropoutCycles =
                 static_cast<std::size_t>(250ms / options.period) + static_cast<std::size_t>(8);
@@ -162,6 +261,7 @@ void runScenario(const std::string& module, const Options& options)
             {
                 const auto frame = context.advance();
                 virtualNow += options.period;
+                delayStream(options);
                 if (cycle + 3 == dropoutCycles)
                     settled = frame;
                 if (cycle + 1 == dropoutCycles)
@@ -170,6 +270,11 @@ void runScenario(const std::string& module, const Options& options)
                                                      settled.state.pose.position.x) < 1e-12;
                 }
             }
+            printJsonEvent(options, module, "watchdog-stop",
+                           watchdogStoppedMotion ? "info" : "error",
+                           watchdogStoppedMotion ? "watchdog held the robot position"
+                                                 : "watchdog failed to hold the robot position",
+                           context.tick());
         }
 
         const auto snapshot = orchestrator.tick(execution);
@@ -177,6 +282,7 @@ void runScenario(const std::string& module, const Options& options)
             throw std::runtime_error(module + ": mission disappeared");
         context.advance();
         virtualNow += options.period;
+        delayStream(options);
         if (snapshot->status == BehaviorExecutionStatus::succeeded)
             break;
         require(snapshot->status != BehaviorExecutionStatus::failed,
@@ -232,11 +338,25 @@ void runScenario(const std::string& module, const Options& options)
             module + ": emergency stop did not hold position");
     runtime.shutdown();
 
-    printRecords(records);
-    std::cout << std::fixed << std::setprecision(6) << "PDR_BUSINESS_SIM_PASS module=" << module
-              << " mission=" << mission << " ticks=" << context.tick()
-              << " x=" << finalFrame.state.pose.position.x << " records=" << records.size()
-              << " watchdog_stop=" << (watchdogStoppedMotion ? "true" : "false") << '\n';
+    if (options.jsonLines)
+    {
+        std::cout << std::fixed << std::setprecision(6)
+                  << "{\"type\":\"summary\",\"status\":\"success\",\"module\":\""
+                  << jsonEscape(module) << "\",\"mission\":\"" << jsonEscape(mission)
+                  << "\",\"ticks\":" << context.tick()
+                  << ",\"x\":" << finalFrame.state.pose.position.x
+                  << ",\"records\":" << records.size()
+                  << ",\"watchdogStop\":" << (watchdogStoppedMotion ? "true" : "false") << "}\n"
+                  << std::flush;
+    }
+    else
+    {
+        printRecords(records);
+        std::cout << std::fixed << std::setprecision(6) << "PDR_BUSINESS_SIM_PASS module=" << module
+                  << " mission=" << mission << " ticks=" << context.tick()
+                  << " x=" << finalFrame.state.pose.position.x << " records=" << records.size()
+                  << " watchdog_stop=" << (watchdogStoppedMotion ? "true" : "false") << '\n';
+    }
 }
 } // namespace
 
@@ -251,7 +371,12 @@ int main(int argc, char** argv)
                 : std::vector<std::string>{options.module};
         for (const auto& module : modules)
             runScenario(module, options);
-        std::cout << "PDR_BUSINESS_SIM_ALL_PASS modules=" << modules.size() << '\n';
+        if (options.jsonLines)
+            std::cout << "{\"type\":\"all-complete\",\"status\":\"success\",\"modules\":"
+                      << modules.size() << "}\n"
+                      << std::flush;
+        else
+            std::cout << "PDR_BUSINESS_SIM_ALL_PASS modules=" << modules.size() << '\n';
         return 0;
     }
     catch (const std::exception& exception)

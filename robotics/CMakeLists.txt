@@ -37,6 +37,10 @@ install(TARGETS PDRRoboticsRuntime EXPORT PDRRoboticsRuntimeTargets
 install(TARGETS pdr-robot-sim RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(TARGETS pdr-business-sim RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(PROGRAMS tools/robotics_web_server.py
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PDRRoboticsRuntime/tools")
+install(DIRECTORY webui/
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PDRRoboticsRuntime/webui")
 install(EXPORT PDRRoboticsRuntimeTargets
     FILE PDRRoboticsRuntimeTargets.cmake
     NAMESPACE PocoDDS::
@@ -87,4 +91,18 @@ if(BUILD_TESTING)
         LABELS "robotics;business;plugin;simulation;safety;sil"
         PASS_REGULAR_EXPRESSION "PDR_BUSINESS_SIM_PASS module=custom_cleaning"
         TIMEOUT 30)
+
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME robotics-business-webui
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/test_robotics_web_server.py"
+                --server "${CMAKE_CURRENT_SOURCE_DIR}/tools/robotics_web_server.py"
+                --binary "$<TARGET_FILE:pdr-business-sim>"
+                --static-dir "${CMAKE_CURRENT_SOURCE_DIR}/webui")
+        set_tests_properties(robotics-business-webui PROPERTIES
+            LABELS "robotics;business;simulation;webui;sil"
+            PASS_REGULAR_EXPRESSION "PDR_ROBOTICS_WEB_TEST_PASS"
+            TIMEOUT 60)
+    endif()
 endif()

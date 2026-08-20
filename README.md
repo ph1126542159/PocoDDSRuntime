@@ -18,7 +18,11 @@ simulation/hardware ports and fail-closed safety logic with Qt, WebUI, Poco/OSP
 and direct Fast-DDS integrations disabled. See
 [docs/architecture/robotics-runtime.md](docs/architecture/robotics-runtime.md).
 The preset also builds `pdr-robot-sim`, a no-Qt deterministic local robot SIL
-scenario that is included in CTest.
+scenario that is included in CTest. `pdr-business-sim` provides replaceable
+warehouse, inspection and pick/place workflows; run
+`python robotics/tools/robotics_web_server.py --open-browser` to execute those
+real C++ workflows from a local WebUI and inspect every node's parameters,
+status, duration and logs.
 
 ## Directory layout
 

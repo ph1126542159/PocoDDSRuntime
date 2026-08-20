@@ -14,6 +14,22 @@ std::int64_t timestampNanoseconds(std::chrono::steady_clock::time_point value)
     return std::chrono::duration_cast<std::chrono::nanoseconds>(value.time_since_epoch()).count();
 }
 
+void invokeStepObserver(const BusinessContext::StepObserver& observer,
+                        const BusinessStepRecord& record) noexcept
+{
+    if (!observer)
+        return;
+    try
+    {
+        observer(record);
+    }
+    catch (...)
+    {
+        // Telemetry consumers must never change robot behavior or terminal state.
+        static_cast<void>(record);
+    }
+}
+
 class TracedBusinessStep final : public Behavior
 {
   public:
@@ -35,6 +51,17 @@ class TracedBusinessStep final : public Behavior
             _started = true;
             _startTick = _context.tick();
             _startTime = _context.now();
+            _context.notifyStepStarted({_module,
+                                        _mission,
+                                        _step,
+                                        BusinessStepStatus::running,
+                                        _input,
+                                        {},
+                                        "started",
+                                        _startTick,
+                                        _startTick,
+                                        timestampNanoseconds(_startTime),
+                                        0});
         }
         const auto status = _child->tick(blackboard);
         if (status != BehaviorStatus::running && !_recorded)
@@ -109,6 +136,8 @@ const char* businessStepStatusName(BusinessStepStatus status) noexcept
 {
     switch (status)
     {
+    case BusinessStepStatus::running:
+        return "running";
     case BusinessStepStatus::succeeded:
         return "succeeded";
     case BusinessStepStatus::failed:
@@ -189,8 +218,31 @@ std::string BusinessContext::signalOr(const std::string& name, const std::string
 
 void BusinessContext::recordStep(BusinessStepRecord record)
 {
+    StepObserver observer;
+    BusinessStepRecord event;
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        _records.push_back(std::move(record));
+        event = _records.back();
+        observer = _stepObserver;
+    }
+    invokeStepObserver(observer, event);
+}
+
+void BusinessContext::setStepObserver(StepObserver observer)
+{
     std::lock_guard<std::mutex> lock(_mutex);
-    _records.push_back(std::move(record));
+    _stepObserver = std::move(observer);
+}
+
+void BusinessContext::notifyStepStarted(const BusinessStepRecord& record)
+{
+    StepObserver observer;
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        observer = _stepObserver;
+    }
+    invokeStepObserver(observer, record);
 }
 
 std::vector<BusinessStepRecord> BusinessContext::records() const

@@ -20,6 +20,10 @@
 using namespace std::chrono_literals;
 using namespace PocoDDS::Robotics;
 
+static_assert(static_cast<int>(BusinessStepStatus::succeeded) == 0);
+static_assert(static_cast<int>(BusinessStepStatus::failed) == 1);
+static_assert(static_cast<int>(BusinessStepStatus::canceled) == 2);
+
 namespace
 {
 class StateAwareLifecycle final : public LifecycleComponent
@@ -619,6 +623,9 @@ void testReplaceableBusinessModule()
     expect(runtime.activate(), "business runtime activate failed");
     runtime.setEmergencyStop(false);
     BusinessContext context(runtime, 10ms, [&now] { return now; });
+    std::vector<BusinessStepRecord> observedSteps;
+    context.setStepObserver([&observedSteps](const BusinessStepRecord& record)
+                            { observedSteps.push_back(record); });
     BusinessModuleRegistry registry;
     expect(registry.registerModule(std::make_shared<CustomTestBusinessModule>()),
            "custom business module registration failed");
@@ -639,8 +646,14 @@ void testReplaceableBusinessModule()
     expect(records.size() == 1 && records.front().step == "custom_logic" &&
                records.front().output == "result=done",
            "custom business trace is incomplete");
+    expect(observedSteps.size() == 2 &&
+               observedSteps.front().status == BusinessStepStatus::running &&
+               observedSteps.back().status == BusinessStepStatus::succeeded,
+           "business step observer did not publish running and terminal events");
     expect(orchestrator.unregisterBehavior(behavior), "custom business behavior unregister failed");
     expect(!orchestrator.hasBehavior(behavior), "custom business behavior remained registered");
+    context.setStepObserver([](const BusinessStepRecord&)
+                            { throw std::runtime_error("injected observer failure"); });
 
     expect(orchestrator.registerBehavior(
                "custom/cancel",
@@ -656,7 +669,7 @@ void testReplaceableBusinessModule()
            "cancel trace behavior did not start");
     const auto running = orchestrator.tick("cancel-execution");
     expect(running && running->status == BehaviorExecutionStatus::running,
-           "cancel trace behavior did not run");
+           "cancel trace behavior or isolated observer did not run");
     expect(orchestrator.cancel("cancel-execution"), "cancel trace behavior did not cancel");
     const auto canceledRecords = context.records();
     expect(canceledRecords.size() == 2 &&

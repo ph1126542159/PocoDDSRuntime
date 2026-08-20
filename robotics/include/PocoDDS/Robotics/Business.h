@@ -20,7 +20,8 @@ enum class BusinessStepStatus
 {
     succeeded,
     failed,
-    canceled
+    canceled,
+    running
 };
 
 const char* businessStepStatusName(BusinessStepStatus status) noexcept;
@@ -44,6 +45,7 @@ class BusinessContext
 {
   public:
     using Clock = std::function<std::chrono::steady_clock::time_point()>;
+    using StepObserver = std::function<void(const BusinessStepRecord&)>;
 
     BusinessContext(
         RobotRuntime& runtime, std::chrono::nanoseconds controlPeriod,
@@ -61,6 +63,8 @@ class BusinessContext
     std::optional<std::string> signal(const std::string& name) const;
     std::string signalOr(const std::string& name, const std::string& fallback) const;
 
+    void setStepObserver(StepObserver observer);
+    void notifyStepStarted(const BusinessStepRecord& record);
     void recordStep(BusinessStepRecord record);
     std::vector<BusinessStepRecord> records() const;
 
@@ -74,6 +78,7 @@ class BusinessContext
     RobotFrame _frame;
     std::unordered_map<std::string, std::string> _signals;
     std::vector<BusinessStepRecord> _records;
+    StepObserver _stepObserver;
 };
 
 class RobotBusinessModule
