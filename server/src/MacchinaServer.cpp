@@ -252,19 +252,6 @@ class MacchinaServer final : public Poco::Util::ServerApplication
                                      std::string(exception.what()));
                 }
             });
-        _traceRuntime->preparePublisher("pdr.process.heartbeat.request");
-        _traceRuntime->subscribe(
-            "pdr.process.heartbeat.response", [this](const PocoDDS::FastDDS::Envelope& envelope) {
-                {
-                    std::lock_guard<std::mutex> lock(_heartbeatMutex);
-                    _heartbeatResponses.insert(envelope.correlationId);
-                }
-                _heartbeatCondition.notify_all();
-            });
-        PocoDDS::Observability::BusinessTracerOptions heartbeatOptions;
-        heartbeatOptions.bundleName = "pdr.runtime";
-        _heartbeatTracer = std::make_unique<PocoDDS::Observability::BusinessTracer>(
-            "pdr-runtime-heartbeat", std::move(heartbeatOptions));
 #endif
         ServerApplication::initialize(self);
         if (_showHelp)
@@ -361,8 +348,30 @@ class MacchinaServer final : public Poco::Util::ServerApplication
             "Configured subprocesses started by the runtime", "{process}");
 #endif
 #if defined(PDR_ENABLE_OBSERVABILITY)
-        _heartbeatStopping = false;
-        _heartbeatThread = std::thread([this] { heartbeatLoop(); });
+        if (startedSubprocesses > 0)
+        {
+            _traceRuntime->preparePublisher("pdr.process.heartbeat.request");
+            _traceRuntime->subscribe(
+                "pdr.process.heartbeat.response",
+                [this](const PocoDDS::FastDDS::Envelope& envelope) {
+                    {
+                        std::lock_guard<std::mutex> lock(_heartbeatMutex);
+                        _heartbeatResponses.insert(envelope.correlationId);
+                    }
+                    _heartbeatCondition.notify_all();
+                });
+            PocoDDS::Observability::BusinessTracerOptions heartbeatOptions;
+            heartbeatOptions.bundleName = "pdr.runtime";
+            _heartbeatTracer = std::make_unique<PocoDDS::Observability::BusinessTracer>(
+                "pdr-runtime-heartbeat", std::move(heartbeatOptions));
+            _heartbeatStopping = false;
+            _heartbeatThread = std::thread([this] { heartbeatLoop(); });
+        }
+        else
+        {
+            logger().information(
+                "Internal subprocess transport heartbeat disabled: no subprocess is running.");
+        }
 #endif
 
         waitForTerminationRequest();

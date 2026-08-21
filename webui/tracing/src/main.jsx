@@ -16,6 +16,7 @@ async function request(path, { robotics = false, method = "GET", body } = {}) {
 }
 
 const statusText = { pending: "等待中", queued: "排队中", running: "执行中", active: "执行中", success: "成功", succeeded: "成功", failed: "失败", cancelled: "已取消", canceled: "已取消" };
+const internalTransportBusinesses = new Set(["主子进程Fast-DDS心跳"]);
 const normalizedStatus = value => ({ queued: "running", active: "running", succeeded: "success", canceled: "cancelled" }[value] || value || "pending");
 const duration = node => normalizedStatus(node.status) === "running" ? "执行中" : `${(Number(node.durationNanoseconds || 0) / 1e6).toFixed(3)} ms`;
 const dateText = value => Number(value) > 0 ? new Date(Number(value) / 1000).toLocaleString("zh-CN", { hour12: false }) : "尚未开始";
@@ -93,7 +94,9 @@ function App() {
   const simulationBusy = roboticsTraces.some(trace => ["queued", "running"].includes(trace.status));
   const loadList = useCallback(async () => {
     const [runtimeResult, roboticsResult, catalogResult] = await Promise.allSettled([request("/api/v1/business-traces"), request("/api/v1/robotics-simulation/runs", { robotics: true }), request("/api/v1/robotics-simulation/catalog", { robotics: true })]);
-    const runtime = runtimeResult.status === "fulfilled" ? (runtimeResult.value.traces || []).map(item => ({ ...item, source: "runtime" })) : [];
+    const runtime = runtimeResult.status === "fulfilled" ? (runtimeResult.value.traces || [])
+      .filter(item => !internalTransportBusinesses.has(item.businessName))
+      .map(item => ({ ...item, source: "runtime" })) : [];
     const robotics = roboticsResult.status === "fulfilled" ? (roboticsResult.value.runs || []).map(item => ({ ...item, source: "robotics" })) : [];
     setRuntimeTraces(runtime); setRoboticsTraces(robotics); setRoboticsAvailable(roboticsResult.status === "fulfilled" && catalogResult.status === "fulfilled");
     if (catalogResult.status === "fulfilled") setCatalog(catalogResult.value);

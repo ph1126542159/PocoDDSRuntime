@@ -474,6 +474,7 @@ if(BUILD_TESTING)
                         --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
                         --timeout 20
                         --stability-window 2
+                        --probe-delay 4
                         --clear-code-cache
                         --path "${PDR_INSTALL_PREFIX}/bin"
                         --path "$<TARGET_FILE_DIR:pdr-runtime>"
@@ -483,6 +484,7 @@ if(BUILD_TESTING)
                         --endpoint "/api/v1/alerts"
                         --endpoint "/api/v1/alert-sinks"
                         --endpoint "/api/v1/business-traces"
+                        --endpoint "/api/v1/heartbeat-businesses"
                         --endpoint "/api/v1/metrics"
                         --endpoint "/health/detail"
                         --endpoint "/webevent"
@@ -541,6 +543,8 @@ if(BUILD_TESTING)
                         --require-body "\"schemaVersion\":2"
                         --require-body "PDR-HEALTH-PROTOCOL-REQUIRED_CLOSED"
                         --require-body "\"affected\":\\[\"runtime-udp\"\\]"
+                        --forbid-body "\"businessName\":\"主子进程Fast-DDS心跳\""
+                        --require-log "Internal subprocess transport heartbeat disabled: no subprocess is running"
                         --report "${CMAKE_BINARY_DIR}/reports/runtime-web-protocol-diagnostics.json")
                 set_tests_properties(runtime-web-protocol-diagnostics PROPERTIES
                     LABELS "runtime;protocol;release;webui"

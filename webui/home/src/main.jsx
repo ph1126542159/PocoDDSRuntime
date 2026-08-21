@@ -595,7 +595,9 @@ function BusinessExecutionList({ process }) {
       try {
         const data = await request("/api/v1/heartbeat-businesses");
         if (active) {
-          setExecutions((data.records || []).slice(0, 1000));
+          setExecutions((data.records || [])
+            .filter(item => item.businessName !== "主子进程Fast-DDS心跳")
+            .slice(0, 1000));
           setAvailable(true);
         }
       } catch {

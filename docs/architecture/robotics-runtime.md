@@ -88,8 +88,18 @@ The local Web simulation centre starts the real `pdr-business-sim` executable;
 it does not reimplement a mock workflow in JavaScript. The C++ process streams
 step-start, step-finish, fault-injection, watchdog and final safety events as
 JSON Lines. A dependency-free Python control service exposes those events as a
-read-only trace model plus start/cancel operations. Start it beside the legacy
-runtime:
+read-only trace model plus start/cancel operations.
+
+The host on port 9080 is still the legacy Poco/OSP management runtime and still
+contains direct Fast DDS integrations. The `robotics` preset itself does not
+build that runtime or Fast DDS; ROS 2 owns inter-process communication on the
+robotics path. The integrated tracing page therefore hides legacy internal
+transport-heartbeat traces and presents operator business traces plus robot SIL
+runs. Replacing the 9080 host itself requires a separate transport-neutral or
+ROS 2 management-plane migration and must not be inferred from this local WebUI
+composition.
+
+To use the current local integrated page, start it beside the legacy runtime:
 
 ```powershell
 python robotics\tools\robotics_web_server.py --port 9096
