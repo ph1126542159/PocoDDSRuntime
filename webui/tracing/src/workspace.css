@@ -1,0 +1,241 @@
+.graph > header {
+  gap: 12px;
+}
+
+.graph-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.graph-actions button {
+  height: 36px;
+  border: 1px solid #9bb7e8;
+  border-radius: 8px;
+  background: #f4f8ff;
+  color: #255fbf;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 650 13px inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.graph-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.history-page {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: #eef2f7;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  padding: 18px;
+  gap: 14px;
+}
+
+.history-page > header {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.history-page > header > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-page > header h2 {
+  font-size: 22px;
+}
+
+.history-page > header p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.history-page > header button,
+.history-page form > button,
+.history-page > footer button {
+  border: 1px solid #cbd6e5;
+  background: #fff;
+  border-radius: 8px;
+  color: #34445d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  font: 650 14px inherit;
+}
+
+.history-page > header button {
+  height: 42px;
+  padding: 0 14px;
+}
+
+.history-page form {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 180px auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.history-page form label {
+  display: grid;
+  gap: 6px;
+  color: #59677a;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.history-page form input,
+.history-page form select {
+  height: 40px;
+  border: 1px solid #c9d3e1;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: #24334a;
+  font: 14px inherit;
+}
+
+.history-page form > button {
+  height: 40px;
+  padding: 0 18px;
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.history-page form > button:disabled {
+  opacity: 0.5;
+}
+
+.history-error {
+  padding: 11px 14px;
+  border: 1px solid #f4bcc6;
+  border-radius: 9px;
+  background: #fff0f3;
+  color: #a92d41;
+}
+
+.history-error.empty-slot {
+  visibility: hidden;
+  height: 0;
+  padding: 0;
+  border: 0;
+}
+
+.history-table {
+  min-height: 0;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.history-columns,
+.history-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) 130px 130px minmax(210px, 1fr) 150px;
+  gap: 14px;
+  align-items: center;
+  padding: 13px 18px;
+}
+
+.history-columns {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f7f9fc;
+  border-bottom: 1px solid var(--border);
+  color: #6c798c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.history-row {
+  min-height: 72px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.history-row b,
+.history-row small {
+  display: block;
+}
+
+.history-row b {
+  font-size: 15px;
+}
+
+.history-row small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-row strong {
+  font-size: 14px;
+  color: #35445a;
+}
+
+.history-page > footer {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.history-page > footer div {
+  display: flex;
+  gap: 8px;
+}
+
+.history-page > footer button {
+  height: 34px;
+  padding: 0 13px;
+}
+
+.history-page > footer button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1100px) {
+  .top nav {
+    flex-wrap: wrap;
+  }
+
+  .history-page form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .history-columns,
+  .history-row {
+    min-width: 950px;
+  }
+}

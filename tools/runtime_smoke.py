@@ -172,6 +172,99 @@ def probe(url: str, timeout: float, method: str = "GET", body: str | None = None
         return error.code, error.read().decode("utf-8", errors="replace")
 
 
+def validate_runtime_scope_contract(response_bodies: list[tuple[str, str]]) -> dict[str, object]:
+    latest: dict[str, object] = {}
+    for endpoint, body in response_bodies:
+        if endpoint in {
+            "/api/v1/topology", "/api/v1/process-detail",
+            "/api/v1/system-metrics?limit=1", "/api/v1/devices", "/api/v1/protocols",
+        }:
+            latest[endpoint] = json.loads(body)
+
+    required = {
+        "/api/v1/topology", "/api/v1/process-detail",
+        "/api/v1/system-metrics?limit=1", "/api/v1/devices", "/api/v1/protocols",
+    }
+    missing = sorted(required - latest.keys())
+    if missing:
+        raise RuntimeError(f"scope contract endpoints were not probed: {missing}")
+
+    topology = latest["/api/v1/topology"]
+    detail = latest["/api/v1/process-detail"]
+    metrics = latest["/api/v1/system-metrics?limit=1"]
+    devices = latest["/api/v1/devices"]
+    protocols = latest["/api/v1/protocols"]
+    if not all(isinstance(value, dict) for value in latest.values()):
+        raise RuntimeError("scope contract endpoints must return JSON objects")
+
+    assert isinstance(topology, dict)
+    assert isinstance(detail, dict)
+    assert isinstance(metrics, dict)
+    assert isinstance(devices, dict)
+    assert isinstance(protocols, dict)
+    checks = [
+        (topology.get("schemaVersion") == 2, "topology schemaVersion must be 2"),
+        (topology.get("scope", {}).get("kind") == "runtime", "topology must be Runtime scoped"),
+        (topology.get("hostResources", {}).get("scope") == "host", "hostResources must be Host scoped"),
+        (topology.get("resourcesDeprecated") is True, "legacy topology resources must be deprecated"),
+        (topology.get("resourcesScope") == "host", "legacy topology resources must declare Host scope"),
+        (topology.get("modules") == [], "runtime modules entity must remain empty"),
+        (topology.get("modulesDeprecated") is True, "runtime modules entity must be deprecated"),
+        (detail.get("schemaVersion") == 2, "process detail schemaVersion must be 2"),
+        (detail.get("scope", {}).get("kind") == "process", "process detail must be Process scoped"),
+        (detail.get("resources", {}).get("scope") == "process", "process resources must be Process scoped"),
+        (detail.get("configurationScope") == "process", "process configuration must declare Process scope"),
+        (detail.get("serviceInventoryAuthority") in {"local-registry", "child-status", "unavailable"},
+         "service inventory authority is invalid"),
+        (metrics.get("schemaVersion") == 2 and metrics.get("resourceScope") == "host",
+         "system metrics must be Host scoped"),
+        (devices.get("schemaVersion") == 2 and devices.get("scope", {}).get("kind") == "runtime",
+         "device inventory must be Runtime scoped"),
+        (protocols.get("schemaVersion") == 2 and protocols.get("scope", {}).get("kind") == "runtime",
+         "protocol inventory must be Runtime scoped"),
+    ]
+    for passed, message in checks:
+        if not passed:
+            raise RuntimeError(message)
+
+    process_id = str(detail.get("process", {}).get("id", ""))
+    if not process_id:
+        raise RuntimeError("process detail is missing process.id")
+    for bundle in detail.get("bundles", []):
+        if (bundle.get("kind") != "bundle" or str(bundle.get("processId", "")) != process_id or
+                bundle.get("owner", {}).get("kind") != "process" or
+                bundle.get("lifecycleOwner", {}).get("kind") != "process"):
+            raise RuntimeError(f"Bundle ownership contract failed: {bundle.get('id', '<unknown>')}")
+    for service in detail.get("services", []):
+        if (service.get("kind") != "service" or str(service.get("processId", "")) != process_id or
+                service.get("registrationState") != "registered"):
+            raise RuntimeError(f"Service process contract failed: {service.get('id', '<unknown>')}")
+        if service.get("ownerKnown"):
+            if (not service.get("bundleId") or service.get("owner", {}).get("kind") != "bundle" or
+                    service.get("lifecycleOwner", {}).get("kind") != "bundle"):
+                raise RuntimeError(f"Service Bundle ownership failed: {service.get('id', '<unknown>')}")
+
+    for inventory_name, inventory, item_name in (
+        ("device", devices, "devices"), ("protocol", protocols, "protocols")
+    ):
+        for item in inventory.get(item_name, []):
+            if (item.get("kind") != inventory_name or
+                    item.get("scope", {}).get("kind") != inventory_name or
+                    item.get("owner", {}).get("kind") != "service" or
+                    item.get("lifecycleOwner", {}).get("kind") != "bundle"):
+                raise RuntimeError(
+                    f"{inventory_name} ownership contract failed: {item.get('id', '<unknown>')}"
+                )
+
+    return {
+        "processId": process_id,
+        "bundleCount": len(detail.get("bundles", [])),
+        "serviceCount": len(detail.get("services", [])),
+        "deviceCount": len(devices.get("devices", [])),
+        "protocolCount": len(protocols.get("protocols", [])),
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--executable", required=True, type=Path)
@@ -212,6 +305,8 @@ def parse_args() -> argparse.Namespace:
                         help="remove WORKING_DIRECTORY/codeCache before launch")
     parser.add_argument("--follow-html-assets", action="store_true",
                         help="fetch same-origin script and stylesheet assets referenced by HTML")
+    parser.add_argument("--validate-runtime-scope-contract", action="store_true",
+                        help="assert Host, Runtime, Process, Bundle and Service ownership boundaries")
     parser.add_argument("--post", action="append", default=[], metavar="ENDPOINT=JSON",
                         help="POST JSON after startup probes; may be repeated in sequence")
     parser.add_argument("--post-delay", type=float, default=0.0,
@@ -610,6 +705,8 @@ def main() -> int:
                 )
                 response_bodies.append((endpoint, body))
             result["followedHtmlAssets"] = len(references)
+        if args.validate_runtime_scope_contract:
+            result["runtimeScopeContract"] = validate_runtime_scope_contract(response_bodies)
         response_content = "\n".join(body for _, body in response_bodies)
         missing_bodies = [
             pattern for pattern in args.require_body

@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import {
   Activity, AppWindow, ArrowLeft, Box, Boxes, ChevronDown, ChevronRight, Clock3,
-  Cpu, Download, FileText, HardDrive, Layers3, MemoryStick, Menu, Network, Play, RefreshCw, RotateCw, Search, Server,
+  Cpu, FileText, HardDrive, Layers3, MemoryStick, Menu, Network, Play, RefreshCw, RotateCw, Search, Server,
   SlidersHorizontal, Square, Terminal, X, Zap, ShieldCheck, Undo2,
   AlertTriangle, CheckCircle2, Database, GitBranch
 } from "lucide-react";
@@ -11,19 +10,23 @@ import "./styles.css";
 import "./embedded.css";
 import "./flow-layout.css";
 import "./bright-theme.css";
+import "./business-summary.css";
+import "./typography.css";
 
 const pageMeta = {
   overview: ["运行态势", "实时掌握运行时状态与资源"],
   processes: ["进程管理", "当前运行时挂载的进程"],
-  devices: ["设备", "当前运行时已装载的设备适配器"],
+  devices: ["设备与协议", "当前 Runtime 的设备、协议实例及提供方归属"],
   plugins: ["插件治理", "外部插件兼容性、依赖与生命周期"],
   metrics: ["指标中心", "按运行域查看 OpenTelemetry Counter 与 Histogram"],
+  governance: ["Runtime 治理", "身份、权限、配置事务、审计与管理任务"],
   tracing: ["业务追踪", "机器人仿真与 OpenTelemetry 业务流程"]
 };
 
 const navItems = [
   ["overview", Activity], ["processes", AppWindow], ["devices", Cpu],
-  ["plugins", Boxes], ["metrics", Activity], ["tracing", GitBranch, "/tracing/"]
+  ["plugins", Boxes], ["metrics", Activity], ["governance", ShieldCheck],
+  ["tracing", GitBranch, "/tracing/"]
 ];
 
 async function request(path, options = {}) {
@@ -52,7 +55,7 @@ async function request(path, options = {}) {
 
 function Status({ state }) {
   const normalized = String(state).toLowerCase();
-  const running = ["active", "running", "started", "ready"].includes(normalized);
+  const running = ["active", "running", "started", "ready", "registered"].includes(normalized);
   const failed = ["fault", "failed", "error", "down"].includes(normalized);
   return <span className={`status ${running ? "ok" : failed ? "bad" : "idle"}`}><i />{state}</span>;
 }
@@ -252,14 +255,15 @@ function RuntimeTopologyOverview({ health, topology, processDetail, childProcess
   const mainRunning = ["active", "running", "ready"].includes(String(mainProcess?.state || "").toLowerCase());
   const childRunning = Boolean(qt3d?.online) || ["active", "running", "ready"].includes(String(qt3d?.state || "").toLowerCase());
   const workers = childRunning ? (childProcessDetail?.children || qt3d?.workers || qt3d?.renderWorkers || []) : [];
-  const resources = processDetail?.resources || topology.resources || topology.system || {};
+  const hostResources = topology.hostResources || {};
+  const processResources = processDetail?.resources || {};
   const unresolvedAlerts = (alertInventory?.alerts || []).filter(item => item.status !== "resolved").length;
   const healthy = health?.status === "UP" && health?.live && health?.ready;
-  const cpu = numeric(resources.cpuPercent ?? resources.cpu);
-  const memory = numeric(resources.memoryPercent ?? resources.memory);
-  const memoryUsed = numeric(resources.memoryUsedMb) / 1024;
-  const memoryTotal = numeric(resources.memoryTotalMb) / 1024;
-  const threadCount = numeric(resources.threadCount);
+  const cpu = numeric(hostResources.cpuPercent ?? hostResources.cpu);
+  const memory = numeric(hostResources.memoryPercent ?? hostResources.memory);
+  const memoryUsed = numeric(hostResources.memoryUsedMb) / 1024;
+  const memoryTotal = numeric(hostResources.memoryTotalMb) / 1024;
+  const disk = numeric(hostResources.diskPercent ?? hostResources.disk);
   const bundles = topology.bundles?.length || processDetail?.bundles?.length || 0;
   const rangeSamples = { "15m": 15, "1h": 60, "6h": 60, "24h": 60 }[range];
   const visibleHistory = history.slice(-rangeSamples);
@@ -282,8 +286,8 @@ function RuntimeTopologyOverview({ health, topology, processDetail, childProcess
 
   return <section className="precision-overview" aria-label="Runtime 运行态势">
     <div className="precision-health-strip">
-      <article className={healthy ? "healthy" : "attention"}><span><ShieldCheck /></span><div><b>{healthy ? "全部服务正常" : "系统需要关注"}</b><small>{healthy ? "系统运行稳定" : "请检查异常组件"}</small></div></article>
-      <article><span><Server /></span><div><small>运行环境</small><b>生产环境</b><em>{health?.ready ? "环境健康" : "等待就绪"}</em></div></article>
+      <article className={healthy ? "healthy" : "attention"}><span><ShieldCheck /></span><div><b>{healthy ? "当前 Runtime 就绪" : "当前 Runtime 需要关注"}</b><small>{healthy ? "本实例聚合健康正常" : "请检查本实例异常对象"}</small></div></article>
+      <article><span><Server /></span><div><small>当前主机</small><b>{topology.host || "本地主机"}</b><em>{health?.ready ? "Runtime 就绪" : "等待就绪"}</em></div></article>
       <article><span><Clock3 /></span><div><small>运行时长</small><b>{mainRunning ? "持续运行" : "未运行"}</b><em>主进程 PID {mainProcess?.pid || mainProcess?.id || "—"}</em></div></article>
       <article><span><Boxes /></span><div><small>Bundles</small><b>{bundles}/{bundles || "—"}</b><em>已就绪 / 总数</em></div></article>
       <article><span><AppWindow /></span><div><small>进程总数</small><b>{processCount}</b><em>主进程 1 · 子进程 {Math.max(0, processCount - 1)}</em></div></article>
@@ -294,7 +298,7 @@ function RuntimeTopologyOverview({ health, topology, processDetail, childProcess
         <header><div><h2>运行拓扑</h2><p>Runtime 与 Qt3D 进程链路</p></div><span><i />{workers.length} 个工作进程在线</span></header>
         <div className="precision-process-head"><span>进程 / 节点</span><span>PID</span><span>状态</span><span>CPU</span><span>内存</span><span>线程</span></div>
         <div className="precision-process-tree">
-          {row(mainProcess, "Runtime 主进程", 0, Box, mainRunning, resources)}
+          {row(mainProcess, "Runtime 主进程", 0, Box, mainRunning, processResources)}
           {row(qt3d, "Qt3D 子进程", 1, Layers3, childRunning, qt3dResources)}
           <div className="precision-worker-label"><span />{workers.length || 0} 个渲染工作进程</div>
           {workers.map((worker, index) => {
@@ -313,8 +317,8 @@ function RuntimeTopologyOverview({ health, topology, processDetail, childProcess
 
       <aside className="precision-attention">
         <header><h2>需要关注</h2><span>{unresolvedAlerts ? `${unresolvedAlerts} 项未处理` : "当前正常"}</span></header>
-        <article className="attention-summary"><span><CheckCircle2 /></span><div><b>{unresolvedAlerts ? "存在待处理事件" : "暂无阻断问题"}</b><p>{unresolvedAlerts ? "建议查看告警详情并确认影响范围" : "当前系统运行正常，继续保持"}</p></div></article>
-        {memory >= 80 && <article className="attention-item warning"><AlertTriangle /><div><b>内存使用率偏高</b><p>当前使用率 {percent(memory)}，建议持续关注</p><small>刚刚</small></div></article>}
+        <article className="attention-summary"><span><CheckCircle2 /></span><div><b>{unresolvedAlerts ? "存在待处理事件" : "暂无阻断问题"}</b><p>{unresolvedAlerts ? "建议查看告警详情并确认影响范围" : "当前 Runtime 运行正常"}</p></div></article>
+        {memory >= 80 && <article className="attention-item warning"><AlertTriangle /><div><b>主机内存使用率偏高</b><p>当前使用率 {percent(memory)}，不是 Runtime 进程 RSS</p><small>Host 作用域</small></div></article>}
         <article className="attention-item info"><Boxes /><div><b>Bundles 已就绪</b><p>{bundles} 个 Bundles 已成功加载</p><small>状态同步完成</small></div></article>
         <article className={`attention-item ${childRunning ? "success" : "warning"}`}>{childRunning ? <CheckCircle2 /> : <AlertTriangle />}<div>
           <b>{childRunning ? "Qt3D 链路正常" : "Qt3D 子进程未运行"}</b><p>{childRunning ? `${workers.length} 个渲染工作进程在线` : "打开进程工作台查看启动日志"}</p><small>{stateText(qt3d?.state)}</small></div></article>
@@ -323,13 +327,13 @@ function RuntimeTopologyOverview({ health, topology, processDetail, childProcess
     </div>
 
     <section className="precision-resources">
-      <header><div><h2>资源趋势</h2><p>最近 {range === "15m" ? "15 分钟" : range === "1h" ? "60 分钟" : range === "6h" ? "6 小时" : "24 小时"}</p></div>
+      <header><div><h2>主机资源趋势</h2><p>Host 作用域 · 最近 {range === "15m" ? "15 分钟" : range === "1h" ? "60 分钟" : range === "6h" ? "6 小时" : "24 小时"}</p></div>
         <div className="precision-range">{[["15m", "15 分钟"], ["1h", "1 小时"], ["6h", "6 小时"], ["24h", "24 小时"]].map(([id, label]) =>
           <button key={id} className={range === id ? "active" : ""} onClick={() => setRange(id)}>{label}</button>)}</div></header>
       <div className="precision-chart-grid">
         <article><div><b><i className="blue" />CPU</b><span>当前 <strong>{percent(cpu)}</strong></span></div><Sparkline values={visibleHistory.map(item => item.cpu)} color="#246fe5" /></article>
         <article><div><b><i className="green" />内存</b><span>当前 <strong>{memoryUsed ? `${memoryUsed.toFixed(1)} GB` : percent(memory)}</strong>{memoryTotal ? ` / ${memoryTotal.toFixed(1)} GB` : ""}</span></div><Sparkline values={visibleHistory.map(item => item.memory)} color="#12a36d" /></article>
-        <article><div><b><i className="violet" />线程</b><span>当前 <strong>{threadCount || "—"}</strong></span></div><Sparkline values={visibleHistory.map(item => item.threads)} color="#7756db" /></article>
+        <article><div><b><i className="violet" />磁盘</b><span>当前 <strong>{percent(disk)}</strong></span></div><Sparkline values={visibleHistory.map(item => item.disk)} color="#7756db" /></article>
       </div>
     </section>
   </section>;
@@ -375,8 +379,8 @@ function ProtocolSummary({ data, inventory, onLifecycle }) {
       predicate(point.attributes || {}))
     .reduce((total, point) => total + numeric(point.value), 0);
   return <section className="surface">
-    <div className="section-head"><div><h2>现场协议运行诊断</h2>
-      <p>来自 /api/v1/metrics 的操作、错误与字节统计</p></div>
+    <div className="section-head"><div><h2>协议实例</h2>
+      <p>Runtime 作用域；操作由 Service 执行，生命周期归提供方 Bundle</p></div>
       <span className="inventory-count">MQTT · ROS · UDP</span></div>
     <div className="metrics business-metrics-grid">{protocols.map(protocol => {
       const operations = sum("pdr.protocol.operations", protocol.id);
@@ -390,11 +394,12 @@ function ProtocolSummary({ data, inventory, onLifecycle }) {
         tone={protocol.tone} />;
     })}</div>
     {!!instances.length && <div className="table-scroll"><table className="metrics-table"><thead><tr>
-      <th>实例</th><th>类型</th><th>状态</th><th>发送/接收</th><th>超时</th><th>最近错误</th><th>操作</th></tr></thead>
+      <th>实例</th><th>类型</th><th>状态</th><th>归属</th><th>发送/接收</th><th>超时</th><th>最近错误</th><th>实例操作</th></tr></thead>
       <tbody>{instances.map(item => <tr key={item.id}>
         <td><b>{item.id}</b><small>{item.name || item.service}{item.autoReconnect ? " · 自动恢复" : ""}</small></td>
         <td>{item.type}</td><td><Status state={item.open ? "ready" :
           item.desiredOpen && item.autoReconnect ? "recovering" : "down"} /></td>
+        <td><div className="owner-stack"><small>Service: {item.serviceId || item.service}</small><small>Bundle: {item.bundleId || item.bundle}</small></div></td>
         <td>{numeric(item.diagnostics?.sentMessages)} / {numeric(item.diagnostics?.receivedMessages)}</td>
         <td>{numeric(item.diagnostics?.timeouts)}</td>
         <td><FailureDetail failure={item.diagnostics?.failure}
@@ -405,70 +410,192 @@ function ProtocolSummary({ data, inventory, onLifecycle }) {
   </section>;
 }
 
-const metricDomains = [
-  { id: "runtime", label: "Runtime", prefixes: ["pdr.runtime.", "process."] },
-  { id: "dds", label: "DDS", prefixes: ["pdr.dds."] },
-  { id: "device", label: "设备", prefixes: ["pdr.device."] },
-  { id: "workflow", label: "工作流", prefixes: ["pdr.workflow."] },
-  { id: "health", label: "健康诊断", prefixes: ["pdr.health.", "pdr.diagnostics."] },
-  { id: "protocol", label: "协议汇总", prefixes: ["pdr.protocol."] },
-  { id: "mqtt", label: "MQTT", prefixes: ["pdr.protocol."], protocol: "mqtt" },
-  { id: "rosbridge", label: "ROS Bridge", prefixes: ["pdr.protocol."], protocol: "rosbridge" },
-  { id: "udp", label: "UDP", prefixes: ["pdr.protocol."], protocol: "udp" },
-  { id: "btle", label: "Bluetooth LE", prefixes: ["pdr.btle.", "pdr.protocol."], protocol: "btle" },
-  { id: "webtunnel", label: "WebTunnel", prefixes: ["pdr.webtunnel.", "pdr.protocol."], protocol: "webtunnel" },
-  { id: "http", label: "HTTP", prefixes: ["http.server."] },
-  { id: "system", label: "系统", prefixes: ["system."] },
-  { id: "export", label: "导出与缓存", prefixes: ["pdr.metrics."] }
+const metricViews = [
+  { id: "overview", label: "运行概览", description: "先确认整体是否正常" },
+  { id: "robot", label: "机器人与设备", description: "设备、工作流和诊断" },
+  { id: "system", label: "系统资源", description: "CPU、内存、磁盘和进程" },
+  { id: "service", label: "接口服务", description: "接口请求、耗时和协议" },
+  { id: "all", label: "全部指标", description: "工程排障时使用" }
 ];
+
+const metricNames = {
+  "pdr.runtime.starts": ["运行时启动次数", "Runtime 本次及历史启动累计"],
+  "pdr.runtime.subprocesses": ["子进程数量", "Runtime 已启动的业务子进程"],
+  "process.thread.count": ["运行线程数", "当前 Runtime 进程线程数量"],
+  "pdr.device.online": ["设备在线状态", "1 表示在线，0 表示离线"],
+  "pdr.device.starts": ["设备启动次数", "设备适配器启动累计"],
+  "pdr.device.commands": ["设备命令数", "发送到设备的命令累计"],
+  "system.cpu.utilization": ["CPU 使用率", "主机 CPU 当前负载"],
+  "system.memory.utilization": ["内存使用率", "主机内存当前占用比例"],
+  "system.memory.usage": ["已用内存", "主机当前已使用内存"],
+  "system.filesystem.utilization": ["磁盘使用率", "Runtime 所在磁盘占用比例"],
+  "system.network.io": ["网络吞吐", "主机网络接收或发送速率"],
+  "http.server.request.duration": ["接口响应耗时", "Web API 请求处理时间"],
+  "http.server.request.count": ["接口请求数", "Web API 请求累计"],
+  "http.server.response.count": ["接口响应数", "Web API 响应累计"],
+  "pdr.management.tasks.queue.utilization": ["任务队列使用率", "管理任务队列容量占用"],
+  "pdr.metrics.cardinality.dropped": ["被丢弃的指标序列", "超过标签基数上限后被保护性丢弃的数量"]
+};
+
+function metricAverage(point) {
+  return point?.kind === "histogram" && numeric(point.count)
+    ? numeric(point.sum) / numeric(point.count, 1) : numeric(point?.value);
+}
+
+function utilizationValue(point) {
+  const value = numeric(point?.value);
+  return point?.unit === "%" || value > 1 ? value : value * 100;
+}
+
+function metricDisplay(point, useAverage = false) {
+  if (!point) return "暂无数据";
+  const value = useAverage ? metricAverage(point) : numeric(point.value);
+  if (point.name.endsWith(".utilization")) return `${utilizationValue({ ...point, value }).toFixed(1)}%`;
+  if (point.unit === "%") return `${value.toFixed(1)}%`;
+  if (point.unit === "ms") return `${value.toFixed(value < 10 ? 2 : 1)} ms`;
+  if (point.unit === "MiBy") return value >= 1024 ? `${(value / 1024).toFixed(1)} GiB` : `${value.toFixed(0)} MiB`;
+  if (point.unit === "KiBy/s") return `${value.toFixed(value < 100 ? 1 : 0)} KiB/s`;
+  if (point.kind === "counter") return value.toLocaleString();
+  return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2);
+}
+
+function metricText(point) {
+  if (metricNames[point.name]) return metricNames[point.name];
+  const protocol = point.attributes?.protocol;
+  if (point.name.startsWith("pdr.protocol.")) {
+    return [`${protocol ? String(protocol).toUpperCase() + " " : ""}协议指标`, point.description || "接口协议运行数据"];
+  }
+  if (point.name.startsWith("pdr.workflow.")) return ["工作流指标", point.description || "机器人业务工作流运行数据"];
+  if (point.name.startsWith("pdr.health.") || point.name.startsWith("pdr.diagnostics.")) {
+    return ["健康诊断指标", point.description || "运行健康与故障诊断数据"];
+  }
+  return [point.description || point.name, "工程指标，展开标签可查看具体对象"];
+}
+
+function metricState(point) {
+  if (point.name === "pdr.device.online") {
+    return numeric(point.value) >= 1
+      ? { tone: "ok", label: "在线", detail: "设备通信正常" }
+      : { tone: "bad", label: "离线", detail: "检查设备或适配器" };
+  }
+  if (point.name.endsWith(".utilization")) {
+    const value = utilizationValue(point);
+    if (value >= 90) return { tone: "bad", label: "过高", detail: "已超过 90%" };
+    if (value >= 75) return { tone: "warn", label: "注意", detail: "已超过 75%" };
+    return { tone: "ok", label: "正常", detail: "低于 75%" };
+  }
+  if (point.name === "http.server.request.duration") {
+    const average = metricAverage(point);
+    if (average >= 500) return { tone: "bad", label: "缓慢", detail: "平均超过 500 ms" };
+    if (average >= 100) return { tone: "warn", label: "注意", detail: "平均超过 100 ms" };
+    return { tone: "ok", label: "正常", detail: "平均低于 100 ms" };
+  }
+  if (point.name === "pdr.metrics.cardinality.dropped" && numeric(point.value) > 0) {
+    return { tone: "warn", label: "有丢弃", detail: "检查标签数量" };
+  }
+  return { tone: "neutral", label: "已采集", detail: point.kind === "counter" ? "累计值" : "最新采样" };
+}
 
 function MetricValue({ point }) {
   if (point.kind === "histogram") {
-    const average = numeric(point.count) ? numeric(point.sum) / numeric(point.count, 1) : 0;
-    return <div className="metric-value-stack"><b>{numeric(point.value).toFixed(2)}</b>
-      <small>最新 · 平均 {average.toFixed(2)} · {numeric(point.count)} 样本</small></div>;
+    return <div className="metric-value-stack"><b>{metricDisplay(point)}</b>
+      <small>平均 {metricDisplay(point, true)} · {numeric(point.count)} 次采样</small></div>;
   }
-  return <b>{numeric(point.value).toLocaleString()}</b>;
+  return <b>{metricDisplay(point)}</b>;
 }
 
 function MetricsCenter({ data }) {
-  const [domain, setDomain] = useState("runtime");
+  const [view, setView] = useState("overview");
   const [filter, setFilter] = useState("");
-  const selected = metricDomains.find(item => item.id === domain) || metricDomains[0];
-  const all = data?.metrics || [];
-  const points = all.filter(point => selected.prefixes.some(prefix => point.name.startsWith(prefix)))
-    .filter(point => !selected.protocol || point.attributes?.protocol === selected.protocol ||
-      point.name.startsWith(`pdr.${selected.protocol}.`))
-    .filter(point => !filter || point.name.toLowerCase().includes(filter.toLowerCase()) ||
-      JSON.stringify(point.attributes || {}).toLowerCase().includes(filter.toLowerCase()));
-  const counters = points.filter(point => point.kind === "counter");
-  const histograms = points.filter(point => point.kind === "histogram");
+  const selected = metricViews.find(item => item.id === view) || metricViews[0];
+  const all = (data?.metrics || []).filter(point => !point.name.startsWith("pdr.dds."));
+  const belongsToView = point => {
+    if (view === "overview") return [
+      "system.cpu.utilization", "system.memory.utilization", "system.filesystem.utilization",
+      "process.thread.count", "pdr.runtime.starts", "pdr.runtime.subprocesses",
+      "pdr.device.online", "http.server.request.duration"
+    ].includes(point.name);
+    if (view === "robot") return ["pdr.device.", "pdr.workflow.", "pdr.health.", "pdr.diagnostics.", "pdr.robot."].some(prefix => point.name.startsWith(prefix));
+    if (view === "system") return ["system.", "process.", "pdr.runtime.", "pdr.management."].some(prefix => point.name.startsWith(prefix));
+    if (view === "service") return ["http.server.", "pdr.protocol.", "pdr.mqtt.", "pdr.rosbridge.", "pdr.udp.", "pdr.btle.", "pdr.webtunnel."].some(prefix => point.name.startsWith(prefix));
+    return true;
+  };
+  const query = filter.trim().toLowerCase();
+  const rawPoints = all.filter(belongsToView);
+  const viewPoints = view === "overview" ? rawPoints.filter((point, index, collection) => {
+    if (point.name === "pdr.device.online") return true;
+    const sameName = collection.filter(candidate => candidate.name === point.name);
+    if (point.name === "http.server.request.duration") {
+      return point === sameName.reduce((slowest, candidate) =>
+        metricAverage(candidate) > metricAverage(slowest) ? candidate : slowest, sameName[0]);
+    }
+    return index === collection.findIndex(candidate => candidate.name === point.name);
+  }) : rawPoints;
+  const points = viewPoints.filter(point => {
+    const [title, help] = metricText(point);
+    return !query || `${title} ${help} ${point.name} ${JSON.stringify(point.attributes || {})}`.toLowerCase().includes(query);
+  });
+  const cpu = all.find(point => point.name === "system.cpu.utilization");
+  const memory = all.find(point => point.name === "system.memory.utilization");
+  const disk = all.find(point => point.name === "system.filesystem.utilization");
+  const devices = all.filter(point => point.name === "pdr.device.online");
+  const onlineDevices = devices.filter(point => numeric(point.value) >= 1).length;
+  const durations = all.filter(point => point.name === "http.server.request.duration" && numeric(point.count));
+  const durationCount = durations.reduce((sum, point) => sum + numeric(point.count), 0);
+  const durationAverage = durationCount ? durations.reduce((sum, point) => sum + numeric(point.sum), 0) / durationCount : 0;
+  const resourceAttention = [cpu, memory, disk].some(point => point && utilizationValue(point) >= 75);
+  const needsAttention = resourceAttention || devices.some(point => numeric(point.value) < 1) || durationAverage >= 100;
+  const summaryCards = [
+    { icon: needsAttention ? AlertTriangle : CheckCircle2, label: "系统状态", value: needsAttention ? "需要关注" : "运行正常", caption: "综合资源、设备与接口", tone: needsAttention ? "warn" : "ok" },
+    { icon: Cpu, label: "CPU", value: metricDisplay(cpu), caption: cpu ? "超过 75% 提醒" : "等待系统采样", tone: cpu && utilizationValue(cpu) >= 75 ? "warn" : "blue" },
+    { icon: MemoryStick, label: "内存", value: metricDisplay(memory), caption: memory ? "超过 75% 提醒" : "等待系统采样", tone: memory && utilizationValue(memory) >= 75 ? "warn" : "violet" },
+    { icon: Server, label: "接口平均耗时", value: durationCount ? `${durationAverage.toFixed(durationAverage < 10 ? 2 : 1)} ms` : "暂无数据", caption: durationCount ? `${durationCount.toLocaleString()} 次请求采样` : "等待接口调用", tone: durationAverage >= 100 ? "warn" : "orange" },
+    { icon: Network, label: "设备在线", value: devices.length ? `${onlineDevices} / ${devices.length}` : "暂无设备", caption: devices.length ? "在线 / 已发现" : "等待设备上报", tone: devices.some(point => numeric(point.value) < 1) ? "warn" : "green" }
+  ];
+
   return <section className="metrics-center">
-    <div className="metrics-domain-tabs" role="tablist">{metricDomains.map(item =>
-      <button key={item.id} role="tab" aria-selected={domain === item.id}
-        className={domain === item.id ? "active" : ""} onClick={() => setDomain(item.id)}>{item.label}</button>)}</div>
+    <div className="metrics-intro">
+      <div><span>怎么用</span><h2>先看状态，有异常再下钻</h2>
+        <p>这里用于回答“系统现在是否正常、哪里需要处理”。黄色或红色表示需要关注；原始指标只在工程排障时查看。</p></div>
+      <ol><li><b>1</b>看顶部状态</li><li><b>2</b>进入异常分类</li><li><b>3</b>按名称或设备搜索</li></ol>
+    </div>
+    <div className="metrics-status-grid">{summaryCards.map(card => {
+      const Icon = card.icon;
+      return <article key={card.label} className={`metrics-status-card ${card.tone}`}>
+        <span><Icon size={21} /></span><div><small>{card.label}</small><strong>{card.value}</strong><em>{card.caption}</em></div>
+      </article>;
+    })}</div>
+    <div className="metrics-domain-tabs" role="tablist" aria-label="指标分类">{metricViews.map(item =>
+      <button key={item.id} role="tab" aria-selected={view === item.id}
+        className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}>
+        <b>{item.label}</b><small>{item.description}</small></button>)}</div>
     <div className="surface metrics-page">
-      <div className="section-head"><div><h2>{selected.label} 指标</h2>
-        <p>{data?.serviceName || "pdr-runtime"} · {data?.serviceInstanceId || "本机实例"}</p></div>
-        <div className="metrics-page-tools"><span className="inventory-count">{points.length} 条序列</span>
-          <label className="search"><Search size={16} /><input value={filter} placeholder="筛选指标或标签"
+      <div className="section-head"><div><h2>{selected.label}</h2>
+        <p>{selected.description} · {data?.serviceName || "pdr-runtime"} · {data?.serviceInstanceId || "本机实例"}</p></div>
+        <div className="metrics-page-tools"><span className="inventory-count">{points.length} 条</span>
+          <label className="search"><Search size={16} /><input value={filter} placeholder="搜索指标、设备或接口"
             onChange={event => setFilter(event.target.value)} /></label></div></div>
-      <div className="metrics metrics-domain-summary">
-        <Metric icon={Activity} label="Counter 序列" value={counters.length} caption="累计事件" tone="blue" />
-        <Metric icon={Clock3} label="Histogram 序列" value={histograms.length} caption="采样与耗时分布" tone="orange" />
-        <Metric icon={Database} label="样本总数" value={histograms.reduce((sum, point) => sum + numeric(point.count), 0)}
-          caption="直方图累计采样" tone="violet" />
-      </div>
-      <div className="table-scroll"><table className="metrics-table"><thead><tr>
-        <th>指标</th><th>类型</th><th>当前值</th><th>单位</th><th>标签</th></tr></thead>
-        <tbody>{points.map((point, index) => <tr key={`${point.name}-${index}`}>
-          <td><b>{point.name}</b><small>{point.description || "—"}</small></td>
-          <td><span className={`metric-kind ${point.kind}`}>{point.kind}</span></td>
-          <td><MetricValue point={point} /></td><td>{point.unit || "1"}</td>
-          <td><div className="metric-labels">{Object.entries(point.attributes || {}).map(([key, value]) =>
-            <span key={key}><i>{key}</i>={String(value)}</span>)}{!Object.keys(point.attributes || {}).length && "—"}</div></td>
-        </tr>)}</tbody></table>{!points.length && <div className="empty"><Activity size={26} />
-          <p>当前分类尚无指标样本</p></div>}</div>
+      <details className="metrics-help"><summary>这些数据怎么读？</summary>
+        <div><p><b>当前值</b>用于快速判断现在的状态；有平均值时，可避免单次波动造成误判。</p>
+          <p><b>累计次数（Counter）</b>只会增加，适合启动、请求和错误计数。</p>
+          <p><b>采样数据（Histogram）</b>记录最新值、平均值和采样次数，适合资源占用与响应耗时。</p></div>
+      </details>
+      <div className="table-scroll"><table className="metrics-table operator-metrics-table"><thead><tr>
+        <th>指标含义</th><th>当前值</th><th>状态</th><th>判断依据</th><th>对象 / 标签</th></tr></thead>
+        <tbody>{points.map((point, index) => {
+          const [title, help] = metricText(point);
+          const state = metricState(point);
+          return <tr key={`${point.name}-${index}`}>
+            <td><b>{title}</b><small>{help}</small><code>{point.name}</code></td>
+            <td><MetricValue point={point} /></td>
+            <td><span className={`metric-state ${state.tone}`}><i />{state.label}</span></td>
+            <td><span className="metric-rule">{state.detail}</span></td>
+            <td><details className="metric-label-details"><summary>{Object.keys(point.attributes || {}).length ? "查看标签" : "无标签"}</summary>
+              <div className="metric-labels">{Object.entries(point.attributes || {}).map(([key, value]) =>
+                <span key={key}><i>{key}</i>={String(value)}</span>)}</div></details></td>
+          </tr>;
+        })}</tbody></table>{!points.length && <div className="empty"><Activity size={26} />
+          <p>当前分类尚无数据，可换一个分类或清除搜索条件</p></div>}</div>
     </div>
   </section>;
 }
@@ -497,96 +624,10 @@ function RuntimeInventory({ processes, bundles, reportedMainProcess }) {
   </div>;
 }
 
-function ProcessSwimlanes({ nodes, selectedNode, onSelect }) {
-  const layout = useMemo(() => {
-    const ordered = [...nodes].sort((a, b) =>
-      Number(a.startedUnixMicroseconds || 0) - Number(b.startedUnixMicroseconds || 0));
-    const laneKeys = [];
-    const laneByKey = new Map();
-    ordered.forEach(node => {
-      // A process can publish spans through multiple tracer service names.
-      // Swimlanes represent actual processes, so PID is the stable lane key.
-      const key = String(node.processId || node.serviceName || "unknown");
-      if (!laneByKey.has(key)) {
-        laneByKey.set(key, laneKeys.length);
-        laneKeys.push({ key, pid: node.processId, service: node.serviceName || "未知进程" });
-      }
-    });
-    const laneWidth = 350, rowHeight = 182, headerHeight = 92;
-    const nodeWidth = 286, nodeHeight = 142;
-    const positioned = ordered.map((node, index) => ({
-      ...node, index, lane: laneByKey.get(String(node.processId || node.serviceName || "unknown")),
-      x: laneByKey.get(String(node.processId || node.serviceName || "unknown")) * laneWidth + 32,
-      y: headerHeight + index * rowHeight + 22
-    }));
-    const bySpan = new Map(positioned.map(node => [node.spanId, node]));
-    return {
-      lanes: laneKeys, nodes: positioned,
-      edges: positioned.map(node => ({ from: bySpan.get(node.parentSpanId), to: node })).filter(edge => edge.from),
-      laneWidth, nodeWidth, nodeHeight,
-      width: Math.max(1050, laneKeys.length * laneWidth + 60),
-      // Include the full final card plus a generous bottom reveal area so the
-      // native horizontal scrollbar never covers the last business step.
-      height: Math.max(460, headerHeight + positioned.length * rowHeight + 220)
-    };
-  }, [nodes]);
-  const laneTitle = lane => {
-    if (lane.service === "pdr-runtime") return "主进程";
-    if (lane.service.includes("window-scene")) return "场景窗口";
-    if (lane.service.includes("window-material")) return "材质窗口";
-    if (lane.service.includes("window-device")) return "设备窗口";
-    return lane.service.includes("qt3d") ? "Qt3D 编排进程" : lane.service;
-  };
-  return <div className="multi-flow-scroll"><div className="multi-flow"
-    style={{ width: layout.width, height: layout.height }}>
-    <div className="multi-flow-head">{layout.lanes.map((lane, index) =>
-      <div key={lane.key} style={{ left: index * layout.laneWidth + 22, width: layout.laneWidth - 44 }}>
-        <AppWindow size={21} /><span><b>{laneTitle(lane)}</b>
-          <small>{lane.service} · PID {lane.pid || "—"}</small></span>
-      </div>)}</div>
-    {layout.lanes.map((lane, index) => <i className="multi-lifeline" key={lane.key}
-      style={{ left: index * layout.laneWidth + layout.laneWidth / 2 }} />)}
-    <svg className="multi-flow-edges" width={layout.width} height={layout.height}>
-      {layout.edges.map(({ from, to }) => {
-        const x1 = from.x + layout.nodeWidth / 2, y1 = from.y + layout.nodeHeight;
-        const x2 = to.x + layout.nodeWidth / 2, y2 = to.y;
-        const middle = (y1 + y2) / 2;
-        return <path key={`${from.spanId}-${to.spanId}`}
-          d={`M ${x1} ${y1} C ${x1} ${middle}, ${x2} ${middle}, ${x2} ${y2}`}
-          className={to.status === "failed" ? "failed" : ""} />;
-      })}
-    </svg>
-    {layout.nodes.map(node => <button key={node.spanId}
-      className={`multi-flow-node ${node.status} ${selectedNode?.spanId === node.spanId ? "active" : ""}`}
-      style={{ left: node.x, top: node.y, width: layout.nodeWidth }}
-      onClick={() => onSelect(node)} title={node.operation}>
-      <small>步骤 {String(node.index + 1).padStart(2, "0")}</small>
-      <b>{node.operation}</b>
-      <span>{(Number(node.durationNanoseconds || 0) / 1e6).toFixed(3)} ms</span>
-      <em>{node.serviceName}</em>
-    </button>)}
-  </div></div>;
-}
-
 function BusinessExecutionList({ process }) {
   const [executions, setExecutions] = useState([]);
   const [available, setAvailable] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [detail, setDetail] = useState(null);
-  const [selectedNode, setSelectedNode] = useState(null);
-  const inspectorRef = useRef(null);
-
-  useEffect(() => {
-    if (!detail && !historyOpen) return undefined;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previous; };
-  }, [detail, historyOpen]);
-
-  useEffect(() => {
-    if (inspectorRef.current) inspectorRef.current.scrollTop = 0;
-  }, [selectedNode?.spanId]);
 
   useEffect(() => {
     if (!process) return undefined;
@@ -595,9 +636,7 @@ function BusinessExecutionList({ process }) {
       try {
         const data = await request("/api/v1/heartbeat-businesses");
         if (active) {
-          setExecutions((data.records || [])
-            .filter(item => item.businessName !== "主子进程Fast-DDS心跳")
-            .slice(0, 1000));
+          setExecutions((data.records || []).slice(0, 20));
           setAvailable(true);
         }
       } catch {
@@ -628,247 +667,42 @@ function BusinessExecutionList({ process }) {
     if (Number.isFinite(nanoseconds)) return `${(nanoseconds / 1e6).toFixed(3)} ms`;
     return ["running", "active"].includes(String(item.status).toLowerCase()) ? "执行中" : "—";
   };
-  const openDetail = async item => {
-    const data = await request(`/api/v1/heartbeat-businesses?traceId=${encodeURIComponent(item.traceId)}`);
-    setDetail({ item, nodes: data.nodes || [] });
-    setSelectedNode(data.nodes?.[0] || null);
-  };
   const linkText = status => status === "success" ? "链路走通" :
     status === "running" ? "执行中" : "链路失败";
-  const exportDiagnosis = () => {
-    if (!detail) return;
-    const byId = new Map(detail.nodes.map(node => [node.spanId, node]));
-    const failed = detail.nodes.filter(node => node.status === "failed");
-    const failedParents = new Set(failed.map(node => node.parentSpanId).filter(Boolean));
-    const rootFailures = failed.filter(node => !failedParents.has(node.spanId));
-    const primary = rootFailures[0] || failed[0] || null;
-    const chain = [];
-    for (let current = primary; current; current = byId.get(current.parentSpanId)) {
-      chain.unshift({
-        operation: current.operation, serviceName: current.serviceName,
-        processId: current.processId, status: current.status,
-        errorCode: current.errorCode || "", errorMessage: current.errorMessage || ""
-      });
-    }
-    const errorCode = primary?.errorCode || detail.item.failedOperation || "UNKNOWN_FAILURE";
-    const recommendations = [];
-    if (/WINDOW_BRANCH|window/i.test(`${errorCode} ${primary?.operation || ""}`)) {
-      recommendations.push("检查失败窗口进程是否仍在运行，以及窗口命令的 correlationId 是否收到对应响应。");
-      recommendations.push("核对失败窗口的输入参数、局部资源初始化和渲染线程日志。");
-      recommendations.push("确认 Qt3D 编排进程已执行补偿，并检查其他窗口结果是否可继续使用。");
-    } else if (failed.length) {
-      recommendations.push("从 primaryFailure 开始，沿 causalChain 向上核对输入输出与父子 Span。");
-      recommendations.push("结合失败节点 logs、errorCode 和 processId 查询对应进程日志。");
-    } else {
-      recommendations.push("当前 Trace 未发现 failed 节点，建议检查超时、丢失响应或业务状态汇总逻辑。");
-    }
-    const report = {
-      schemaVersion: "pdr-business-diagnosis/1.0",
-      exportedAt: new Date().toISOString(),
-      summary: {
-        businessName: detail.item.businessName,
-        businessInstanceId: detail.item.businessInstanceId,
-        traceId: detail.item.traceId,
-        status: detail.item.status,
-        nodeCount: detail.nodes.length,
-        failedNodeCount: failed.length
-      },
-      analysis: {
-        conclusion: primary
-          ? `首要失败点为“${primary.operation}”，错误码 ${errorCode}：${primary.errorMessage || "未提供更详细错误信息"}`
-          : "未找到明确失败节点。",
-        primaryFailure: primary,
-        causalChain: chain,
-        allFailures: failed,
-        recommendations
-      },
-      processes: [...new Map(detail.nodes.map(node => [
-        `${node.processId}:${node.serviceName}`,
-        { processId: node.processId, serviceName: node.serviceName, hostName: node.hostName }
-      ])).values()],
-      nodes: detail.nodes
-    };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `business-diagnosis-${detail.item.traceId || Date.now()}.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  };
+  const openTracing = item => window.location.assign(
+    `/tracing/?traceId=${encodeURIComponent(item.traceId)}`);
 
   return <section className="surface business-execution-card">
-    <div className="section-head"><div><h2>业务流程执行列表</h2><p>当前进程的业务实例与执行进度</p></div>
+    <div className="section-head"><div><h2>内部链路摘要</h2>
+      <p>只显示主子进程心跳与跨进程协同状态；完整流程、参数、日志和历史记录统一在业务追踪查看</p></div>
       <div className="section-head-actions">
-        <button className="business-history-query" onClick={() => setHistoryOpen(true)}
-          title="进入业务历史查询页面"><Search size={20} />查询</button>
         <span className="inventory-count">{executions.length} 条</span>
         <button className={`section-collapse ${collapsed ? "collapsed" : ""}`}
           onClick={() => setCollapsed(value => !value)} aria-expanded={!collapsed}
-          title={collapsed ? "展开业务流程执行列表" : "折叠业务流程执行列表"}>
+          title={collapsed ? "展开内部链路摘要" : "折叠内部链路摘要"}>
           <ChevronDown size={24} />
         </button>
       </div></div>
     {!collapsed && <div className="business-execution-list">
-      <div className="business-execution-columns"><span>业务流程 / 实例</span><span>状态</span>
+      <div className="business-execution-columns"><span>内部业务 / 实例</span><span>状态</span>
         <span>步骤</span><span>开始时间</span><span>执行耗时</span></div>
       {executions.map((item, index) =>
       <article key={item.traceId || item.businessInstanceId || index}
-        onDoubleClick={() => openDetail(item)} title="双击查看业务详细流程图">
-        <div><b>{item.businessName || item.name || "未命名业务流程"}</b>
-          <small>{item.businessInstanceId || item.traceId || "实例标识未知"}</small></div>
+        title="在业务追踪中查看完整链路">
+        <button className="business-trace-link" onClick={() => openTracing(item)}>
+          <b>{item.businessName || item.name || "未命名业务流程"}</b>
+          <small>{item.businessInstanceId || item.traceId || "实例标识未知"}</small>
+          <em>查看完整追踪</em>
+        </button>
         <span className={`business-link ${item.status}`}>{linkText(item.status)}</span>
         <strong>{item.currentStep || item.stepName || `${item.stepCount || 0} 个步骤`}</strong>
         <strong>{formatTime(item.startedUnixMicroseconds || item.startedAt || item.startTime)}</strong>
         <strong>{formatDuration(item)}</strong>
       </article>)}
       {!executions.length && <div className="workbench-empty">
-        {available ? "当前进程暂无业务流程执行记录" : "业务流程追踪服务暂未提供数据"}
+        {available ? "当前暂无内部链路状态记录" : "内部链路监测服务暂未提供数据"}
       </div>}
     </div>}
-    {detail && createPortal(<div className="business-modal-backdrop">
-      <section className="business-modal">
-        <nav className="flow-page-tabs">
-          <button onClick={() => setDetail(null)}><Activity size={24} />运行总览</button>
-          <ChevronRight size={25} />
-          <button className="active"><Activity size={24} />流程-{detail.item.businessName}</button>
-          <span><i />当前：业务流程页面</span>
-          <button className="flow-page-close" onClick={() => setDetail(null)}><X size={27} />返回总览</button>
-        </nav>
-        <header><div><span className={`business-link ${detail.item.status}`}>
-          {linkText(detail.item.status)}</span><h2>{detail.item.businessName}</h2>
-          <p>业务实例：{detail.item.businessInstanceId} · 共 {detail.nodes.length} 个执行节点</p></div></header>
-        <div className="business-flow">
-          <main className="flow-canvas"><div className="flow-canvas-title"><div><h3>业务执行流程</h3>
-            <p>点击任意节点查看该步骤的耗时、传入及传出参数</p></div>
-            <div className="flow-canvas-actions"><button onClick={exportDiagnosis}
-              title="导出完整链路和失败原因分析"><Download size={20} />导出诊断报告</button>
-              <span>{detail.nodes.length} 个节点</span></div></div>
-            <ProcessSwimlanes nodes={detail.nodes} selectedNode={selectedNode} onSelect={setSelectedNode} />
-          </main>
-          <aside className="flow-inspector" ref={inspectorRef}>{selectedNode ? <><div className="step-head">
-            <div><span className={`business-link ${selectedNode.status}`}>
-              {selectedNode.status === "success" ? "执行成功" : selectedNode.status === "failed" ? "执行失败" : selectedNode.status}</span>
-              <small>当前选中节点</small></div><h3>{selectedNode.operation}</h3></div>
-            {selectedNode.status === "failed" && <section className="flow-error-panel">
-              <div><b>错误码</b><strong>{selectedNode.errorCode || "UNKNOWN_ERROR"}</strong></div>
-              <div><b>失败原因</b><strong>{selectedNode.errorMessage || "未提供失败原因"}</strong></div>
-              <div><b>失败节点</b><strong>{selectedNode.operation}</strong></div>
-            </section>}
-            <dl><div><dt>节点耗时</dt><dd>{(Number(selectedNode.durationNanoseconds || 0) / 1e6).toFixed(3)} ms</dd></div>
-              <div><dt>服务 / Bundle</dt><dd>{selectedNode.serviceName} / {selectedNode.bundleName || "—"}</dd></div>
-              <div><dt>主机 / PID</dt><dd>{selectedNode.hostName} / {selectedNode.processId}</dd></div></dl>
-            <div className="flow-parameters"><section><h4>传入参数</h4>
-              <pre>{JSON.stringify(selectedNode.inputs || {}, null, 2)}</pre></section>
-              <section><h4>传出参数</h4>
-                <pre>{JSON.stringify(selectedNode.outputs || {}, null, 2)}</pre></section></div>
-          </> : <div className="workbench-empty">点击流程节点查看详情</div>}</aside>
-        </div>
-      </section>
-    </div>, document.body)}
-    {historyOpen && createPortal(<div className="business-history-page">
-      <nav className="flow-page-tabs">
-        <button onClick={() => setHistoryOpen(false)}><Activity size={24} />运行总览</button>
-        <ChevronRight size={25} />
-        <button className="active"><Search size={24} />业务历史查询</button>
-        <span><i />当前：业务历史查询页面</span>
-        <button className="flow-page-close" onClick={() => setHistoryOpen(false)}>
-          <X size={27} />返回总览
-        </button>
-      </nav>
-      <main><BusinessHistoryPanel /></main>
-    </div>, document.body)}
-  </section>;
-}
-
-function BusinessHistoryPanel() {
-  const localDateTime = date => {
-    const offset = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-  };
-  const [collapsed, setCollapsed] = useState(false);
-  const [from, setFrom] = useState(() => localDateTime(new Date(Date.now() - 3600000)));
-  const [to, setTo] = useState(() => localDateTime(new Date()));
-  const [name, setName] = useState("");
-  const [status, setStatus] = useState("");
-  const [records, setRecords] = useState([]);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const limit = 100;
-
-  const load = async nextOffset => {
-    setLoading(true); setError("");
-    try {
-      const query = new URLSearchParams({
-        from: String(new Date(from).getTime() * 1000),
-        to: String(new Date(to).getTime() * 1000 + 59999999),
-        name, status, limit: String(limit), offset: String(nextOffset)
-      });
-      const data = await request(`/api/v1/business-trace-history?${query}`);
-      setRecords(data.records || []);
-      setHasMore(Boolean(data.hasMore));
-      setOffset(nextOffset);
-    } catch (requestError) {
-      setRecords([]); setHasMore(false); setError(requestError.message);
-    } finally { setLoading(false); }
-  };
-  const formatTime = value => value
-    ? new Date(Number(value) / 1000).toLocaleString()
-    : "—";
-  const formatDuration = value => {
-    const milliseconds = Number(value) / 1e6;
-    if (!Number.isFinite(milliseconds)) return "—";
-    return milliseconds < 1000 ? `${milliseconds.toFixed(3)} ms` : `${(milliseconds / 1000).toFixed(2)} s`;
-  };
-
-  return <section className="surface business-history-card">
-    <div className="section-head"><div><h2>业务流程历史记录查询</h2><p>按小时 SQLite 分片，保留最近 10 天</p></div>
-      <div className="section-head-actions"><span className="inventory-count">{records.length} 条</span>
-        <button className={`section-collapse ${collapsed ? "collapsed" : ""}`}
-          onClick={() => setCollapsed(value => !value)} aria-expanded={!collapsed}
-          title={collapsed ? "展开历史记录查询" : "折叠历史记录查询"}>
-          <ChevronDown size={24} />
-        </button>
-      </div></div>
-    {!collapsed && <><form className="business-history-filters" onSubmit={event => {
-      event.preventDefault(); load(0);
-    }}>
-      <label><span>开始时间</span><input type="datetime-local" value={from}
-        onChange={event => setFrom(event.target.value)} /></label>
-      <label><span>结束时间</span><input type="datetime-local" value={to}
-        onChange={event => setTo(event.target.value)} /></label>
-      <label><span>流程名称</span><input value={name}
-        onChange={event => setName(event.target.value)} placeholder="支持模糊查询" /></label>
-      <label><span>状态</span><select value={status} onChange={event => setStatus(event.target.value)}>
-        <option value="">全部</option><option value="running">执行中</option>
-        <option value="success">成功</option><option value="failed">失败</option>
-        <option value="cancelled">已取消</option>
-      </select></label>
-      <button type="submit" disabled={loading}><Search size={20} />{loading ? "查询中" : "查询"}</button>
-    </form>
-    {error && <div className="business-history-error">{error}</div>}
-    <div className="business-history-table">
-      <div className="business-history-columns"><span>业务流程 / 实例</span><span>状态</span>
-        <span>步骤</span><span>开始时间</span><span>执行耗时</span></div>
-      {records.map(item => <div className="business-history-row" key={item.traceId}>
-        <div><b>{item.businessName}</b><small>{item.businessInstanceId || item.traceId}</small></div>
-        <Status state={item.status} /><strong>{item.stepCount} 个步骤</strong>
-        <strong>{formatTime(item.startedUnixMicroseconds)}</strong>
-        <strong>{formatDuration(item.durationNanoseconds)}</strong>
-      </div>)}
-      {!records.length && !loading && <div className="workbench-empty">请选择条件查询历史记录</div>}
-    </div>
-    <footer className="business-history-pagination">
-      <span>每页 {limit} 条 · 第 {Math.floor(offset / limit) + 1} 页</span>
-      <div><button type="button" disabled={loading || offset === 0}
-        onClick={() => load(Math.max(0, offset - limit))}>上一页</button>
-        <button type="button" disabled={loading || !hasMore}
-          onClick={() => load(offset + limit)}>下一页</button></div>
-    </footer></>}
   </section>;
 }
 
@@ -891,7 +725,12 @@ function ProcessWorkspace({ items }) {
     let active = true;
     const load = async () => {
       try {
-        const query = new URLSearchParams({ id: selected.id, name: selected.name, limit: "500" });
+        const query = new URLSearchParams({
+          id: selected.id,
+          name: selected.name,
+          limit: "500",
+          _ts: String(Date.now())
+        });
         const data = await request(`/api/v1/process-logs?${query}`);
         if (active) { setLines(data.lines || []); setConnected(true); }
       } catch {
@@ -950,7 +789,8 @@ function ProcessScopedLogs({ process }) {
         const query = new URLSearchParams({
           id: process.pid ?? process.id,
           name: process.name,
-          limit: "500"
+          limit: "500",
+          _ts: String(Date.now())
         });
         const data = await request(`/api/v1/process-logs?${query}`);
         if (active) { setLines(data.lines || []); setConnected(true); }
@@ -984,7 +824,7 @@ function ProcessScopedLogs({ process }) {
   </section>;
 }
 
-function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSection, onSectionChange, onNotify }) {
+function ProcessWorkbench({ mainProcess, activeSection, onSectionChange, onNotify, governanceOnly = false }) {
   const [selected, setSelected] = useState(null);
   const [trail, setTrail] = useState([]);
   const [detail, setDetail] = useState(null);
@@ -1053,13 +893,13 @@ function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSect
       .then(async data => {
         if (!active) return;
         setConfigurationControl(data);
-        if ((data.managementSession?.permissions || []).includes("audit.read")) {
+        if (governanceOnly && (data.managementSession?.permissions || []).includes("audit.read")) {
           try {
             const audit = await request("/api/v1/management-audit?limit=20");
             if (active) setManagementAudit(audit.events || []);
           } catch { if (active) setManagementAudit([]); }
         } else setManagementAudit([]);
-        if ((data.managementSession?.permissions || []).includes("task.read")) {
+        if (governanceOnly && (data.managementSession?.permissions || []).includes("task.read")) {
           try {
             const tasks = await request("/api/v1/management-tasks?limit=20");
             if (active) {
@@ -1070,7 +910,7 @@ function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSect
             }
           } catch { if (active) { setManagementTasks([]); setManagementTaskPersistence(null); setManagementIdempotency(null); setManagementTaskScheduler(null); } }
         } else { setManagementTasks([]); setManagementTaskPersistence(null); setManagementIdempotency(null); setManagementTaskScheduler(null); }
-        if ((data.managementSession?.permissions || []).includes("identity.manage")) {
+        if (governanceOnly && (data.managementSession?.permissions || []).includes("identity.manage")) {
           try {
             const identity = await request("/api/v1/identity");
             if (active) setIdentitySnapshot(identity);
@@ -1079,7 +919,7 @@ function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSect
       })
       .catch(() => { if (active) setConfigurationControl(null); });
     return () => { active = false; };
-  }, [selected?.id, detail?.process?.main, revision]);
+  }, [selected?.id, detail?.process?.main, revision, governanceOnly]);
 
   const selectProcess = process => {
     setDetail(null);
@@ -1102,16 +942,14 @@ function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSect
   const children = detail?.children || [];
   const selectedProcess = detail?.process || selected;
   const isMainProcess = Boolean(detail?.process?.main ?? selected?.main ?? selected?.role === "main");
-  const processServices = isMainProcess ? services : [];
-  const processModules = isMainProcess ? modules : [];
+  const processServices = detail?.services || [];
   const processSections = [
     ["overview", Activity, "概览"],
     ["services", Server, "服务", processServices.length],
-    ["components", Layers3, "组件", processModules.length],
     ["bundles", Boxes, "Bundles", bundles.length],
     ["logs", FileText, "日志"],
-    ["configuration", SlidersHorizontal, "配置与治理"],
-    ["business", GitBranch, "业务执行"]
+    ["configuration", SlidersHorizontal, "进程配置"],
+    ["business", GitBranch, "链路摘要"]
   ];
   const managementPermissions = new Set(configurationControl?.managementSession?.permissions || []);
   const canManageBundles = managementPermissions.has("bundle.manage");
@@ -1219,7 +1057,7 @@ function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSect
       String(child.state).toLowerCase() === "running");
 
   return <div className="process-workbench">
-    <div className="process-guide">
+    {!governanceOnly && <><div className="process-guide">
       <div className="guide-label"><span>进程引导</span>{trail.map((item, index) =>
         <React.Fragment key={item.id}>
           {index > 0 && <ChevronRight size={22} />}
@@ -1245,9 +1083,9 @@ function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSect
         onClick={() => onSectionChange(id)} aria-current={activeSection === id ? "page" : undefined}>
         <Icon size={17} /><span>{label}</span>{count !== undefined && <small>{count}</small>}
       </button>)}
-    </nav>
+    </nav></>}
 
-    {activeSection === "overview" && <>
+    {!governanceOnly && activeSection === "overview" && <>
     <div className="workbench-grid">
       <section className="surface child-process-card">
         <div className="section-head"><div><h2>加载的子进程</h2><p>点击进入子进程工作台</p></div>
@@ -1329,19 +1167,24 @@ function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSect
         </section>
       </div>
     </div>}
-    {activeSection === "services" && <section className="process-entity-section">
-      <div className="section-head"><div><h2>当前进程注册的服务</h2><p>服务随当前进程切换，不再作为平台级入口</p></div>
+    {!governanceOnly && activeSection === "services" && <section className="process-entity-section">
+      <div className="section-head"><div><h2>当前进程注册的服务</h2><p>
+        {detail?.serviceInventoryAuthority === "local-registry" ? "权威来源：当前进程 OSP ServiceRegistry" :
+          detail?.serviceInventoryAuthority === "child-status" ? "权威来源：子进程状态快照" :
+            "当前子进程没有可验证的 Service 清单；不会继承主进程服务"}</p></div>
         <span className="inventory-count">{processServices.length} 项</span></div>
       <EntityTable items={processServices} onLife={() => {}} />
     </section>}
-    {activeSection === "components" && <section className="process-entity-section">
-      <div className="section-head"><div><h2>当前进程提供的组件</h2><p>组件由当前进程内的 Bundle 提供</p></div>
-        <span className="inventory-count">{processModules.length} 项</span></div>
-      <EntityTable items={processModules} onLife={() => {}} />
+    {!governanceOnly && activeSection === "logs" && <ProcessScopedLogs process={selectedProcess} />}
+    {!governanceOnly && activeSection === "configuration" && <section className="surface process-config-card">
+      <div className="section-head"><div><h2>当前进程配置</h2><p>只读展示该 OS 进程实际加载的 properties；Runtime 治理操作位于全局治理页</p></div>
+        <span className="inventory-count">{configEntries.length} 项</span></div>
+      <div className="config-detail-list">{configEntries.map(([key, value]) => <div key={key}>
+        <b>{key}</b><code>{String(value)}</code><span className="readonly-config">进程作用域 · 只读</span>
+      </div>)}{!configEntries.length && <div className="workbench-empty">当前进程没有可读取的配置</div>}</div>
     </section>}
-    {activeSection === "logs" && <ProcessScopedLogs process={selectedProcess} />}
-    {activeSection === "configuration" && <section className="surface process-config-card">
-      <div className="section-head"><div><h2>当前进程配置信息</h2><p>配置、身份与管理审计均绑定当前进程</p></div>
+    {governanceOnly && <section className="surface process-config-card">
+      <div className="section-head"><div><h2>Runtime 控制面治理</h2><p>当前 Runtime 实例的身份、权限、配置事务、审计、幂等账本和管理任务</p></div>
         <div className="section-head-actions">
           {configurationControl && <span title={(configurationControl.managementSession?.permissions || []).join(", ")}
             className={`management-auth ${!configurationControl.managementAuthenticationRequired || configurationControl.managementSession?.authenticated ? "enabled" : "disabled"}`}>
@@ -1409,6 +1252,9 @@ function ProcessWorkbench({ mainProcess, services = [], modules = [], activeSect
 }
 
 function EntityActions({ item, onLife }) {
+  if (item.kind === "service") return <span className="readonly-config">
+    {item.bundleId ? `生命周期：${item.bundleId}` : "提供方未知 · 不允许通用启停"}
+  </span>;
   if (item.kind !== "bundle" || !item.manageable) return <span className="readonly-config">只读</span>;
   const canStart = item.kind === "bundle" && item.state !== "active";
   return <div className="entity-actions">
@@ -1423,20 +1269,22 @@ function EntityActions({ item, onLife }) {
 
 function EntityTable({ items, onLife, searchable = true }) {
   const [filter, setFilter] = useState("");
+  const ownerLabel = item => typeof item.owner === "object" && item.owner
+    ? `${item.owner.kind}: ${item.owner.id}` : item.bundleId || item.owner || item.version || item.type || "所有者未上报";
   const filtered = items.filter(item =>
-    `${item.name} ${item.id} ${item.owner || ""}`.toLowerCase().includes(filter.toLowerCase()));
+    `${item.name} ${item.id} ${ownerLabel(item)}`.toLowerCase().includes(filter.toLowerCase()));
   return <section className="surface">
     {searchable && <div className="table-tools"><div className="search"><Search size={17} /><input value={filter}
       onChange={event => setFilter(event.target.value)} placeholder="搜索名称、标识或所属 Bundle" /></div>
       <span>{filtered.length} 项</span></div>}
     <div className="table-scroll">
       <table className="entity-table">
-        <thead><tr><th>名称</th><th>状态</th><th>所属 / 版本</th><th /></tr></thead>
+        <thead><tr><th>名称</th><th>注册 / 生命周期状态</th><th>所有者 / 版本</th><th>生命周期控制</th></tr></thead>
         <tbody>{filtered.map(item => <tr key={`${item.kind}-${item.id}`}>
           <td><div className="entity-name"><span className={`entity-glyph ${item.kind}`}><Box size={17} /></span>
             <div><b>{item.name}</b><small>{item.id}</small></div></div></td>
           <td><Status state={item.state} /></td>
-          <td className="secondary-text">{item.owner || item.version || item.type || "—"}
+          <td className="secondary-text">{ownerLabel(item)}
             {item.plugin && <small className={item.compatible ? "plugin-ready" : "plugin-incompatible"}>
               {item.governanceStatus} · {(item.dependencies || []).length} 个依赖
             </small>}
@@ -1453,13 +1301,40 @@ function EntityTable({ items, onLife, searchable = true }) {
   </section>;
 }
 
+function PluginGovernance({ plugins, bundles, onLife, onOpenBundles }) {
+  const incompatible = plugins.filter(item => item.compatible === false || item.governanceStatus === "incompatible").length;
+  const quarantined = plugins.filter(item => item.quarantined || item.governanceStatus === "quarantined").length;
+  const manageable = plugins.filter(item => item.manageable).length;
+  return <div className="plugin-governance">
+    <section className="surface plugin-summary">
+      <div className="section-head"><div><h2>外部插件治理</h2><p>只管理采用 pdr.plugin.* 契约的扩展；内置 Bundle 仍归进程管理</p></div>
+        <span className={`plugin-governance-state ${incompatible || quarantined ? "attention" : "ready"}`}>
+          <i />{plugins.length ? incompatible || quarantined ? "需要处理" : "插件正常" : "等待安装"}
+        </span></div>
+      <div className="plugin-stats">
+        <article><small>已安装外部插件</small><b>{plugins.length}</b><span>pdr.plugin.*</span></article>
+        <article><small>可执行生命周期操作</small><b>{manageable}</b><span>由 Runtime 白名单授权</span></article>
+        <article className={incompatible ? "bad" : ""}><small>兼容性异常</small><b>{incompatible}</b><span>API / ABI / Runtime 契约</span></article>
+        <article className={quarantined ? "bad" : ""}><small>已隔离</small><b>{quarantined}</b><span>连续失败预算保护</span></article>
+      </div>
+    </section>
+    {plugins.length ? <EntityTable items={plugins} onLife={onLife} /> : <section className="surface plugin-empty-state">
+      <Boxes size={42} />
+      <h2>当前未安装外部插件</h2>
+      <p>Runtime 已加载 {bundles.length} 个内置 Bundle，运行状态正常；它们不属于外部插件治理，因此不会混入此列表。</p>
+      <div className="plugin-contract"><span>插件标识：<code>pdr.plugin.*</code></span><span>必需元数据：Plugin-API、Plugin-ABI、Runtime-Version</span></div>
+      <button type="button" onClick={onOpenBundles}><AppWindow size={17} />查看进程中的全部 Bundles</button>
+    </section>}
+  </div>;
+}
+
 function DeviceInventory({ inventory }) {
   const [filter, setFilter] = useState("");
   const devices = (inventory?.devices || []).filter(device =>
     !filter || `${device.id} ${device.type} ${device.bundle}`.toLowerCase().includes(filter.toLowerCase()));
   return <section className="surface">
-    <div className="section-head"><div><h2>设备适配器</h2>
-      <p>来自 /api/v1/devices 的实时状态与适配器诊断</p></div>
+    <div className="section-head"><div><h2>设备实例</h2>
+      <p>Runtime 作用域；由 Service 提供，生命周期归提供方 Bundle</p></div>
       <span className="inventory-count">{inventory?.count || 0} 个</span></div>
     <div className="table-tools"><span>设备 ID 在整个 Runtime 内全局唯一</span>
       <label className="search"><Search size={16} /><input value={filter} placeholder="筛选 ID、类型或 Bundle"
@@ -1475,7 +1350,8 @@ function DeviceInventory({ inventory }) {
           <small>重连 {numeric(device.diagnostics.reconnectAttempts)} · 连续失败 {numeric(device.diagnostics.consecutiveFailures)}</small>
           <FailureDetail failure={device.diagnostics.failure} legacy={device.diagnostics.lastError} />
         </div> : <span className="secondary-text">未提供</span>}</td>
-        <td className="secondary-text">{device.bundle || "—"}</td>
+        <td className="secondary-text"><div className="owner-stack"><small>Service: {device.serviceId || device.service || "—"}</small>
+          <small>Bundle: {device.bundleId || device.bundle || "—"}</small></div></td>
       </tr>)}</tbody></table>
       {!devices.length && <div className="empty"><Cpu size={26} /><p>没有匹配的活跃设备</p></div>}</div>
   </section>;
@@ -1509,10 +1385,11 @@ function Logs() {
 }
 
 function App() {
-  const [page, setPage] = useState("overview");
+  const initialPage = new URLSearchParams(window.location.search).get("page");
+  const [page, setPage] = useState(pageMeta[initialPage] && initialPage !== "tracing" ? initialPage : "overview");
   const [processSection, setProcessSection] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [topology, setTopology] = useState({ processes: [], services: [], modules: [], bundles: [] });
+  const [topology, setTopology] = useState({ processes: [], services: [], bundles: [], hostResources: {} });
   const [resourceHistory, setResourceHistory] = useState([]);
   const [health, setHealth] = useState(null);
   const [processDetail, setProcessDetail] = useState(null);
@@ -1556,17 +1433,17 @@ function App() {
     } else setChildProcessDetail(null);
     if (healthDetail) setHealth(healthDetail);
     const samples = monitoring.samples || [];
-    const monitoredResources = monitoring.current || {};
+    const monitoredHostResources = monitoring.current || {};
     if (mainDetail?.bundles) {
       const management = new Map(mainDetail.bundles.map(bundle => [bundle.id, bundle]));
       data.bundles = (data.bundles || []).map(bundle => ({
         ...bundle, ...(management.get(bundle.id) || {})
       }));
     }
-    if (Object.keys(monitoredResources).length)
-      data.resources = { ...(data.resources || {}), ...monitoredResources };
+    if (Object.keys(monitoredHostResources).length)
+      data.hostResources = { ...(data.hostResources || {}), ...monitoredHostResources, scope: "host", hostId: data.host };
     setTopology(data);
-    const resources = data.resources || data.system || {};
+    const resources = data.hostResources || {};
     setResourceHistory(current => samples.length ? samples.map(sample => ({
       cpu: numeric(sample.cpuPercent), memory: numeric(sample.memoryPercent),
       disk: numeric(sample.diskPercent), networkReceive: numeric(sample.networkReceiveKbps),
@@ -1607,10 +1484,13 @@ function App() {
       await refresh();
     } catch (error) { notify(error.message, true); await refresh(); }
   };
-  const currentItems = (topology.bundles || []).filter(item => item.plugin || String(item.id).startsWith("pdr.plugin."));
+  const pluginItems = (topology.bundles || []).filter(item => item.plugin || String(item.id).startsWith("pdr.plugin."));
   const openProcessSection = section => {
     setProcessSection(section);
     setPage("processes");
+    const url = new URL(window.location.href);
+    url.searchParams.set("page", "processes");
+    window.history.replaceState({}, "", url);
   };
 
   return <div className="app-shell precision-shell">
@@ -1628,7 +1508,13 @@ function App() {
         onClick={() => {
           setMenuOpen(false);
           if (href) window.location.assign(href);
-          else setPage(id);
+          else {
+            setPage(id);
+            const url = new URL(window.location.href);
+            if (id === "overview") url.searchParams.delete("page");
+            else url.searchParams.set("page", id);
+            window.history.replaceState({}, "", url);
+          }
         }}><Icon size={18} /><span>{pageMeta[id][0]}</span><ChevronRight size={15} /></button>)}</nav>
       <div className={`runtime-state ${health?.ready === false ? "degraded" : ""}`}><i /><div>
         <b>{health?.ready === false ? "Runtime 异常" : "Runtime 在线"}</b>
@@ -1640,11 +1526,14 @@ function App() {
           processDetail={processDetail} childProcessDetail={childProcessDetail} history={resourceHistory} alertInventory={alertInventory}
           onOpenProcesses={() => openProcessSection("overview")} onOpenLogs={() => openProcessSection("logs")} />}
         {page === "processes" && <ProcessWorkbench mainProcess={topology.mainProcess}
-          services={topology.services} modules={topology.modules} activeSection={processSection}
-          onSectionChange={setProcessSection} onNotify={notify} />}
-        {page === "devices" && <DeviceInventory inventory={deviceInventory} />}
-        {page === "plugins" && <EntityTable items={currentItems} onLife={life} />}
+          activeSection={processSection} onSectionChange={setProcessSection} onNotify={notify} />}
+        {page === "devices" && <><DeviceInventory inventory={deviceInventory} />
+          <ProtocolSummary data={businessMetrics} inventory={protocolInventory} onLifecycle={protocolLife} /></>}
+        {page === "plugins" && <PluginGovernance plugins={pluginItems} bundles={topology.bundles || []} onLife={life}
+          onOpenBundles={() => openProcessSection("bundles")} />}
         {page === "metrics" && <MetricsCenter data={businessMetrics} />}
+        {page === "governance" && <ProcessWorkbench mainProcess={topology.mainProcess}
+          activeSection="configuration" onSectionChange={() => {}} onNotify={notify} governanceOnly />}
       </div>
     </main>
     {menuOpen && <button className="mobile-overlay" onClick={() => setMenuOpen(false)} />}

@@ -107,6 +107,7 @@ public:
         IdentityService::Ptr identity = new IdentityServiceImpl;
         identity->reload(*preferences->configuration());
         Poco::OSP::Properties properties;
+        properties.set("pdr.bundle", context->thisBundle()->symbolicName());
         _identityService = context->registry().registerService(
             IdentityService::SERVICE_NAME, identity, properties);
         try

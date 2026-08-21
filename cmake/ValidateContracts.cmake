@@ -1,5 +1,6 @@
 set(required_files
     "${SOURCE_DIR}/contracts/schemas/runtime-config.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/runtime-resource.schema.json"
     "${SOURCE_DIR}/contracts/schemas/release-trust-policy.schema.json"
     "${SOURCE_DIR}/contracts/schemas/plugin-trust-policy.schema.json"
     "${SOURCE_DIR}/contracts/schemas/plugin-host-state.schema.json"

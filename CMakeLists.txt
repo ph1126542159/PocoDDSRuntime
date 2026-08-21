@@ -143,6 +143,7 @@ set(SHARED_LIBRARY_VERSION 1 CACHE STRING "Compatibility version for migrated pl
 
 include(PDRWarnings)
 include(PDRProcessLayout)
+include(PDRComponents)
 
 if(PDR_BUILD_ROBOTICS_RUNTIME)
     set(CMAKE_FOLDER "Robotics")
@@ -466,6 +467,29 @@ if(BUILD_TESTING)
                 RESOURCE_LOCK pdr_runtime_http
                 TIMEOUT 45)
             if(PDR_BUILD_WEBUI)
+                add_test(NAME runtime-resource-scope-contract
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --timeout 20
+                        --stability-window 1
+                        --probe-delay 2
+                        --clear-code-cache
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --endpoint "/api/v1/topology"
+                        --endpoint "/api/v1/process-detail"
+                        --endpoint "/api/v1/system-metrics?limit=1"
+                        --endpoint "/api/v1/devices"
+                        --endpoint "/api/v1/protocols"
+                        --validate-runtime-scope-contract
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-resource-scope-contract.json")
+                set_tests_properties(runtime-resource-scope-contract PROPERTIES
+                    LABELS "runtime;contract;web;integration"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 35)
                 add_test(NAME runtime-web-protocol-diagnostics
                     COMMAND "${Python3_EXECUTABLE}"
                         "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"

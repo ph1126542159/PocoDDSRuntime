@@ -1,5 +1,6 @@
 set(required_docs
     "docs/architecture/layering-rules.md"
+    "docs/architecture/extensibility.md"
     "docs/architecture/deployment-profiles.md"
     "docs/adr/README.md"
     "docs/operations/runbook.md"
@@ -20,6 +21,7 @@ endforeach()
 file(READ "${SOURCE_DIR}/docs/README.md" index)
 foreach(link
         "architecture/layering-rules.md"
+        "architecture/extensibility.md"
         "operations/runbook.md"
         "operations/troubleshooting.md"
         "operations/recovery.md")

@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-KINDS = ("service", "device", "workflow", "plugin")
+KINDS = ("module", "service", "device", "workflow", "bundle", "plugin", "subprocess")
 PERSISTENCE_KINDS = {"tasks": "tasks", "idempotency": "requests"}
 
 
@@ -618,7 +618,7 @@ def valid_name(value: str) -> str:
     return value
 
 
-def plugin_templates(name: str) -> dict[str, str]:
+def plugin_templates(name: str, requested_kind: str = "plugin") -> dict[str, str]:
     lowered = name.lower()
     namespace = f"PocoDDS::Generated::{name}"
     symbolic = f"pdr.plugin.{lowered}"
@@ -761,9 +761,17 @@ int main()
   </code>
 </bundlespec>
 '''
+    kind_note = (
+        "`bundle` is the user-facing alias for a deployable external OSP plugin. "
+        "The `pdr.plugin.*` symbolic-name boundary keeps it subject to the same "
+        "compatibility, signing and quarantine gates."
+        if requested_kind == "bundle" else
+        "This is a deployable external OSP plugin Bundle."
+    )
     readme = f'''# {name} Plugin
 
 Generated external OSP plugin using only the installed `PocoDDSRuntime` Plugins component.
+{kind_note}
 
 ```text
 pdr verify . --prefix <install-prefix> --config Release --artifact-output dist \
@@ -786,9 +794,123 @@ Never overwrite an existing symbolic name without an explicit compatibility and 
     }
 
 
+def subprocess_templates(name: str) -> dict[str, str]:
+    target = "pdr-" + re.sub(r"(?<!^)(?=[A-Z])", "-", name).lower()
+    cmake = f'''cmake_minimum_required(VERSION 3.24)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project({name}Subprocess LANGUAGES CXX)
+    find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED)
+    include(CTest)
+endif()
+
+add_executable({target} src/main.cpp)
+target_link_libraries({target} PRIVATE PocoDDS::SDK)
+if(DEFINED PDR_SUBPROCESS_OUTPUT_ROOT)
+    set({name}_OUTPUT_ROOT "${{PDR_SUBPROCESS_OUTPUT_ROOT}}")
+else()
+    set({name}_OUTPUT_ROOT "${{CMAKE_BINARY_DIR}}/processes")
+endif()
+set_target_properties({target} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${{{name}_OUTPUT_ROOT}}/{target}")
+if(CMAKE_CONFIGURATION_TYPES)
+    foreach(configuration IN LISTS CMAKE_CONFIGURATION_TYPES)
+        string(TOUPPER "${{configuration}}" configuration_upper)
+        set_target_properties({target} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY_${{configuration_upper}}
+                "${{{name}_OUTPUT_ROOT}}/{target}")
+    endforeach()
+endif()
+
+if(BUILD_TESTING)
+    add_test(NAME {target}-self-test COMMAND {target} --self-test)
+endif()
+
+install(TARGETS {target}
+    RUNTIME DESTINATION "bin/processes/{target}")
+install(FILES config/pdr-subprocess-entry.properties
+    DESTINATION "share/PocoDDSRuntime/subprocesses/{target}")
+'''
+    source = f'''#include <PocoDDS/SDK/SDK.h>
+
+#include <atomic>
+#include <chrono>
+#include <csignal>
+#include <iostream>
+#include <string_view>
+#include <thread>
+
+namespace
+{{
+std::atomic_bool running{{true}};
+
+void requestStop(int)
+{{
+    running.store(false);
+}}
+}}
+
+int main(int argc, char** argv)
+{{
+    for (int index = 1; index < argc; ++index)
+    {{
+        if (std::string_view(argv[index]) == "--self-test")
+        {{
+            std::cout << "{target.upper().replace('-', '_')}_SELF_TEST_PASS sdk="
+                      << PocoDDS::SDK::versionString << '\\n';
+            return 0;
+        }}
+    }}
+
+    std::signal(SIGINT, requestStop);
+    std::signal(SIGTERM, requestStop);
+    std::cout << "{target.upper().replace('-', '_')}_READY" << std::endl;
+    while (running.load())
+    {{
+        std::cout << "{target.upper().replace('-', '_')}_HEARTBEAT" << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }}
+    std::cout << "{target.upper().replace('-', '_')}_STOPPED" << std::endl;
+    return 0;
+}}
+'''
+    configuration = f'''# Merge this block into pdr-subprocesses.properties and replace N with
+# the next contiguous numeric slot. Paths are relative to the Runtime bin directory.
+subprocess.N.enabled = true
+subprocess.N.name = {target}
+subprocess.N.location = local
+subprocess.N.required = false
+subprocess.N.path = processes/{target}/{target}{'.exe' if os.name == 'nt' else ''}
+subprocess.N.workingDirectory = processes/{target}
+subprocess.N.argument.count = 0
+'''
+    readme = f'''# {name} subprocess
+
+This process is an independent failure boundary. It communicates through public
+contracts and must not access the Runtime's in-process OSP Service Registry.
+
+Build and test it against an installed SDK:
+
+```text
+pdr verify . --prefix <install-prefix> --config Release --report verify-report.json
+```
+
+After installing, merge `config/pdr-subprocess-entry.properties` into the
+deployment's `pdr-subprocesses.properties`, replace `N` with the next contiguous
+slot, and validate start, heartbeat, graceful stop and crash recovery.
+'''
+    return {
+        "CMakeLists.txt": cmake,
+        "src/main.cpp": source,
+        "config/pdr-subprocess-entry.properties": configuration,
+        "README.md": readme,
+    }
+
+
 def templates(kind: str, name: str) -> dict[str, str]:
-    if kind == "plugin":
-        return plugin_templates(name)
+    if kind in ("bundle", "plugin"):
+        return plugin_templates(name, kind)
+    if kind == "subprocess":
+        return subprocess_templates(name)
     namespace = f"PocoDDS::Generated::{name}"
     common_cmake = f'''cmake_minimum_required(VERSION 3.24)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)

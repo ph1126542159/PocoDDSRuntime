@@ -404,7 +404,9 @@ void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, P
 			}
 			json << "]}";
 			const std::string body = json.str();
-			response.setContentType("application/json");
+			response.setContentType("application/json; charset=utf-8");
+			response.set("Cache-Control", "no-store, no-cache, must-revalidate");
+			response.set("Pragma", "no-cache");
 			response.setStatusAndReason(HTTPResponse::HTTP_OK);
 			response.setContentLength(static_cast<int>(body.size()));
 			response.sendBuffer(body.data(), body.size());
@@ -415,6 +417,9 @@ void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, P
 			std::vector<Bundle::Ptr> bundles;
 			_pContext->listBundles(bundles);
 			std::vector<ServiceRef::Ptr> services = _pContext->registry().find("name");
+			const std::string hostId = Poco::Environment::nodeName();
+			const std::string processId = Poco::NumberFormatter::format(Poco::Process::id());
+			const std::string runtimeId = hostId + ":pdr-runtime:" + processId;
 
 			double cpuPercent = 0.0;
 			double memoryPercent = 0.0;
@@ -480,11 +485,22 @@ void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, P
 #endif
 
 			std::ostringstream json;
-			json << "{\"host\":\"" << jsonize(Poco::Environment::nodeName())
-				<< "\",\"mainProcess\":{\"kind\":\"process\",\"id\":\""
-				<< Poco::Process::id() << "\",\"pid\":" << Poco::Process::id()
-				<< ",\"name\":\"pdr-runtime\",\"role\":\"main\",\"state\":\"running\"},";
-			json << "\"resources\":{\"cpuPercent\":" << cpuPercent
+			json << "{\"schemaVersion\":2,\"scope\":{\"kind\":\"runtime\",\"hostId\":\""
+				<< jsonize(hostId) << "\",\"runtimeId\":\"" << jsonize(runtimeId)
+				<< "\"},\"host\":\"" << jsonize(hostId) << "\",\"runtime\":{\"kind\":\"runtime\",\"id\":\""
+				<< jsonize(runtimeId) << "\",\"name\":\"PocoDDS Runtime\",\"state\":\"running\",\"scope\":{\"hostId\":\""
+				<< jsonize(hostId) << "\",\"runtimeId\":\"" << jsonize(runtimeId)
+				<< "\"},\"owner\":{\"kind\":\"host\",\"id\":\"" << jsonize(hostId)
+				<< "\"},\"lifecycleOwner\":{\"kind\":\"external-supervisor\",\"id\":\"host-service-manager\"}},"
+				<< "\"mainProcess\":{\"kind\":\"process\",\"id\":\"" << processId
+				<< "\",\"pid\":" << Poco::Process::id()
+				<< ",\"name\":\"pdr-runtime\",\"role\":\"main\",\"state\":\"running\",\"scope\":{\"hostId\":\""
+				<< jsonize(hostId) << "\",\"runtimeId\":\"" << jsonize(runtimeId)
+				<< "\",\"processId\":\"" << processId
+				<< "\"},\"owner\":{\"kind\":\"runtime\",\"id\":\"" << jsonize(runtimeId)
+				<< "\"},\"lifecycleOwner\":{\"kind\":\"external-supervisor\",\"id\":\"host-service-manager\"}},";
+			json << "\"hostResources\":{\"scope\":\"host\",\"hostId\":\"" << jsonize(hostId)
+				<< "\",\"cpuPercent\":" << cpuPercent
 				<< ",\"cpuCores\":" << Poco::Environment::processorCount()
 				<< ",\"memoryPercent\":" << memoryPercent
 				<< ",\"memoryUsedMb\":" << memoryUsedMB
@@ -492,6 +508,13 @@ void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, P
 				<< ",\"diskPercent\":" << diskPercent
 				<< ",\"diskUsedGb\":" << diskUsedGB
 				<< ",\"diskTotalGb\":" << diskTotalGB << "},";
+			// Compatibility only. New clients must use hostResources because these
+			// samples describe the host, not pdr-runtime.exe.
+			json << "\"resourcesDeprecated\":true,\"resourcesScope\":\"host\",\"resources\":{\"cpuPercent\":"
+				<< cpuPercent << ",\"cpuCores\":" << Poco::Environment::processorCount()
+				<< ",\"memoryPercent\":" << memoryPercent << ",\"memoryUsedMb\":" << memoryUsedMB
+				<< ",\"memoryTotalMb\":" << memoryTotalMB << ",\"diskPercent\":" << diskPercent
+				<< ",\"diskUsedGb\":" << diskUsedGB << ",\"diskTotalGb\":" << diskTotalGB << "},";
 
 			json << "\"processes\":[";
 #if defined(POCO_OS_FAMILY_WINDOWS)
@@ -516,7 +539,12 @@ void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, P
 							Poco::UnicodeConverter::toUTF8(entry.szExeFile, name);
 							json << "{\"kind\":\"process\",\"id\":\"" << entry.th32ProcessID
 								<< "\",\"pid\":" << entry.th32ProcessID << ",\"name\":\""
-								<< jsonize(name) << "\",\"state\":\"running\"}";
+								<< jsonize(name) << "\",\"state\":\"running\",\"scope\":{\"hostId\":\""
+								<< jsonize(hostId) << "\",\"runtimeId\":\"" << jsonize(runtimeId)
+								<< "\",\"processId\":\"" << entry.th32ProcessID
+								<< "\"},\"owner\":{\"kind\":\"runtime\",\"id\":\"" << jsonize(runtimeId)
+								<< "\"},\"lifecycleOwner\":{\"kind\":\"runtime\",\"id\":\""
+								<< jsonize(runtimeId) << "\"}}";
 						}
 					}
 					while (Process32NextW(snapshot, &entry));
@@ -528,11 +556,25 @@ void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, P
 			for (std::size_t index = 0; index < services.size(); ++index)
 			{
 				if (index) json << ',';
+				const auto& properties = services[index]->properties();
+				const std::string bundleId = properties.get("pdr.bundle", "");
 				json << "{\"kind\":\"service\",\"id\":\""
 					<< jsonize(services[index]->name()) << "\",\"name\":\""
-					<< jsonize(services[index]->name()) << "\",\"state\":\"active\"}";
+					<< jsonize(services[index]->name()) << "\",\"state\":\"registered\",\"registrationState\":\"registered\",\"health\":\"unknown\",\"serviceType\":\""
+					<< jsonize(properties.get("type", "")) << "\",\"processId\":\"" << processId
+					<< "\",\"bundleId\":\"" << jsonize(bundleId) << "\",\"ownerKnown\":"
+					<< (bundleId.empty() ? "false" : "true") << ",\"scope\":{\"hostId\":\""
+					<< jsonize(hostId) << "\",\"runtimeId\":\"" << jsonize(runtimeId)
+					<< "\",\"processId\":\"" << processId << "\",\"serviceId\":\""
+					<< jsonize(services[index]->name()) << "\"";
+				if (!bundleId.empty()) json << ",\"bundleId\":\"" << jsonize(bundleId) << "\"";
+				json << "},\"owner\":";
+				if (bundleId.empty()) json << "null,\"lifecycleOwner\":null";
+				else json << "{\"kind\":\"bundle\",\"id\":\"" << jsonize(bundleId)
+					<< "\"},\"lifecycleOwner\":{\"kind\":\"bundle\",\"id\":\"" << jsonize(bundleId) << "\"}";
+				json << '}';
 			}
-			json << "],\"modules\":[],\"bundles\":[";
+			json << "],\"modules\":[],\"modulesDeprecated\":true,\"bundles\":[";
 			for (std::size_t index = 0; index < bundles.size(); ++index)
 			{
 				if (index) json << ',';
@@ -541,7 +583,12 @@ void WebServerDispatcher::handleRequest(Poco::Net::HTTPServerRequest& request, P
 					<< "\",\"name\":\"" << jsonize(bundle->name()) << "\",\"version\":\""
 					<< jsonize(bundle->version().toString()) << "\",\"state\":\""
 					<< (bundle->state() == Bundle::BUNDLE_ACTIVE ? "active" : "resolved")
-					<< "\"}";
+					<< "\",\"processId\":\"" << processId << "\",\"scope\":{\"hostId\":\""
+					<< jsonize(hostId) << "\",\"runtimeId\":\"" << jsonize(runtimeId)
+					<< "\",\"processId\":\"" << processId << "\",\"bundleId\":\""
+					<< jsonize(bundle->symbolicName()) << "\"},\"owner\":{\"kind\":\"process\",\"id\":\""
+					<< processId << "\"},\"lifecycleOwner\":{\"kind\":\"process\",\"id\":\""
+					<< processId << "\"}}";
 			}
 			json << "]}";
 

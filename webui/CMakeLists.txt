@@ -25,10 +25,5 @@ function(pdr_add_webui_bundle target bundle_spec)
     add_custom_target(${target}_Package ALL DEPENDS "${stamp}")
 endfunction()
 
-file(GLOB web_bundle_cmake_files CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*/CMakeLists.txt")
-foreach(web_bundle_cmake IN LISTS web_bundle_cmake_files)
-    get_filename_component(web_bundle_dir "${web_bundle_cmake}" DIRECTORY)
-    get_filename_component(web_bundle_name "${web_bundle_dir}" NAME)
-    add_subdirectory("${web_bundle_name}")
-endforeach()
+pdr_add_component_directories("${CMAKE_CURRENT_SOURCE_DIR}"
+    FOLDER "WebUI")

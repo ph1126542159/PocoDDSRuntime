@@ -2408,7 +2408,14 @@ public:
         for (const auto& sample : history)
             samples->add(sampleJson(sample));
         Poco::JSON::Object root;
-        root.set("host", Poco::Environment::nodeName());
+        const std::string hostId = Poco::Environment::nodeName();
+        root.set("schemaVersion", 2);
+        root.set("resourceScope", "host");
+        root.set("host", hostId);
+        Poco::JSON::Object::Ptr scope = new Poco::JSON::Object;
+        scope->set("kind", "host");
+        scope->set("hostId", hostId);
+        root.set("scope", scope);
         root.set("intervalMilliseconds", 1000);
         root.set("samples", samples);
         if (!history.empty())
@@ -3335,6 +3342,9 @@ public:
     void handleRequest(Poco::Net::HTTPServerRequest&,
                        Poco::Net::HTTPServerResponse& response) override
     {
+        const std::string hostId = Poco::Environment::nodeName();
+        const std::string processId = std::to_string(Poco::Process::id());
+        const std::string runtimeId = hostId + ":pdr-runtime:" + processId;
         Poco::JSON::Array::Ptr devices = new Poco::JSON::Array;
         auto services = _context->registry().find("pdr.device");
         std::sort(services.begin(), services.end(), [](const auto& left, const auto& right) {
@@ -3385,13 +3395,35 @@ public:
                 hasDiagnostics = true;
             }
             Poco::JSON::Object::Ptr device = new Poco::JSON::Object;
+            const std::string bundleId = properties.get("pdr.bundle", "");
+            const std::string serviceId = service->name();
+            device->set("kind", "device");
             device->set("id", snapshot.id);
             device->set("type", snapshot.type);
             device->set("state", PocoDDS::Devices::toString(snapshot.state));
             device->set("sequence", snapshot.sequence);
             device->set("timestampMicroseconds", snapshot.timestampMicroseconds);
-            device->set("bundle", properties.get("pdr.bundle", ""));
-            device->set("service", service->name());
+            device->set("bundle", bundleId);
+            device->set("bundleId", bundleId);
+            device->set("service", serviceId);
+            device->set("serviceId", serviceId);
+            device->set("processId", processId);
+            Poco::JSON::Object::Ptr scope = new Poco::JSON::Object;
+            scope->set("kind", "device");
+            scope->set("hostId", hostId);
+            scope->set("runtimeId", runtimeId);
+            scope->set("processId", processId);
+            scope->set("bundleId", bundleId);
+            scope->set("serviceId", serviceId);
+            device->set("scope", scope);
+            Poco::JSON::Object::Ptr owner = new Poco::JSON::Object;
+            owner->set("kind", "service");
+            owner->set("id", serviceId);
+            device->set("owner", owner);
+            Poco::JSON::Object::Ptr lifecycleOwner = new Poco::JSON::Object;
+            lifecycleOwner->set("kind", "bundle");
+            lifecycleOwner->set("id", bundleId);
+            device->set("lifecycleOwner", lifecycleOwner);
             device->set("required", properties.getBool("pdr.deviceRequired", true));
             if (hasDiagnostics)
             {
@@ -3433,7 +3465,12 @@ public:
             devices->add(device);
         }
         Poco::JSON::Object root;
-        root.set("schemaVersion", 1);
+        root.set("schemaVersion", 2);
+        Poco::JSON::Object::Ptr inventoryScope = new Poco::JSON::Object;
+        inventoryScope->set("kind", "runtime");
+        inventoryScope->set("hostId", hostId);
+        inventoryScope->set("runtimeId", runtimeId);
+        root.set("scope", inventoryScope);
         root.set("count", devices->size());
         root.set("devices", devices);
         response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
@@ -3496,6 +3533,9 @@ public:
             return sendJsonError(response, Poco::Net::HTTPResponse::HTTP_METHOD_NOT_ALLOWED,
                                  "protocol endpoint only supports GET and POST");
 
+        const std::string hostId = Poco::Environment::nodeName();
+        const std::string processId = std::to_string(Poco::Process::id());
+        const std::string runtimeId = hostId + ":pdr-runtime:" + processId;
         Poco::JSON::Array::Ptr protocols = new Poco::JSON::Array;
         auto services = _context->registry().find("pdr.protocol");
         std::sort(services.begin(), services.end(), [](const auto& left, const auto& right) {
@@ -3506,10 +3546,37 @@ public:
         {
             const auto& properties = service->properties();
             Poco::JSON::Object::Ptr item = new Poco::JSON::Object;
-            item->set("id", properties.get("pdr.protocol.id", service->name()));
+            const std::string protocolId = properties.get("pdr.protocol.id", service->name());
+            const std::string bundleId = properties.get("pdr.bundle", "");
+            const std::string serviceId = service->name();
+            item->set("kind", "protocol");
+            item->set("id", protocolId);
             item->set("type", properties.get("pdr.protocol.type", "unknown"));
-            item->set("bundle", properties.get("pdr.bundle", ""));
-            item->set("service", service->name());
+            item->set("bundle", bundleId);
+            item->set("bundleId", bundleId);
+            item->set("service", serviceId);
+            item->set("serviceId", serviceId);
+            item->set("processId", processId);
+            Poco::JSON::Object::Ptr scope = new Poco::JSON::Object;
+            scope->set("kind", "protocol");
+            scope->set("hostId", hostId);
+            scope->set("runtimeId", runtimeId);
+            scope->set("processId", processId);
+            scope->set("bundleId", bundleId);
+            scope->set("serviceId", serviceId);
+            item->set("scope", scope);
+            Poco::JSON::Object::Ptr owner = new Poco::JSON::Object;
+            owner->set("kind", "service");
+            owner->set("id", serviceId);
+            item->set("owner", owner);
+            Poco::JSON::Object::Ptr lifecycleOwner = new Poco::JSON::Object;
+            lifecycleOwner->set("kind", "bundle");
+            lifecycleOwner->set("id", bundleId);
+            item->set("lifecycleOwner", lifecycleOwner);
+            Poco::JSON::Object::Ptr operationOwner = new Poco::JSON::Object;
+            operationOwner->set("kind", "service");
+            operationOwner->set("id", serviceId);
+            item->set("operationOwner", operationOwner);
             item->set("required", properties.getBool("pdr.protocol.required", false));
             item->set("autoReconnect",
                       properties.getBool("pdr.protocol.autoReconnect", false));
@@ -3546,7 +3613,12 @@ public:
             protocols->add(item);
         }
         Poco::JSON::Object root;
-        root.set("schemaVersion", 1);
+        root.set("schemaVersion", 2);
+        Poco::JSON::Object::Ptr inventoryScope = new Poco::JSON::Object;
+        inventoryScope->set("kind", "runtime");
+        inventoryScope->set("hostId", hostId);
+        inventoryScope->set("runtimeId", runtimeId);
+        root.set("scope", inventoryScope);
         root.set("count", protocols->size());
         root.set("protocols", protocols);
         response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
@@ -3747,7 +3819,9 @@ public:
         root.set("processId", processId);
         root.set("lines", jsonLines);
         response.setStatus(Poco::Net::HTTPResponse::HTTP_OK);
-        response.setContentType("application/json");
+        response.setContentType("application/json; charset=utf-8");
+        response.set("Cache-Control", "no-store, no-cache, must-revalidate");
+        response.set("Pragma", "no-cache");
         root.stringify(response.send());
     }
 };
@@ -3772,6 +3846,8 @@ public:
             else if (parameter.first == "name") processName = parameter.second;
         }
         const std::string mainId = std::to_string(Poco::Process::id());
+        const std::string hostId = Poco::Environment::nodeName();
+        const std::string runtimeId = hostId + ":pdr-runtime:" + mainId;
         const bool mainProcess = processId.empty() || processId == mainId;
         if (mainProcess)
         {
@@ -3798,13 +3874,30 @@ public:
         }
 
         Poco::JSON::Object root;
+        root.set("schemaVersion", 2);
+        Poco::JSON::Object::Ptr rootScope = new Poco::JSON::Object;
+        rootScope->set("kind", "process");
+        rootScope->set("hostId", hostId);
+        rootScope->set("runtimeId", runtimeId);
+        rootScope->set("processId", processId);
+        root.set("scope", rootScope);
         Poco::JSON::Object::Ptr process = new Poco::JSON::Object;
+        process->set("kind", "process");
         process->set("id", processId);
         process->set("pid", processId);
         process->set("name", processName);
         process->set("main", mainProcess);
         process->set("state", processState);
         process->set("location", processLocation);
+        process->set("scope", rootScope);
+        Poco::JSON::Object::Ptr processOwner = new Poco::JSON::Object;
+        processOwner->set("kind", "runtime");
+        processOwner->set("id", runtimeId);
+        process->set("owner", processOwner);
+        Poco::JSON::Object::Ptr processLifecycleOwner = new Poco::JSON::Object;
+        processLifecycleOwner->set("kind", mainProcess ? "external-supervisor" : "runtime");
+        processLifecycleOwner->set("id", mainProcess ? "host-service-manager" : runtimeId);
+        process->set("lifecycleOwner", processLifecycleOwner);
         root.set("process", process);
 
         Poco::JSON::Array::Ptr children = new Poco::JSON::Array;
@@ -3830,6 +3923,9 @@ public:
                 bundle->set("version", loadedBundle->version().toString());
                 bundle->set("state", loadedBundle->stateString());
                 bundle->set("manageable", manageableBundle(loadedBundle->symbolicName()));
+                appendResourceOwnership(bundle, "bundle", loadedBundle->symbolicName(), hostId,
+                                        runtimeId, processId, "process", processId,
+                                        "process", processId);
                 appendBundleGovernance(_context, loadedBundle, bundle);
                 bundles->add(bundle);
             }
@@ -3844,15 +3940,89 @@ public:
             if (bundles->size() == 0)
                 appendRepositoryBundles(processName, bundles);
         }
+        for (unsigned index = 0; index < bundles->size(); ++index)
+        {
+            auto bundle = bundles->getObject(index);
+            const std::string bundleId = bundle->optValue<std::string>(
+                "id", bundle->optValue<std::string>("name", "unknown-bundle"));
+            appendResourceOwnership(bundle, "bundle", bundleId, hostId, runtimeId,
+                                    processId, "process", processId,
+                                    "process", processId);
+        }
         root.set("bundles", bundles);
 
+        Poco::JSON::Array::Ptr services = new Poco::JSON::Array;
+        std::string serviceInventoryAuthority = "unavailable";
+        if (mainProcess)
+        {
+            serviceInventoryAuthority = "local-registry";
+            for (const auto& service : _context->registry().find("name"))
+            {
+                const auto& properties = service->properties();
+                const std::string serviceId = service->name();
+                const std::string bundleId = properties.get("pdr.bundle", "");
+                Poco::JSON::Object::Ptr item = new Poco::JSON::Object;
+                item->set("kind", "service");
+                item->set("id", serviceId);
+                item->set("name", serviceId);
+                item->set("state", "registered");
+                item->set("registrationState", "registered");
+                item->set("health", "unknown");
+                item->set("serviceType", properties.get("type", ""));
+                item->set("processId", processId);
+                item->set("bundleId", bundleId);
+                item->set("ownerKnown", !bundleId.empty());
+                appendResourceOwnership(item, "service", serviceId, hostId, runtimeId,
+                                        processId, bundleId.empty() ? "" : "bundle",
+                                        bundleId, bundleId.empty() ? "" : "bundle", bundleId);
+                Poco::JSON::Object::Ptr serviceScope = item->getObject("scope");
+                serviceScope->set("serviceId", serviceId);
+                if (!bundleId.empty()) serviceScope->set("bundleId", bundleId);
+                services->add(item);
+            }
+        }
+        else if (auto status = readChildStatus(processName))
+        {
+            if (status->has("services"))
+            {
+                services = status->getArray("services");
+                serviceInventoryAuthority = "child-status";
+                for (unsigned index = 0; index < services->size(); ++index)
+                {
+                    auto item = services->getObject(index);
+                    const std::string serviceId = item->optValue<std::string>(
+                        "id", item->optValue<std::string>("name", "unknown-service"));
+                    const std::string bundleId = item->optValue<std::string>(
+                        "bundleId", item->optValue<std::string>("bundle", ""));
+                    item->set("name", item->optValue<std::string>("name", serviceId));
+                    item->set("state", "registered");
+                    item->set("registrationState", "registered");
+                    item->set("health", item->optValue<std::string>("health", "unknown"));
+                    item->set("serviceType", item->optValue<std::string>("serviceType", ""));
+                    item->set("bundleId", bundleId);
+                    item->set("ownerKnown", !bundleId.empty());
+                    appendResourceOwnership(item, "service", serviceId, hostId, runtimeId,
+                                            processId, bundleId.empty() ? "" : "bundle",
+                                            bundleId, bundleId.empty() ? "" : "bundle", bundleId);
+                    Poco::JSON::Object::Ptr serviceScope = item->getObject("scope");
+                    serviceScope->set("serviceId", serviceId);
+                    if (!bundleId.empty()) serviceScope->set("bundleId", bundleId);
+                }
+            }
+        }
+        root.set("services", services);
+        root.set("serviceInventoryAuthority", serviceInventoryAuthority);
+
         Poco::JSON::Object::Ptr resources = new Poco::JSON::Object;
-        appendResources(processId, mainProcess, resources);
+        appendResources(processId, resources);
+        resources->set("scope", "process");
+        resources->set("processId", processId);
         root.set("resources", resources);
 
         Poco::JSON::Object::Ptr configuration = new Poco::JSON::Object;
         appendConfiguration(processName, mainProcess, configuration);
         root.set("configuration", configuration);
+        root.set("configurationScope", "process");
         Poco::JSON::Array::Ptr editable = new Poco::JSON::Array;
         if (mainProcess)
         {
@@ -3867,6 +4037,45 @@ public:
     }
 
 private:
+    static void appendResourceOwnership(Poco::JSON::Object::Ptr object,
+                                        const std::string& kind,
+                                        const std::string& id,
+                                        const std::string& hostId,
+                                        const std::string& runtimeId,
+                                        const std::string& processId,
+                                        const std::string& ownerKind,
+                                        const std::string& ownerId,
+                                        const std::string& lifecycleKind,
+                                        const std::string& lifecycleId)
+    {
+        object->set("kind", kind);
+        object->set("id", id);
+        object->set("processId", processId);
+        Poco::JSON::Object::Ptr scope = new Poco::JSON::Object;
+        scope->set("kind", kind);
+        scope->set("hostId", hostId);
+        scope->set("runtimeId", runtimeId);
+        scope->set("processId", processId);
+        if (kind == "bundle") scope->set("bundleId", id);
+        object->set("scope", scope);
+        if (!ownerKind.empty())
+        {
+            Poco::JSON::Object::Ptr owner = new Poco::JSON::Object;
+            owner->set("kind", ownerKind);
+            owner->set("id", ownerId);
+            object->set("owner", owner);
+        }
+        else object->set("owner", Poco::Dynamic::Var());
+        if (!lifecycleKind.empty())
+        {
+            Poco::JSON::Object::Ptr owner = new Poco::JSON::Object;
+            owner->set("kind", lifecycleKind);
+            owner->set("id", lifecycleId);
+            object->set("lifecycleOwner", owner);
+        }
+        else object->set("lifecycleOwner", Poco::Dynamic::Var());
+    }
+
     static Poco::JSON::Object::Ptr readChildStatus(const std::string& processName)
     {
         Poco::Path path("processes");
@@ -3984,32 +4193,9 @@ private:
         }
     }
 
-    void appendResources(const std::string& processId, bool mainProcess,
+    void appendResources(const std::string& processId,
                          Poco::JSON::Object::Ptr resources)
     {
-        if (mainProcess)
-        {
-            const auto serviceRef = _context->registry().findByName(SERVICE_NAME);
-            if (serviceRef)
-            {
-                const auto history =
-                    serviceRef->castedInstance<SystemMonitoringService>()->history();
-                if (!history.empty())
-                {
-                    const auto& sample = history.back();
-                    resources->set("cpuPercent", sample.cpuPercent);
-                    resources->set("memoryPercent", sample.memoryPercent);
-                    resources->set("memoryUsedMb", sample.memoryUsedMb);
-                    resources->set("memoryTotalMb", sample.memoryTotalMb);
-                    resources->set("networkReceiveKbps", sample.networkReceiveKbps);
-                    resources->set("networkSendKbps", sample.networkSendKbps);
-                    resources->set("threadCount", sample.threadCount);
-                    resources->set("diskPercent", sample.diskPercent);
-                }
-            }
-            return;
-        }
-
 #if defined(POCO_OS_FAMILY_WINDOWS)
         DWORD pid = 0;
         try { pid = static_cast<DWORD>(std::stoul(processId)); }
@@ -4086,6 +4272,9 @@ private:
         resources->set("threadCount", threads);
 #endif
         if (!resources->has("cpuPercent")) resources->set("cpuPercent", 0);
+        if (!resources->has("memoryUsedMb")) resources->set("memoryUsedMb", 0);
+        if (!resources->has("memoryPercent")) resources->set("memoryPercent", 0);
+        if (!resources->has("threadCount")) resources->set("threadCount", 0);
         resources->set("diskPercent", 0);
         resources->set("networkReceiveKbps", 0);
         resources->set("networkSendKbps", 0);
@@ -5716,6 +5905,7 @@ public:
         Poco::OSP::Properties taskHealthProperties;
         taskHealthProperties.set("pdr.healthContributor", "true");
         taskHealthProperties.set("pdr.healthContributor.component", "management-tasks");
+        taskHealthProperties.set("pdr.bundle", context->thisBundle()->symbolicName());
         _taskHealthServiceRef = context->registry().registerService(
             "pdr.health.managementTasks", new ManagementTaskHealthService,
             taskHealthProperties);
@@ -5756,6 +5946,7 @@ public:
                 sinkProperties.set("pdr.alertSink.name", "local-history");
                 sinkProperties.set("pdr.alertSink.type", "jsonl-history");
                 sinkProperties.set("pdr.alertSink.receiveSilenced", "true");
+                sinkProperties.set("pdr.bundle", context->thisBundle()->symbolicName());
                 _historySinkRef = context->registry().registerService(
                     "pdr.alertSink.localHistory", _historySink, sinkProperties);
             }

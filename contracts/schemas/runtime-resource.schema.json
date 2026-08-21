@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/runtime-resource.schema.json",
+  "title": "PocoDDSRuntime scoped resource reference",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["kind", "id", "scope", "owner"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["host", "runtime", "process", "bundle", "service", "device", "protocol"]
+    },
+    "id": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostId", "runtimeId"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["host", "runtime", "process", "bundle", "service", "device", "protocol"]
+        },
+        "hostId": { "type": "string", "minLength": 1 },
+        "runtimeId": { "type": "string", "minLength": 1 },
+        "processId": { "type": "string", "minLength": 1 },
+        "bundleId": { "type": "string", "minLength": 1 },
+        "serviceId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "owner": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["host", "runtime", "process", "bundle", "service"] },
+            "id": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "ownerKnown": { "type": "boolean" },
+    "lifecycleOwner": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["external-supervisor", "runtime", "process", "bundle"] },
+            "id": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    }
+  }
+}

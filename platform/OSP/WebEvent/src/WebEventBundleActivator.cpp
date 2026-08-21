@@ -82,7 +82,9 @@ public:
 		int maxWebSockets = pPrefs->configuration()->getInt("osp.web.event.maxWebSockets", 0);
 
 		WebEventServiceImpl::Ptr pService = new WebEventServiceImpl(pContext, maxWebSockets, workerCount);
-		_pWebEventServiceRef = pContext->registry().registerService(WebEventService::SERVICE_NAME, pService, Properties());
+		Properties properties;
+		properties.set("pdr.bundle", pContext->thisBundle()->symbolicName());
+		_pWebEventServiceRef = pContext->registry().registerService(WebEventService::SERVICE_NAME, pService, properties);
 	}
 		
 	void stop(BundleContext::Ptr pContext)

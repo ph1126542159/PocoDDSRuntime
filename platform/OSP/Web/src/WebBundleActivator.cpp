@@ -73,7 +73,9 @@ public:
 		{
 			pMediaTypeMapper->load(*pStream);
 		}
-		_pMediaTypeMapperSvc = pContext->registry().registerService(MediaTypeMapper::SERVICE_NAME, pMediaTypeMapper, Properties());
+		Properties serviceProperties;
+		serviceProperties.set("pdr.bundle", pContext->thisBundle()->symbolicName());
+		_pMediaTypeMapperSvc = pContext->registry().registerService(MediaTypeMapper::SERVICE_NAME, pMediaTypeMapper, serviceProperties);
 		ServiceRef::Ptr pPrefsSvcRef = pContext->registry().findByName("osp.core.preferences"s);
 
 		std::string authServiceName(pContext->thisBundle()->properties().getString("authServiceName"s, ""s));
@@ -176,7 +178,7 @@ public:
 		if (authMethods) config.authMethods = authMethods;
 
 		Poco::AutoPtr<WebServerDispatcher> pWebServerDispatcher = new WebServerDispatcher(config);
-		_pWebServerDispatcherSvc = pContext->registry().registerService(WebServerDispatcher::SERVICE_NAME, pWebServerDispatcher, Properties());
+		_pWebServerDispatcherSvc = pContext->registry().registerService(WebServerDispatcher::SERVICE_NAME, pWebServerDispatcher, serviceProperties);
 
 		WebSessionManager::CookiePersistence cookiePersistence = WebSessionManager::COOKIE_PERSISTENT;
 		if (sessionCookiePersistence == "transient")
@@ -206,7 +208,7 @@ public:
 		else if (cookieSameSite == "strict")
 			_pWebSessionManager->setCookieSameSite(Poco::Net::HTTPCookie::SAME_SITE_STRICT);
 
-		_pWebSessionManagerSvc = pContext->registry().registerService(WebSessionManager::SERVICE_NAME, _pWebSessionManager, Properties());
+		_pWebSessionManagerSvc = pContext->registry().registerService(WebSessionManager::SERVICE_NAME, _pWebSessionManager, serviceProperties);
 
 		ServiceRef::Ptr pXPSRef = pContext->registry().findByName("osp.core.xp"s);
 		if (pXPSRef)

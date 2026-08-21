@@ -120,9 +120,11 @@ void OSPSubsystem::initialize(Poco::Util::Application& app)
 	Service::Ptr pExtensionPointService(new ExtensionPointService(_pBundleLoader->events()));
 	Service::Ptr pPreferencesService(new PreferencesService(dataPath, &app.config()));
 	Service::Ptr pBundleInstallerService(new BundleInstallerService(*_pBundleRepository));
-	_pServiceRegistry->registerService(ExtensionPointService::SERVICE_NAME, pExtensionPointService, Properties());
-	_pServiceRegistry->registerService(PreferencesService::SERVICE_NAME, pPreferencesService, Properties());
-	_pServiceRegistry->registerService(BundleInstallerService::SERVICE_NAME, pBundleInstallerService, Properties());
+	Properties coreServiceProperties;
+	coreServiceProperties.set("pdr.bundle", "osp.core");
+	_pServiceRegistry->registerService(ExtensionPointService::SERVICE_NAME, pExtensionPointService, coreServiceProperties);
+	_pServiceRegistry->registerService(PreferencesService::SERVICE_NAME, pPreferencesService, coreServiceProperties);
+	_pServiceRegistry->registerService(BundleInstallerService::SERVICE_NAME, pBundleInstallerService, coreServiceProperties);
 	
 	loadBundles(app);
 	startBundles(app);

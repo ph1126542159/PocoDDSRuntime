@@ -150,7 +150,9 @@ public:
 			}
 
 			AutoPtr<SimpleAuthService> pService = new SimpleAuthService(adminName, adminPasswordHash, userName, userPasswordHash, userPermissions, salt);
-			_pService = pContext->registry().registerService("osp.auth", pService, Properties());
+			Properties properties;
+			properties.set("pdr.bundle", pContext->thisBundle()->symbolicName());
+			_pService = pContext->registry().registerService("osp.auth", pService, properties);
 		}
 		else
 		{

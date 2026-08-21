@@ -1,0 +1,29 @@
+.business-trace-link {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.business-trace-link:hover b,
+.business-trace-link:focus-visible b {
+  color: #1d5fce;
+}
+
+.business-trace-link:focus-visible {
+  outline: 3px solid #8eb1ef;
+  outline-offset: 5px;
+  border-radius: 4px;
+}
+
+.business-trace-link em {
+  display: block;
+  margin-top: 4px;
+  color: #2563eb;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 700;
+}

@@ -79,10 +79,13 @@ Windows PowerShell：
   --report build/reports/config-validation.json
 ./tools/pdr.ps1 identity check config/pdr-runtime.properties config/site.properties `
   --prefix build/install --report build/reports/identity-check.json
+./tools/pdr.ps1 new module TemperatureModel --output modules
 ./tools/pdr.ps1 new service TemperatureService --output services
 ./tools/pdr.ps1 new device CanTemperatureSensor --output platform/devices
 ./tools/pdr.ps1 new workflow BoardPowerOnTest --output application/workflows
+./tools/pdr.ps1 new bundle AcmeDiagnostics --output bundles
 ./tools/pdr.ps1 new plugin AcmeDiagnostics --output plugins
+./tools/pdr.ps1 new subprocess VisionWorker --output subprocesses
 ./tools/pdr.ps1 verify platform/devices/CanTemperatureSensor `
   --prefix build/install `
   --config Release --report build/reports/can-temperature-sensor-verify.json
@@ -109,10 +112,13 @@ python3 tools/pdr.py verify services/TemperatureService \
   --report build/reports/temperature-verify.json
 ```
 
-名称必须采用 PascalCase。脚手架生成公共头文件、实现、CMake Target、冒烟测试和
-集成说明。目标目录已有内容时命令默认拒绝覆盖；只有明确传入 `--force` 才会覆盖。
+名称必须采用 PascalCase。`module/service/device/workflow` 脚手架生成公共头文件、实现、
+CMake Target、冒烟测试和集成说明；`subprocess` 生成独立可执行文件、自检、安装规则和
+`pdr-subprocesses.properties` 合并片段。目标目录已有内容时命令默认拒绝覆盖；只有明确传入
+`--force` 才会覆盖。
 
-`new plugin` 额外生成 BundleActivator、Service、`.bndlspec` 和打包规则。`verify` 会要求
+`new bundle` 是 `new plugin` 的用户侧别名，两者都生成 BundleActivator、Service、
+`.bndlspec` 和打包规则，并使用受治理的 `pdr.plugin.*` 命名。`verify` 会要求
 插件实际产出 `.bndl`，并在 JSON 中记录文件名、大小和 SHA-256；`--artifact-output` 将验证过的
 Bundle 复制到发布目录。`generated-plugin-consumer` 回归测试还会把该 Bundle 放入隔离安装的
 Runtime，只有日志确认插件启动后才通过。部署到生产目录前应停止 Runtime、保留旧 Bundle，

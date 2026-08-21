@@ -118,7 +118,7 @@ class PdrToolTests(unittest.TestCase):
     def test_generates_all_supported_module_kinds(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for kind in ("service", "device", "workflow", "plugin"):
+            for kind in ("module", "service", "device", "workflow", "bundle", "plugin", "subprocess"):
                 name = kind.title() + "Example"
                 result = subprocess.run(
                     [sys.executable, str(TOOL), "new", kind, name, "--output", str(root)],
@@ -129,10 +129,16 @@ class PdrToolTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 module = root / name
                 self.assertTrue((module / "CMakeLists.txt").is_file())
-                source_name = "BundleActivator.cpp" if kind == "plugin" else f"{name}.cpp"
+                if kind in ("bundle", "plugin"):
+                    source_name = "BundleActivator.cpp"
+                elif kind == "subprocess":
+                    source_name = "main.cpp"
+                else:
+                    source_name = f"{name}.cpp"
                 self.assertTrue((module / f"src/{source_name}").is_file())
-                self.assertTrue((module / f"tests/{name}Smoke.cpp").is_file())
-                if kind == "plugin":
+                if kind != "subprocess":
+                    self.assertTrue((module / f"tests/{name}Smoke.cpp").is_file())
+                if kind in ("bundle", "plugin"):
                     cmake = (module / "CMakeLists.txt").read_text(encoding="utf-8")
                     specification = (module / f"{name}.bndlspec").read_text(encoding="utf-8")
                     self.assertIn("COMPONENTS Plugins", cmake)
@@ -150,6 +156,13 @@ class PdrToolTests(unittest.TestCase):
                     self.assertIn('operation != "ping"', source)
                     self.assertIn("successfulOperations", source)
                     self.assertIn(f"pdr.{name.lower()}.count = 1", readme)
+                if kind == "subprocess":
+                    cmake = (module / "CMakeLists.txt").read_text(encoding="utf-8")
+                    entry = (module / "config/pdr-subprocess-entry.properties").read_text(
+                        encoding="utf-8"
+                    )
+                    self.assertIn("RUNTIME_OUTPUT_DIRECTORY", cmake)
+                    self.assertIn("subprocess.N.name", entry)
 
     def test_rejects_invalid_name(self):
         result = subprocess.run(

@@ -3,6 +3,16 @@ info:
   title: PocoDDSRuntime Management API
   version: 0.1.0
 paths:
+  /api/v1/topology:
+    get:
+      operationId: getRuntimeTopology
+      summary: Return the current Runtime topology with explicit Host, Process, Bundle and Service ownership
+      responses:
+        "200":
+          description: Scoped Runtime topology
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuntimeTopology" }
   /api/v1/protocols:
     get:
       operationId: listProtocols
@@ -439,12 +449,89 @@ components:
               state: { type: string }
     ProcessDetail:
       type: object
-      required: [process, children, bundles, resources]
+      required: [schemaVersion, scope, process, children, bundles, services, serviceInventoryAuthority, resources, configurationScope]
       properties:
+        schemaVersion: { type: integer, const: 2 }
+        scope: { $ref: "#/components/schemas/ResourceScope" }
         process: { type: object }
         children: { type: array, items: { type: object } }
-        bundles: { type: array, items: { $ref: "#/components/schemas/ManagedBundle" } }
+        bundles: { type: array, items: { $ref: "#/components/schemas/RuntimeBundle" } }
+        services: { type: array, items: { $ref: "#/components/schemas/RuntimeService" } }
+        serviceInventoryAuthority: { type: string, enum: [local-registry, child-status, unavailable] }
         resources: { type: object }
+        configurationScope: { type: string, const: process }
+    ResourceScope:
+      type: object
+      required: [hostId, runtimeId]
+      properties:
+        kind: { type: string, enum: [host, runtime, process, bundle, service, device, protocol] }
+        hostId: { type: string, minLength: 1 }
+        runtimeId: { type: string, minLength: 1 }
+        processId: { type: string, minLength: 1 }
+        bundleId: { type: string, minLength: 1 }
+        serviceId: { type: string, minLength: 1 }
+    ResourceOwner:
+      type: object
+      required: [kind, id]
+      properties:
+        kind: { type: string, enum: [host, runtime, process, bundle, service, external-supervisor] }
+        id: { type: string, minLength: 1 }
+    RuntimeService:
+      type: object
+      required: [kind, id, name, state, registrationState, health, processId, bundleId, ownerKnown, scope]
+      properties:
+        kind: { type: string, const: service }
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        state: { type: string, const: registered }
+        registrationState: { type: string, const: registered }
+        health: { type: string, enum: [unknown, up, degraded, down] }
+        serviceType: { type: string }
+        processId: { type: string, minLength: 1 }
+        bundleId: { type: string }
+        ownerKnown: { type: boolean }
+        scope: { $ref: "#/components/schemas/ResourceScope" }
+        owner:
+          oneOf:
+            - { $ref: "#/components/schemas/ResourceOwner" }
+            - { type: "null" }
+        lifecycleOwner:
+          oneOf:
+            - { $ref: "#/components/schemas/ResourceOwner" }
+            - { type: "null" }
+    RuntimeBundle:
+      type: object
+      required: [kind, id, name, version, state, processId, scope, owner, lifecycleOwner]
+      properties:
+        kind: { type: string, const: bundle }
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        version: { type: string, minLength: 1 }
+        state: { type: string, enum: [installed, resolved, starting, active, stopping, uninstalled] }
+        processId: { type: string, minLength: 1 }
+        scope: { $ref: "#/components/schemas/ResourceScope" }
+        owner: { $ref: "#/components/schemas/ResourceOwner" }
+        lifecycleOwner: { $ref: "#/components/schemas/ResourceOwner" }
+    RuntimeTopology:
+      type: object
+      required: [schemaVersion, scope, host, runtime, mainProcess, hostResources, resourcesDeprecated, resourcesScope, processes, services, modules, modulesDeprecated, bundles]
+      properties:
+        schemaVersion: { type: integer, const: 2 }
+        scope: { $ref: "#/components/schemas/ResourceScope" }
+        host: { type: string, minLength: 1 }
+        runtime: { type: object }
+        mainProcess: { type: object }
+        hostResources: { type: object }
+        resourcesDeprecated: { type: boolean, const: true }
+        resourcesScope: { type: string, const: host }
+        resources:
+          type: object
+          deprecated: true
+        processes: { type: array, items: { type: object } }
+        services: { type: array, items: { $ref: "#/components/schemas/RuntimeService" } }
+        modules: { type: array, maxItems: 0 }
+        modulesDeprecated: { type: boolean, const: true }
+        bundles: { type: array, items: { $ref: "#/components/schemas/RuntimeBundle" } }
     BundleLifecycleResponse:
       type: object
       required: [message, requestId, idempotentReplay]
@@ -869,15 +956,22 @@ components:
           items: { $ref: "#/components/schemas/HealthComponent" }
     DeviceDescriptor:
       type: object
-      required: [id, type, state, sequence, timestampMicroseconds, bundle, service, required]
+      required: [kind, id, type, state, sequence, timestampMicroseconds, bundle, bundleId, service, serviceId, processId, scope, owner, lifecycleOwner, required]
       properties:
+        kind: { type: string, const: device }
         id: { type: string, minLength: 1 }
         type: { type: string, minLength: 1 }
         state: { type: string, enum: [ready, offline, fault] }
         sequence: { type: integer, minimum: 0 }
         timestampMicroseconds: { type: integer }
         bundle: { type: string }
+        bundleId: { type: string, minLength: 1 }
         service: { type: string, minLength: 1 }
+        serviceId: { type: string, minLength: 1 }
+        processId: { type: string, minLength: 1 }
+        scope: { $ref: "#/components/schemas/ResourceScope" }
+        owner: { $ref: "#/components/schemas/ResourceOwner" }
+        lifecycleOwner: { $ref: "#/components/schemas/ResourceOwner" }
         required: { type: boolean }
         diagnostics:
           $ref: "#/components/schemas/DeviceDiagnostics"
@@ -910,12 +1004,20 @@ components:
         failure: { $ref: "#/components/schemas/DiagnosticFailure" }
     ProtocolDescriptor:
       type: object
-      required: [id, type, bundle, service, required, autoReconnect, open]
+      required: [kind, id, type, bundle, bundleId, service, serviceId, processId, scope, owner, lifecycleOwner, operationOwner, required, autoReconnect, open]
       properties:
+        kind: { type: string, const: protocol }
         id: { type: string, minLength: 1 }
         type: { type: string, minLength: 1 }
         bundle: { type: string }
+        bundleId: { type: string, minLength: 1 }
         service: { type: string, minLength: 1 }
+        serviceId: { type: string, minLength: 1 }
+        processId: { type: string, minLength: 1 }
+        scope: { $ref: "#/components/schemas/ResourceScope" }
+        owner: { $ref: "#/components/schemas/ResourceOwner" }
+        lifecycleOwner: { $ref: "#/components/schemas/ResourceOwner" }
+        operationOwner: { $ref: "#/components/schemas/ResourceOwner" }
         required: { type: boolean }
         autoReconnect: { type: boolean }
         open: { type: boolean }
@@ -924,18 +1026,20 @@ components:
         error: { type: string }
     ProtocolInventory:
       type: object
-      required: [schemaVersion, count, protocols]
+      required: [schemaVersion, scope, count, protocols]
       properties:
-        schemaVersion: { type: integer, const: 1 }
+        schemaVersion: { type: integer, const: 2 }
+        scope: { $ref: "#/components/schemas/ResourceScope" }
         count: { type: integer, minimum: 0 }
         protocols:
           type: array
           items: { $ref: "#/components/schemas/ProtocolDescriptor" }
     DeviceInventory:
       type: object
-      required: [schemaVersion, count, devices]
+      required: [schemaVersion, scope, count, devices]
       properties:
-        schemaVersion: { type: integer, const: 1 }
+        schemaVersion: { type: integer, const: 2 }
+        scope: { $ref: "#/components/schemas/ResourceScope" }
         count: { type: integer, minimum: 0 }
         devices:
           type: array

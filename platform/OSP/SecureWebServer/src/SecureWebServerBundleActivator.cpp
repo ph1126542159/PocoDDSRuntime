@@ -192,6 +192,7 @@ public:
 				props.set("protocol", "https");
 				props.set("host", host);
 				props.set("port", format("%d", port));
+				props.set("pdr.bundle", pContext->thisBundle()->symbolicName());
 				_pService = pContext->registry().registerService("osp.web.server.secure", new SecureWebServerService(pParams, *_pHTTPServer, host), props);
 			}
 		}

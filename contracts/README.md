@@ -3,6 +3,7 @@
 本目录是跨入口契约的唯一文档入口：
 
 - `schemas/runtime-config.schema.json`：运行时配置类型、范围和必填项。
+- `schemas/runtime-resource.schema.json`：Host → Runtime → Process → Bundle → Service 的作用域、所有权和生命周期所有者公共契约。
 - `schemas/release-trust-policy.schema.json`：发布允许密钥、有效期与吊销列表格式。
 - `schemas/plugin-trust-policy.schema.json`：插件发布者、允许命名范围、Ed25519 公钥、有效期和吊销契约。
 - `schemas/plugin-host-state.schema.json`：隔离插件宿主向 Runtime/Web 暴露的跨进程状态快照。

@@ -2,9 +2,11 @@
 
 ## 实现过程
 
-`webui/home` 提供进程、服务、组件、Bundle、受控配置、日志和生命周期操作界面。React 页面调用运行时 REST API；静态资源打包为 `pdr-webui-home` OSP Bundle。平台侧栏只保留平台级入口；服务、组件、Bundle、日志、配置治理和业务执行统一放在“进程管理”的当前进程上下文中。选择主进程或子进程后，页内标签和数据会随当前进程一起切换。
+`webui/home` 按 Host → Runtime → Process → Bundle → Service 的运行时模型组织页面。React 页面调用运行时 REST API；静态资源打包为 `pdr-webui-home` OSP Bundle。Host 只承载整机资源，Runtime 承载聚合健康和控制面治理，进程页只展示当前 OS 进程的资源、配置、日志、Bundle 和 Service。
 
-服务和组件清单是只读视图；页面把基础 `/api/v1/topology` 清单与 `/api/v1/process-detail` 返回的权威 `manageable` 标记合并，只有后端 allowlist 放行的 Bundle 才显示启动或重启操作，不会为不存在的后端能力显示配置或卸载按钮。当前拓扑 API 只为主进程返回 OSP 服务和组件清单，因此子进程页不会把主进程清单错误归属给子进程。
+Bundle 是进程内的部署和生命周期单元；Service 是 Bundle 注册到本进程 Registry 的能力，不提供通用启停。进程页只读取 `/api/v1/process-detail` 返回的本进程 Service 清单，并显示 `local-registry`、`child-status` 或 `unavailable` 权威来源，绝不继承主进程清单。源码模块、C++ 库和页面组件不属于运行时实体，旧 `modules` 字段已废弃。完整边界见 [ADR 0001](../../../adr/0001-runtime-resource-scope-and-ownership.md)。
+
+Runtime 身份、权限、配置事务、管理审计、幂等保护和异步管理任务集中在“Runtime 治理”页面。普通“进程配置”仅表示所选进程实际加载的 properties；主进程也不能通过自身管理接口停止自己，外部服务管理器才是其生命周期所有者。
 
 ## 用法
 
@@ -22,7 +24,8 @@ npm run build
 
 | API | 用途 |
 | --- | --- |
-| `GET /api/v1/topology` | 进程、模块、Bundle、服务拓扑 |
+| `GET /api/v1/topology` | 当前 Runtime 的 Host、进程、Bundle、Service 作用域和所有权拓扑 |
+| `GET /api/v1/process-detail?id=...&name=...` | 单个进程的资源、配置、Bundle、Service 及清单权威来源 |
 | `POST /api/v1/process-config` | 事务式修改后端白名单中的 Runtime 配置项 |
 | `POST /api/v1/process-lifecycle` | 本机子进程生命周期操作 |
 | `POST /api/v1/bundle-lifecycle` | 可管理 Bundle 的启动、停止或重启 |
@@ -33,8 +36,7 @@ npm run build
 | `GET /api/v1/alert-sinks` | 已注册告警 Sink 的名称、类型和静默接收策略，不返回密钥 |
 | `GET /api/v1/identity` | 当前身份快照代次、身份数量和认证状态，不返回 ID、路径或令牌 |
 | `POST /api/v1/identity` | 经 `identity.manage` 授权和二次确认后原子重载文件型令牌 |
-| `GET /api/v1/heartbeat-businesses` | 当前业务执行列表，最多返回最近 1000 条 |
-| `GET /api/v1/business-trace-history?...` | 按时间、名称和状态分页查询业务历史 |
+| `GET /api/v1/heartbeat-businesses` | 内部心跳与跨进程协同摘要；点击记录后按 `traceId` 跳转业务追踪页 |
 
 请求使用 sessionStorage 中的 Bearer token。主页只是客户端；真实操作由 `platform/OSP/Web` 的 dispatcher 执行。
 同一 Bearer token 也会随配置、协议、进程和 Bundle 写请求发送。配置卡明确显示后端当前是
@@ -70,9 +72,8 @@ Web 成功提示会明确显示“已校验、持久化并应用”或“已校�
 点击时必须提交页面刚读取到的 `transactionId`，服务端会拒绝过期事务或外部改写后的
 配置，防止旧页面覆盖新配置。审计记录不保存配置值和敏感信息。
 
-主页中的业务执行列表采用单行紧凑布局；业务历史记录查询面板可按起止时间、
-业务名称和状态筛选，每页显示 100 条。历史数据由运行时的 Poco SQLite 小时分库
-提供，默认保留 10 天。
+主页只保留内部链路摘要，不再重复实现流程图、节点参数、日志、历史查询或诊断报告。
+点击摘要记录后进入 `/tracing/?traceId=...`；完整追踪能力统一由业务追踪组件提供。
 
 运行总览的告警区同时展示已注册 AlertSink、逐 Sink 健康状态和成功/失败次数，以及 `pdr.alert.delivery` 的全局成功、失败、丢弃计数；连续失败的 Sink 标为 degraded，悬停可查看最近错误。
 Sink API 或指标暂时不可用时该区域降级为空清单和零计数，不阻断首页其余运行状态刷新。
@@ -88,7 +89,7 @@ Set-Location webui\home
 npm install
 npm run build
 Set-Location ..\..
-cmake --build build --config Release --target pdr_webui_home
+cmake --build build --config Release --target pdr_webui_home_Package
 ```
 
 页面未更新时检查新 `.bndl` 是否进入实际运行目录，并确认热更新日志和 Bundle active 状态。

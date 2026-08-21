@@ -1,0 +1,80 @@
+/* A compact, readable hierarchy for the tracking workspace and history view. */
+:root {
+  --trace-caption: 12px;
+  --trace-meta: 13px;
+  --trace-body: 14px;
+  --trace-section: 18px;
+  --trace-page: 24px;
+}
+
+body { font-size: var(--trace-body); line-height: 1.45; }
+button,
+input,
+select,
+textarea { font-size: var(--trace-body); }
+
+.top h1 { font-size: var(--trace-page); }
+.top p { font-size: var(--trace-body); }
+.top button,
+.top a { font-size: var(--trace-body); }
+.banner { font-size: var(--trace-body); }
+
+.simulation-title h2,
+.graph h2 { font-size: var(--trace-section); }
+.simulation-title p,
+.simulation-panel footer { font-size: var(--trace-body); }
+.simulation-fields label { font-size: var(--trace-body); }
+.simulation-fields select,
+.simulation-fields input,
+.simulation-fields button { font-size: var(--trace-body); }
+
+.traces > h2,
+.inspector > h2 { font-size: 16px; }
+.traces > h2 span,
+.traces small,
+.traces em,
+.status { font-size: var(--trace-meta); }
+.traces b { font-size: 15px; }
+.source { font-size: var(--trace-caption); }
+
+.graph p,
+.graph-actions button { font-size: var(--trace-meta); }
+.run-overview span { font-size: var(--trace-meta); }
+.run-overview b { font-size: var(--trace-body); }
+.run-overview button { font-size: var(--trace-meta); }
+.node > span,
+.node small { font-size: var(--trace-meta); }
+.node b { font-size: 15px; }
+
+.detail-head h2 { font-size: 20px; }
+.detail-head p,
+dl > div,
+.detail h3,
+.field pre,
+.log pre,
+.error pre,
+.none { font-size: var(--trace-meta); }
+.field label,
+.log header { font-size: var(--trace-caption); }
+.empty p,
+.safety { font-size: var(--trace-body); }
+
+.history-page > header h2 { font-size: 20px; }
+.history-page > header p,
+.history-page > header button,
+.history-page form label,
+.history-page form input,
+.history-page form select,
+.history-page form > button { font-size: var(--trace-body); }
+.history-error { font-size: var(--trace-body); }
+.history-columns { font-size: var(--trace-meta); }
+.history-row b { font-size: 15px; }
+.history-row small { font-size: var(--trace-meta); }
+.history-row strong { font-size: var(--trace-body); }
+.history-page > footer,
+.history-page > footer button { font-size: var(--trace-meta); }
+
+@media (max-width: 650px) {
+  .top h1 { font-size: 22px; }
+  .history-page > header h2 { font-size: var(--trace-section); }
+}

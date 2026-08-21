@@ -60,6 +60,12 @@ and optional OTLP/HTTP JSON export to a Collector.
 - `config/` — runtime configuration.
 - `build/` — all generated dependency, native, cross and install trees.
 
+Direct children of `services/`, `SubSystem/` and `webui/` are discovered from
+their local `CMakeLists.txt`; adding a component does not require editing a
+central source list. Project-specific code should normally consume the installed
+SDK from a separate product repository. See
+[the extensibility boundary](docs/architecture/extensibility.md).
+
 ## Communication boundary
 
 Fast DDS replaces RemotingNG only for communication between processes or
@@ -179,10 +185,13 @@ Use the developer command to check the environment or create a standard module:
   --report build/reports/developer-doctor.json
 ./tools/pdr.ps1 validate-config config/pdr-runtime.properties `
   --prefix build/install --report build/reports/config-validation.json
+./tools/pdr.ps1 new module TemperatureModel --output modules
 ./tools/pdr.ps1 new service TemperatureService --output services
 ./tools/pdr.ps1 new device CanTemperatureSensor --output platform/devices
 ./tools/pdr.ps1 new workflow BoardPowerOnTest --output application/workflows
+./tools/pdr.ps1 new bundle AcmeDiagnostics --output bundles
 ./tools/pdr.ps1 new plugin AcmeDiagnostics --output plugins
+./tools/pdr.ps1 new subprocess VisionWorker --output SubSystem
 ./tools/pdr.ps1 verify platform/devices/CanTemperatureSensor `
   --prefix build/install --config Release `
   --report build/reports/can-temperature-sensor-verify.json

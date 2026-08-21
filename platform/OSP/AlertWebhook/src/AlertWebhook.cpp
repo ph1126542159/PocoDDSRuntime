@@ -241,6 +241,7 @@ public:
             properties.set("pdr.alertSink", "true");
             properties.set("pdr.alertSink.name", instance.legacy ? "webhook" : instance.id);
             properties.set("pdr.alertSink.type", "https-webhook");
+            properties.set("pdr.bundle", context->thisBundle()->symbolicName());
             const auto serviceName = instance.legacy
                 ? "pdr.alertSink.webhook" : "pdr.alertSink.webhook." + instance.id;
             _services.push_back(

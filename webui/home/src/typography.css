@@ -1,0 +1,152 @@
+/* Final typography pass: one readable scale across every runtime-center view. */
+.precision-shell {
+  --type-caption: 12px;
+  --type-meta: 13px;
+  --type-body: 14px;
+  --type-section: 17px;
+  --type-page: 20px;
+  --type-display: 22px;
+  font-size: var(--type-body);
+  line-height: 1.45;
+}
+
+.precision-shell button,
+.precision-shell input,
+.precision-shell select,
+.precision-shell textarea {
+  font-size: var(--type-body);
+}
+
+.precision-shell .command-brand b { font-size: 18px; }
+.precision-shell .command-title { font-size: var(--type-section); }
+.precision-shell .command-actions,
+.precision-shell .command-actions .last-update,
+.precision-shell .command-online { font-size: var(--type-meta) !important; }
+.precision-shell nav button { font-size: var(--type-body); }
+.precision-shell .runtime-state b { font-size: var(--type-meta); }
+.precision-shell .runtime-state small { font-size: var(--type-caption); }
+
+/* Runtime overview */
+.precision-shell .precision-health-strip b { font-size: 18px; }
+.precision-shell .precision-health-strip small { font-size: var(--type-meta); }
+.precision-shell .precision-health-strip em { font-size: var(--type-caption); }
+.precision-shell .precision-topology h2,
+.precision-shell .precision-attention h2,
+.precision-shell .precision-resources h2,
+.precision-shell .section-head h2 { font-size: var(--type-section); }
+.precision-shell .precision-topology header p,
+.precision-shell .precision-resources header p,
+.precision-shell .precision-topology header > span,
+.precision-shell .precision-worker-label,
+.precision-shell .precision-legend,
+.precision-shell .precision-attention > header span,
+.precision-shell .precision-attention small,
+.precision-shell .precision-range button,
+.precision-shell .precision-chart-grid article > div,
+.precision-shell .section-head p,
+.precision-shell .table-tools > span,
+.precision-shell .healthy,
+.precision-shell .inventory-count { font-size: var(--type-meta); }
+.precision-shell .precision-process-head { font-size: var(--type-meta); }
+.precision-shell .precision-process-row,
+.precision-shell .precision-process-name b,
+.precision-shell .precision-attention b,
+.precision-shell .precision-attention p { font-size: var(--type-body); }
+.precision-shell .precision-process-name small { font-size: var(--type-meta); }
+.precision-shell .precision-state,
+.precision-shell .precision-chart-grid b,
+.precision-shell .precision-chart-grid strong { font-size: var(--type-meta); }
+
+/* Process workbench and process-scoped entities */
+.precision-shell .selected-process-head h2 { font-size: var(--type-display); }
+.precision-shell .selected-process-head p,
+.precision-shell .selected-process-head small,
+.precision-shell .guide-label > span { font-size: var(--type-meta); }
+.precision-shell .process-section-tabs button { font-size: var(--type-body); }
+.precision-shell .process-section-tabs button small { font-size: var(--type-caption); }
+.precision-shell .resource-chart header small,
+.precision-shell .resource-chart footer,
+.precision-shell .child-process-title small,
+.precision-shell .child-process-facts small,
+.precision-shell .bundle-detail-list small,
+.precision-shell .protected-bundle,
+.precision-shell .readonly-config,
+.precision-shell .identity-snapshot small,
+.precision-shell .identity-snapshot button,
+.precision-shell .process-log-panel > footer { font-size: var(--type-meta); }
+.precision-shell .resource-chart header strong { font-size: 20px; }
+.precision-shell .child-process-title b,
+.precision-shell .config-transactions h3,
+.precision-shell .process-log-panel h2 { font-size: var(--type-section); }
+.precision-shell .child-process-facts strong,
+.precision-shell .location-badge,
+.precision-shell .bundle-detail-list b,
+.precision-shell .identity-snapshot b,
+.precision-shell .terminal-empty p { font-size: var(--type-body); }
+.precision-shell .bundle-lifecycle button,
+.precision-shell .config-edit button,
+.precision-shell .config-detail-list b,
+.precision-shell .config-detail-list code,
+.precision-shell .config-edit input,
+.precision-shell .management-auth,
+.precision-shell .config-rollback,
+.precision-shell .config-transactions > div,
+.precision-shell .persistence-recovery-guidance,
+.precision-shell .process-log-panel p,
+.precision-shell .live-indicator,
+.precision-shell .process-log-toolbar input,
+.precision-shell .terminal { font-size: var(--type-meta); }
+
+/* Inventory, devices, plugins, logs, and metric tables */
+.precision-shell .search input,
+.precision-shell .log-tools select,
+.precision-shell .source-filter { font-size: var(--type-body); }
+.precision-shell .entity-table th,
+.precision-shell .log-table th,
+.precision-shell .metrics-table th { font-size: var(--type-meta); }
+.precision-shell .entity-table td,
+.precision-shell .log-table td,
+.precision-shell .metrics-table td,
+.precision-shell .entity-name b,
+.precision-shell .inventory-row b { font-size: var(--type-body); }
+.precision-shell .entity-name small,
+.precision-shell .inventory-row small,
+.precision-shell .metrics-table td:first-child small,
+.precision-shell .metric-value-stack small { font-size: var(--type-meta); }
+.precision-shell .status,
+.precision-shell .level,
+.precision-shell .metric-kind,
+.precision-shell .metric-labels span { font-size: var(--type-caption); }
+.precision-shell .log-table td:last-child { font-size: var(--type-meta); }
+.precision-shell .refresh,
+.precision-shell .primary,
+.precision-shell .ghost { font-size: var(--type-body); }
+
+/* Metrics center */
+.precision-shell .metrics-intro > div > span { font-size: var(--type-meta); }
+.precision-shell .metrics-intro h2 { font-size: var(--type-display); }
+.precision-shell .metrics-intro p { font-size: var(--type-body); }
+.precision-shell .metrics-intro li { font-size: var(--type-meta); }
+.precision-shell .metrics-intro li b { font-size: var(--type-caption); }
+.precision-shell .metrics-status-card small,
+.precision-shell .metrics-status-card em { font-size: var(--type-meta); }
+.precision-shell .metrics-status-card strong { font-size: 20px; }
+.precision-shell .metrics-center .metrics-domain-tabs button b { font-size: var(--type-body); }
+.precision-shell .metrics-center .metrics-domain-tabs button small { font-size: var(--type-meta); }
+.precision-shell .metrics-help summary,
+.precision-shell .metrics-help p { font-size: var(--type-meta); }
+
+/* Internal-link summary; full trace analysis belongs to /tracing/. */
+.precision-shell .business-execution-columns { font-size: var(--type-meta); }
+.precision-shell .business-execution-list > article,
+.precision-shell .business-execution-list b,
+.precision-shell .business-execution-list > article > strong { font-size: var(--type-body); }
+.precision-shell .business-execution-list small,
+.precision-shell .business-link,
+.precision-shell .business-history-query { font-size: var(--type-meta); }
+.precision-shell .business-trace-link em { font-size: var(--type-meta); }
+
+@media (max-width: 680px) {
+  .precision-shell .selected-process-head h2,
+  .precision-shell .metrics-intro h2 { font-size: 20px; }
+}
