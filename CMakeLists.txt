@@ -493,6 +493,7 @@ if(BUILD_TESTING)
                         --require-body "需要关注"
                         --require-body "资源趋势"
                         --require-body "打开进程工作台"
+                        --require-body "业务追踪"
                         --require-body "ROS Bridge"
                         --require-body "\"protocols\""
                         --set "pdr.udp.count=1"
