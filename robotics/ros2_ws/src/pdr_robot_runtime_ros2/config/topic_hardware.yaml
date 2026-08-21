@@ -1,0 +1,11 @@
+pdr_robot_runtime:
+  ros__parameters:
+    backend: topic_hardware
+    hardware_name: device-gateway
+    hardware_description: gateway://robot
+    simulator_feedback_timeout_ms: 100
+    tick_period_ms: 10
+    maximum_linear_speed: 0.5
+    maximum_angular_speed: 0.8
+    command_timeout_ms: 100
+    # Omit all joint arrays for a jointless robot; otherwise provide every array together.

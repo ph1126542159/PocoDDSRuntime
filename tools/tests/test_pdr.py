@@ -250,6 +250,30 @@ class PdrToolTests(unittest.TestCase):
             layout = next(item for item in evidence["checks"] if item["id"] == "layout")
             self.assertIn("installed:", layout["detail"])
 
+    def test_doctor_accepts_unix_poco_package_layout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            prefix = Path(directory) / "install"
+            self.create_doctor_layout(root, prefix)
+            windows_layout = prefix / "cmake" / "PocoConfig.cmake"
+            windows_layout.unlink()
+            unix_layout = prefix / "lib" / "cmake" / "Poco" / "PocoConfig.cmake"
+            unix_layout.parent.mkdir(parents=True)
+            unix_layout.write_text("# Unix Poco package\n", encoding="utf-8")
+            report = Path(directory) / "doctor.json"
+            result = subprocess.run(
+                [sys.executable, str(TOOL), "doctor", "--root", str(root),
+                 "--prefix", str(prefix), "--report", str(report)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            evidence = json.loads(report.read_text(encoding="utf-8"))
+            poco = next(item for item in evidence["checks"]
+                        if item["id"] == "poco-package")
+            self.assertEqual(Path(poco["detail"]), unix_layout)
+
     def test_doctor_failure_report_contains_remedies(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "source"
@@ -801,8 +825,11 @@ class PdrToolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runtime = root / "runtime"
-            launcher = runtime / "processes" / "pdr-launcher" / "pdr-launcher.exe"
-            host = runtime / "processes" / "pdr-plugin-host" / "pdr-plugin-host.exe"
+            executable_suffix = ".exe" if os.name == "nt" else ""
+            launcher = (runtime / "processes" / "pdr-launcher" /
+                        f"pdr-launcher{executable_suffix}")
+            host = (runtime / "processes" / "pdr-plugin-host" /
+                    f"pdr-plugin-host{executable_suffix}")
             launcher.parent.mkdir(parents=True)
             host.parent.mkdir(parents=True)
             launcher.write_bytes(b"launcher")

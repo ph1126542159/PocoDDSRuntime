@@ -70,6 +70,25 @@
       "cacheVariables": {
         "PDR_RELEASE_REQUIRE_CLEAN": "ON"
       }
+    },
+    {
+      "name": "robotics",
+      "inherits": "base",
+      "displayName": "Embodied robotics runtime core",
+      "description": "Cross-platform transport-neutral core; ROS 2 adapters are built with colcon",
+      "binaryDir": "${sourceDir}/build/robotics",
+      "cacheVariables": {
+        "PDR_PROFILE": "custom",
+        "PDR_BUILD_LEGACY_RUNTIME": "OFF",
+        "PDR_BUILD_ROBOTICS_RUNTIME": "ON",
+        "PDR_COMM_BACKEND": "ROS2",
+        "PDR_ENABLE_OBSERVABILITY": "OFF",
+        "PDR_AUTO_BOOTSTRAP_DEPENDENCIES": "OFF",
+        "PDR_BUILD_WEBUI": "OFF",
+        "PDR_BUILD_LAUNCHER": "OFF",
+        "PDR_BUILD_PLUGIN_HOST": "OFF",
+        "PDR_BUILD_QT3D": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -85,6 +104,12 @@
     {
       "name": "release",
       "configurePreset": "release",
+      "configuration": "Release",
+      "jobs": 2
+    },
+    {
+      "name": "robotics",
+      "configurePreset": "robotics",
       "configuration": "Release",
       "jobs": 2
     }
@@ -106,6 +131,11 @@
       "name": "release",
       "configurePreset": "release",
       "description": "Full governed release suite with clean-worktree enforcement",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "robotics",
+      "configurePreset": "robotics",
       "output": { "outputOnFailure": true }
     }
   ]

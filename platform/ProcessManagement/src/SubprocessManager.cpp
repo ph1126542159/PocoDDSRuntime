@@ -40,9 +40,8 @@ std::string resolveRelativePath(const std::string& rootDirectory, const std::str
     std::string rootText = root.toString();
     std::string resolvedText = resolved.toString();
 #if defined(POCO_OS_FAMILY_WINDOWS)
-    const auto lower = [](unsigned char character) {
-        return static_cast<char>(std::tolower(character));
-    };
+    const auto lower = [](unsigned char character)
+    { return static_cast<char>(std::tolower(character)); };
     std::transform(rootText.begin(), rootText.end(), rootText.begin(), lower);
     std::transform(resolvedText.begin(), resolvedText.end(), resolvedText.begin(), lower);
 #endif
@@ -105,8 +104,7 @@ class SubprocessManager::Impl final
                     continue;
 
                 const std::string relativePath = configuration->getString(prefix + "path");
-                const std::string executable =
-                    resolveRelativePath(rootDirectory, relativePath);
+                const std::string executable = resolveRelativePath(rootDirectory, relativePath);
                 Poco::File executableFile(executable);
                 if (!executableFile.exists() || !executableFile.isFile())
                     throw Poco::FileNotFoundException("Subprocess executable", executable);
@@ -116,8 +114,8 @@ class SubprocessManager::Impl final
                     std::max(0, configuration->getInt(prefix + "argument.count", 0));
                 for (int argument = 0; argument < argumentCount; ++argument)
                 {
-                    arguments.push_back(configuration->getString(
-                        prefix + "argument." + std::to_string(argument)));
+                    arguments.push_back(
+                        configuration->getString(prefix + "argument." + std::to_string(argument)));
                 }
 
                 std::string initialDirectory;
@@ -137,9 +135,8 @@ class SubprocessManager::Impl final
                     configuration->getString(prefix + "name", Poco::Path(executable).getBaseName());
                 std::string location = configuration->getString(prefix + "location", "local");
                 std::transform(location.begin(), location.end(), location.begin(),
-                               [](unsigned char value) {
-                                   return static_cast<char>(std::tolower(value));
-                               });
+                               [](unsigned char value)
+                               { return static_cast<char>(std::tolower(value)); });
                 if (location != "local" && location != "remote")
                     throw Poco::InvalidArgumentException(
                         "Subprocess location must be local or remote", location);
@@ -231,19 +228,16 @@ class SubprocessManager::Impl final
     {
         Poco::FastMutex::ScopedLock lock(_mutex);
         return static_cast<std::size_t>(
-            std::count_if(_running.begin(), _running.end(), [](const RunningProcess& process) {
-                return Poco::Process::isRunning(*process.handle);
-            }));
+            std::count_if(_running.begin(), _running.end(), [](const RunningProcess& process)
+                          { return Poco::Process::isRunning(*process.handle); }));
     }
 
   private:
     void launch(const ConfiguredProcess& process)
     {
-        _logger.information("Starting local subprocess '%s': %s", process.name,
-                            process.executable);
+        _logger.information("Starting local subprocess '%s': %s", process.name, process.executable);
         auto handle = std::make_unique<Poco::ProcessHandle>(
-            Poco::Process::launch(process.executable, process.arguments,
-                                  process.initialDirectory));
+            Poco::Process::launch(process.executable, process.arguments, process.initialDirectory));
         _logger.information("Subprocess '%s' started with PID %d.", process.name,
                             static_cast<int>(handle->id()));
         _running.push_back({process.name, std::move(handle)});
@@ -259,47 +253,37 @@ class SubprocessManager::Impl final
         const Poco::Timestamp::TimeVal timeoutMicroseconds =
             _options.shutdownTimeoutMilliseconds * 1000;
         Poco::Timestamp started;
-        while (Poco::Process::isRunning(*process.handle) &&
-               !started.isElapsed(timeoutMicroseconds))
+        while (Poco::Process::isRunning(*process.handle) && !started.isElapsed(timeoutMicroseconds))
             Poco::Thread::sleep(50);
         if (Poco::Process::isRunning(*process.handle))
         {
-            _logger.warning("Subprocess '%s' did not stop in time; terminating it.",
-                            process.name);
+            _logger.warning("Subprocess '%s' did not stop in time; terminating it.", process.name);
             Poco::Process::kill(*process.handle);
         }
     }
 
-    auto findConfigured(const std::string& name)
+    std::vector<ConfiguredProcess>::iterator findConfigured(const std::string& name)
     {
         return std::find_if(_configured.begin(), _configured.end(),
-                            [&](const ConfiguredProcess& process) {
-                                return process.name == name;
-                            });
+                            [&](const ConfiguredProcess& process) { return process.name == name; });
     }
 
-    auto findConfigured(const std::string& name) const
+    std::vector<ConfiguredProcess>::const_iterator findConfigured(const std::string& name) const
     {
         return std::find_if(_configured.begin(), _configured.end(),
-                            [&](const ConfiguredProcess& process) {
-                                return process.name == name;
-                            });
+                            [&](const ConfiguredProcess& process) { return process.name == name; });
     }
 
-    auto findRunning(const std::string& name)
+    std::vector<RunningProcess>::iterator findRunning(const std::string& name)
     {
         return std::find_if(_running.begin(), _running.end(),
-                            [&](const RunningProcess& process) {
-                                return process.name == name;
-                            });
+                            [&](const RunningProcess& process) { return process.name == name; });
     }
 
-    auto findRunning(const std::string& name) const
+    std::vector<RunningProcess>::const_iterator findRunning(const std::string& name) const
     {
         return std::find_if(_running.begin(), _running.end(),
-                            [&](const RunningProcess& process) {
-                                return process.name == name;
-                            });
+                            [&](const RunningProcess& process) { return process.name == name; });
     }
 
     Poco::Logger& _logger;

@@ -99,7 +99,7 @@
 .flow-error-panel > div:last-child { padding-bottom: 0; border-bottom: 0; }
 .flow-diagram { min-width: 900px !important; }
 
-/* Keep the inspector inside the content grid and fit all six heartbeat steps on 1080p screens. */
+/* Keep the inspector inside the content grid and fit the full flow on 1080p screens. */
 .business-modal {
   grid-template-rows: 70px 92px minmax(0, 1fr) !important;
 }

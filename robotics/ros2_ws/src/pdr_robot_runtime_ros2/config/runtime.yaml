@@ -1,0 +1,17 @@
+pdr_robot_runtime:
+  ros__parameters:
+    backend: in_memory
+    world: empty
+    hardware_description: mock://robot
+    simulator_name: external-simulator
+    simulator_feedback_timeout_ms: 500
+    tick_period_ms: 20
+    maximum_linear_speed: 1.0
+    maximum_angular_speed: 1.0
+    command_timeout_ms: 250
+    # Omit all joint arrays for a jointless robot; otherwise provide every array together.
+    # Optional reference modules: warehouse, inspection, pick_place.
+    # Custom modules implement RobotBusinessModule and register without changing the runtime.
+    # Omit business_modules when no business mission should be installed.
+    # Explicit trusted DLL/SO paths only; directories are never scanned automatically.
+    # Omit business_plugins when no external plugin should be loaded.

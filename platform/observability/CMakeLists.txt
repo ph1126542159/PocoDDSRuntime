@@ -35,6 +35,8 @@ target_link_libraries(PDRObservability
         Poco::Crypto
         Poco::JSON
         Poco::Foundation)
+
+pdr_isolate_embedded_static_dependencies(PDRObservability)
 pdr_set_warnings(PDRObservability)
 
 if(BUILD_TESTING)

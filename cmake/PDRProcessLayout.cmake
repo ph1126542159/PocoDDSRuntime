@@ -29,6 +29,12 @@ function(pdr_configure_subprocess target)
         endforeach()
     endif()
 
+    if(UNIX AND NOT APPLE)
+        pdr_isolate_embedded_static_dependencies(${target})
+        set_target_properties(${target} PROPERTIES
+            INSTALL_RPATH "$ORIGIN/../../../${CMAKE_INSTALL_LIBDIR}")
+    endif()
+
     add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
             "$<TARGET_FILE_DIR:${target}>/logs"

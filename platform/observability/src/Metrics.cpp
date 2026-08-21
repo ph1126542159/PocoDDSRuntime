@@ -1,29 +1,30 @@
 #include "PocoDDS/Observability/Metrics.h"
 
-#include <Poco/JSON/Array.h>
-#include <Poco/JSON/Object.h>
-#include <Poco/Net/HTTPClientSession.h>
-#include <Poco/Net/HTTPSClientSession.h>
-#include <Poco/Net/Context.h>
-#include <Poco/Net/HTTPRequest.h>
-#include <Poco/Net/HTTPResponse.h>
-#include <Poco/StreamCopier.h>
-#include <Poco/Timestamp.h>
-#include <Poco/URI.h>
 #include <Poco/DirectoryIterator.h>
 #include <Poco/File.h>
 #include <Poco/FileStream.h>
+#include <Poco/JSON/Array.h>
+#include <Poco/JSON/Object.h>
+#include <Poco/Net/Context.h>
+#include <Poco/Net/HTTPClientSession.h>
+#include <Poco/Net/HTTPRequest.h>
+#include <Poco/Net/HTTPResponse.h>
+#include <Poco/Net/HTTPSClientSession.h>
+#include <Poco/StreamCopier.h>
+#include <Poco/Timestamp.h>
+#include <Poco/URI.h>
 
-#include <opentelemetry/metrics/meter.h>
-#include <opentelemetry/metrics/provider.h>
-#include <opentelemetry/context/context.h>
 #include <opentelemetry/common/key_value_iterable_view.h>
-#include <opentelemetry/sdk/metrics/meter_context_factory.h>
-#include <opentelemetry/sdk/metrics/meter_provider_factory.h>
-#include <opentelemetry/sdk/metrics/view/view_registry.h>
-#include <opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_factory.h>
+#include <opentelemetry/context/context.h>
 #include <opentelemetry/exporters/otlp/otlp_http_metric_exporter_factory.h>
 #include <opentelemetry/exporters/otlp/otlp_http_metric_exporter_options.h>
+#include <opentelemetry/metrics/meter.h>
+#include <opentelemetry/metrics/provider.h>
+#include <opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_factory.h>
+#include <opentelemetry/sdk/metrics/meter_context_factory.h>
+#include <opentelemetry/sdk/metrics/meter_provider_factory.h>
+#include <opentelemetry/sdk/metrics/push_metric_exporter.h>
+#include <opentelemetry/sdk/metrics/view/view_registry.h>
 #include <opentelemetry/sdk/resource/resource.h>
 
 #include <algorithm>
@@ -44,6 +45,50 @@ namespace metricsSdk = opentelemetry::sdk::metrics;
 
 namespace
 {
+struct MetricExportStatus
+{
+    std::atomic<std::uint64_t> failures{0};
+};
+
+class StatusTrackingMetricExporter final : public metricsSdk::PushMetricExporter
+{
+  public:
+    StatusTrackingMetricExporter(std::unique_ptr<metricsSdk::PushMetricExporter> delegate,
+                                 std::shared_ptr<MetricExportStatus> status)
+        : _delegate(std::move(delegate)), _status(std::move(status))
+    {
+    }
+
+    otel::sdk::common::ExportResult
+    Export(const metricsSdk::ResourceMetrics& data) noexcept override
+    {
+        const auto result = _delegate->Export(data);
+        if (result != otel::sdk::common::ExportResult::kSuccess)
+            _status->failures.fetch_add(1, std::memory_order_relaxed);
+        return result;
+    }
+
+    metricsSdk::AggregationTemporality
+    GetAggregationTemporality(metricsSdk::InstrumentType instrumentType) const noexcept override
+    {
+        return _delegate->GetAggregationTemporality(instrumentType);
+    }
+
+    bool ForceFlush(std::chrono::microseconds timeout) noexcept override
+    {
+        return _delegate->ForceFlush(timeout);
+    }
+
+    bool Shutdown(std::chrono::microseconds timeout) noexcept override
+    {
+        return _delegate->Shutdown(timeout);
+    }
+
+  private:
+    std::unique_ptr<metricsSdk::PushMetricExporter> _delegate;
+    std::shared_ptr<MetricExportStatus> _status;
+};
+
 std::string seriesKey(const std::string& name, const MetricAttributes& attributes)
 {
     std::string key = name;
@@ -61,8 +106,10 @@ const char* kindName(MetricKind kind)
 {
     switch (kind)
     {
-    case MetricKind::counter: return "counter";
-    case MetricKind::histogram: return "histogram";
+    case MetricKind::counter:
+        return "counter";
+    case MetricKind::histogram:
+        return "histogram";
     }
     return "unknown";
 }
@@ -74,11 +121,11 @@ Poco::JSON::Object::Ptr attributesJson(const MetricAttributes& attributes)
         result->set(attribute.first, attribute.second);
     return result;
 }
-}
+} // namespace
 
 class Metrics::Impl
 {
-public:
+  public:
     ~Impl() { shutdown(); }
 
     bool isActive() const noexcept { return active; }
@@ -95,9 +142,9 @@ public:
             droppedSeries = 0;
         }
 
-        const auto resource = otel::sdk::resource::Resource::Create({
-            {"service.name", options.serviceName},
-            {"service.instance.id", options.serviceInstanceId}});
+        const auto resource = otel::sdk::resource::Resource::Create(
+            {{"service.name", options.serviceName},
+             {"service.instance.id", options.serviceInstanceId}});
         auto context = metricsSdk::MeterContextFactory::Create(
             std::make_unique<metricsSdk::ViewRegistry>(), resource);
         auto sdkProvider = metricsSdk::MeterProviderFactory::Create(std::move(context));
@@ -118,14 +165,18 @@ public:
             exporterOptions.retry_policy_initial_backoff = std::chrono::seconds(1);
             exporterOptions.retry_policy_max_backoff = std::chrono::seconds(30);
             exporterOptions.retry_policy_backoff_multiplier = 2.0F;
-            auto metricExporter = otel::exporter::otlp::OtlpHttpMetricExporterFactory::Create(
-                exporterOptions);
+            auto metricExporter =
+                otel::exporter::otlp::OtlpHttpMetricExporterFactory::Create(exporterOptions);
+            exportStatus = std::make_shared<MetricExportStatus>();
+            metricExporter = std::make_unique<StatusTrackingMetricExporter>(
+                std::move(metricExporter), exportStatus);
             metricsSdk::PeriodicExportingMetricReaderOptions readerOptions;
             readerOptions.export_interval_millis = options.exportInterval;
             readerOptions.export_timeout_millis = options.exportTimeout;
             auto reader = metricsSdk::PeriodicExportingMetricReaderFactory::Create(
                 std::move(metricExporter), readerOptions);
-            sdkProvider->AddMetricReader(std::shared_ptr<metricsSdk::MetricReader>(reader.release()));
+            sdkProvider->AddMetricReader(
+                std::shared_ptr<metricsSdk::MetricReader>(reader.release()));
         }
         provider = otel::nostd::shared_ptr<otel::metrics::MeterProvider>(sdkProvider.release());
         otel::metrics::Provider::SetMeterProvider(provider);
@@ -134,30 +185,35 @@ public:
         // OpenTelemetry C++ builds serialize instrument creation with SDK
         // collection; avoiding first-use creation on request/DDS callbacks
         // also removes latency from those hot paths.
-        for (const std::string name : {
-                 "pdr.runtime.starts", "pdr.runtime.shutdowns",
-                 "pdr.dds.runtime.starts", "pdr.dds.messages.received",
-                 "pdr.dds.messages.published", "pdr.dds.handler.errors",
-                 "pdr.dds.publish.errors", "pdr.dds.service.cache.hits",
-                 "pdr.dds.service.requests", "pdr.dds.service.response.errors",
-                 "pdr.device.starts", "pdr.device.commands",
-                 "pdr.workflow.executions", "pdr.workflow.compensations",
-                 "pdr.protocol.operations", "pdr.protocol.io",
-                 "pdr.health.component.samples",
-                 "pdr.diagnostics.failure.samples",
-                 "pdr.alert.transitions",
-                 "pdr.alert.delivery",
-                 "http.server.request.count", "http.server.response.count"})
+        for (const std::string name : {"pdr.runtime.starts",
+                                       "pdr.runtime.shutdowns",
+                                       "pdr.dds.runtime.starts",
+                                       "pdr.dds.messages.received",
+                                       "pdr.dds.messages.published",
+                                       "pdr.dds.handler.errors",
+                                       "pdr.dds.publish.errors",
+                                       "pdr.dds.service.cache.hits",
+                                       "pdr.dds.service.requests",
+                                       "pdr.dds.service.response.errors",
+                                       "pdr.device.starts",
+                                       "pdr.device.commands",
+                                       "pdr.workflow.executions",
+                                       "pdr.workflow.compensations",
+                                       "pdr.protocol.operations",
+                                       "pdr.protocol.io",
+                                       "pdr.health.component.samples",
+                                       "pdr.diagnostics.failure.samples",
+                                       "pdr.alert.transitions",
+                                       "pdr.alert.delivery",
+                                       "http.server.request.count",
+                                       "http.server.response.count"})
             counters.emplace(name, meter->CreateUInt64Counter(name));
-        for (const std::string name : {
-                 "pdr.dds.publish.duration", "pdr.dds.service.duration",
-                 "pdr.device.command.duration", "pdr.workflow.duration",
-                 "pdr.protocol.operation.duration", "http.server.request.duration",
-                 "pdr.management.tasks.queue.depth",
-                 "pdr.management.tasks.workers.active",
-                 "pdr.management.tasks.resource.waiting",
-                 "pdr.management.tasks.queue.utilization",
-                 "pdr.management.tasks.wait.max"})
+        for (const std::string name :
+             {"pdr.dds.publish.duration", "pdr.dds.service.duration", "pdr.device.command.duration",
+              "pdr.workflow.duration", "pdr.protocol.operation.duration",
+              "http.server.request.duration", "pdr.management.tasks.queue.depth",
+              "pdr.management.tasks.workers.active", "pdr.management.tasks.resource.waiting",
+              "pdr.management.tasks.queue.utilization", "pdr.management.tasks.wait.max"})
             histograms.emplace(name, meter->CreateDoubleHistogram(name));
         active = true;
         if (!options.otlpHttpEndpoint.empty())
@@ -171,7 +227,8 @@ public:
     {
         active = false;
         wake.notify_all();
-        if (exporter.joinable()) exporter.join();
+        if (exporter.joinable())
+            exporter.join();
         if (provider)
         {
             auto* sdkProvider = dynamic_cast<metricsSdk::MeterProvider*>(provider.get());
@@ -181,6 +238,7 @@ public:
         }
         meter = {};
         provider = {};
+        exportStatus = {};
         counters.clear();
         histograms.clear();
     }
@@ -199,11 +257,11 @@ public:
         return true;
     }
 
-    void addCounter(const std::string& name, std::uint64_t value,
-                    MetricAttributes attributes, const std::string& description,
-                    const std::string& unit, bool recordWithSdk)
+    void addCounter(const std::string& name, std::uint64_t value, MetricAttributes attributes,
+                    const std::string& description, const std::string& unit, bool recordWithSdk)
     {
-        if (!active || name.empty()) return;
+        if (!active || name.empty())
+            return;
         if (meter && recordWithSdk)
         {
             std::lock_guard<std::mutex> instrumentLock(instrumentMutex);
@@ -214,10 +272,12 @@ public:
             counter->Add(value, labels, otel::context::Context{});
         }
         std::unique_lock<std::mutex> lock(mutex, std::try_to_lock);
-        if (!lock.owns_lock()) return;
+        if (!lock.owns_lock())
+            return;
         const auto key = seriesKey(name, attributes);
         MetricPoint initial{name, description, unit, MetricKind::counter, attributes};
-        if (!addSeries(key, std::move(initial))) return;
+        if (!addSeries(key, std::move(initial)))
+            return;
         auto& point = points[key];
         point.value += static_cast<double>(value);
         point.timestampUnixNano = nowUnixNano();
@@ -227,7 +287,8 @@ public:
                          const std::string& description, const std::string& unit,
                          bool recordWithSdk)
     {
-        if (!active || name.empty()) return;
+        if (!active || name.empty())
+            return;
         if (meter && recordWithSdk)
         {
             std::lock_guard<std::mutex> instrumentLock(instrumentMutex);
@@ -238,10 +299,12 @@ public:
             histogram->Record(value, labels, otel::context::Context{});
         }
         std::unique_lock<std::mutex> lock(mutex, std::try_to_lock);
-        if (!lock.owns_lock()) return;
+        if (!lock.owns_lock())
+            return;
         const auto key = seriesKey(name, attributes);
         MetricPoint initial{name, description, unit, MetricKind::histogram, attributes};
-        if (!addSeries(key, std::move(initial))) return;
+        if (!addSeries(key, std::move(initial)))
+            return;
         auto& point = points[key];
         if (point.explicitBounds.empty())
         {
@@ -257,12 +320,14 @@ public:
         }
         else
         {
-            if (value < point.minimum) point.minimum = value;
-            if (value > point.maximum) point.maximum = value;
+            if (value < point.minimum)
+                point.minimum = value;
+            if (value > point.maximum)
+                point.maximum = value;
         }
         ++point.count;
-        const auto bucket = std::upper_bound(point.explicitBounds.begin(),
-                                             point.explicitBounds.end(), value);
+        const auto bucket =
+            std::upper_bound(point.explicitBounds.begin(), point.explicitBounds.end(), value);
         ++point.bucketCounts[static_cast<std::size_t>(bucket - point.explicitBounds.begin())];
         point.timestampUnixNano = nowUnixNano();
     }
@@ -276,7 +341,9 @@ public:
             result.push_back(item.second);
         if (droppedSeries)
         {
-            MetricPoint dropped{"pdr.metrics.series.dropped", "Metric series rejected by cardinality guard", "{series}", MetricKind::counter};
+            MetricPoint dropped{"pdr.metrics.series.dropped",
+                                "Metric series rejected by cardinality guard", "{series}",
+                                MetricKind::counter};
             dropped.value = static_cast<double>(droppedSeries);
             dropped.timestampUnixNano = nowUnixNano();
             result.push_back(std::move(dropped));
@@ -306,9 +373,11 @@ public:
             if (point.kind == MetricKind::histogram)
             {
                 Poco::JSON::Array::Ptr bounds = new Poco::JSON::Array;
-                for (const auto bound : point.explicitBounds) bounds->add(bound);
+                for (const auto bound : point.explicitBounds)
+                    bounds->add(bound);
                 Poco::JSON::Array::Ptr buckets = new Poco::JSON::Array;
-                for (const auto count : point.bucketCounts) buckets->add(count);
+                for (const auto count : point.bucketCounts)
+                    buckets->add(count);
                 item->set("explicitBounds", bounds);
                 item->set("bucketCounts", buckets);
             }
@@ -323,10 +392,17 @@ public:
 
     bool flush(std::chrono::milliseconds timeout)
     {
-        if (options.otlpHttpEndpoint.empty()) return true;
+        if (options.otlpHttpEndpoint.empty())
+            return true;
         auto* sdkProvider = dynamic_cast<metricsSdk::MeterProvider*>(provider.get());
-        const bool exported = sdkProvider && sdkProvider->ForceFlush(std::chrono::microseconds(
-            std::chrono::duration_cast<std::chrono::microseconds>(timeout)));
+        const auto status = exportStatus;
+        const auto failuresBefore = status ? status->failures.load(std::memory_order_relaxed) : 0;
+        const bool flushed =
+            sdkProvider && sdkProvider->ForceFlush(std::chrono::microseconds(
+                               std::chrono::duration_cast<std::chrono::microseconds>(timeout)));
+        const bool exported =
+            flushed &&
+            (!status || status->failures.load(std::memory_order_relaxed) == failuresBefore);
         if (!exported)
         {
             cachePayload(otlpJson());
@@ -340,17 +416,15 @@ public:
         return true;
     }
 
-private:
-    static std::int64_t nowUnixNano()
-    {
-        return Poco::Timestamp().epochMicroseconds() * 1000;
-    }
+  private:
+    static std::int64_t nowUnixNano() { return Poco::Timestamp().epochMicroseconds() * 1000; }
 
     std::string otlpJson() const
     {
         Poco::JSON::Array::Ptr resourceAttributes = new Poco::JSON::Array;
-        for (const auto& attribute : MetricAttributes{{"service.name", options.serviceName},
-                                                       {"service.instance.id", options.serviceInstanceId}})
+        for (const auto& attribute :
+             MetricAttributes{{"service.name", options.serviceName},
+                              {"service.instance.id", options.serviceInstanceId}})
         {
             Poco::JSON::Object::Ptr entry = new Poco::JSON::Object;
             entry->set("key", attribute.first);
@@ -387,7 +461,8 @@ private:
                 dataPoint->set("min", point.minimum);
                 dataPoint->set("max", point.maximum);
                 Poco::JSON::Array::Ptr bounds = new Poco::JSON::Array;
-                for (const auto bound : point.explicitBounds) bounds->add(bound);
+                for (const auto bound : point.explicitBounds)
+                    bounds->add(bound);
                 Poco::JSON::Array::Ptr buckets = new Poco::JSON::Array;
                 for (const auto count : point.bucketCounts)
                     buckets->add(std::to_string(count));
@@ -433,8 +508,8 @@ private:
         return output.str();
     }
 
-    std::unique_ptr<Poco::Net::HTTPClientSession> createSession(
-        const Poco::URI& uri, std::chrono::milliseconds timeout) const
+    std::unique_ptr<Poco::Net::HTTPClientSession>
+    createSession(const Poco::URI& uri, std::chrono::milliseconds timeout) const
     {
         std::unique_ptr<Poco::Net::HTTPClientSession> session;
         if (uri.getScheme() == "https")
@@ -444,16 +519,17 @@ private:
             params.certificateFile = options.otlpClientCertificatePath;
             params.privateKeyFile = options.otlpClientKeyPath;
             params.verificationMode = options.otlpInsecureSkipVerify
-                ? Poco::Net::Context::VERIFY_NONE : Poco::Net::Context::VERIFY_STRICT;
+                                          ? Poco::Net::Context::VERIFY_NONE
+                                          : Poco::Net::Context::VERIFY_STRICT;
             params.loadDefaultCAs = params.caLocation.empty();
             auto context = new Poco::Net::Context(Poco::Net::Context::CLIENT_USE, params);
-            session = std::make_unique<Poco::Net::HTTPSClientSession>(
-                uri.getHost(), uri.getPort(), context);
+            session = std::make_unique<Poco::Net::HTTPSClientSession>(uri.getHost(), uri.getPort(),
+                                                                      context);
         }
         else
             session = std::make_unique<Poco::Net::HTTPClientSession>(uri.getHost(), uri.getPort());
-        session->setTimeout(Poco::Timespan(
-            std::chrono::duration_cast<std::chrono::microseconds>(timeout).count()));
+        session->setTimeout(
+            Poco::Timespan(std::chrono::duration_cast<std::chrono::microseconds>(timeout).count()));
         return session;
     }
 
@@ -462,10 +538,11 @@ private:
         try
         {
             Poco::URI uri(options.otlpHttpEndpoint);
-            if (uri.getPath().empty() || uri.getPath() == "/") uri.setPath("/v1/metrics");
+            if (uri.getPath().empty() || uri.getPath() == "/")
+                uri.setPath("/v1/metrics");
             auto session = createSession(uri, timeout);
-            Poco::Net::HTTPRequest request(Poco::Net::HTTPRequest::HTTP_POST,
-                                           uri.getPathEtc(), Poco::Net::HTTPMessage::HTTP_1_1);
+            Poco::Net::HTTPRequest request(Poco::Net::HTTPRequest::HTTP_POST, uri.getPathEtc(),
+                                           Poco::Net::HTTPMessage::HTTP_1_1);
             request.setContentType("application/json");
             request.setContentLength(payload.size());
             session->sendRequest(request) << payload;
@@ -475,14 +552,18 @@ private:
             Poco::StreamCopier::copyToString(responseStream, ignored);
             return response.getStatus() >= 200 && response.getStatus() < 300;
         }
-        catch (...) { return false; }
+        catch (...)
+        {
+            return false;
+        }
     }
 
     std::vector<std::string> cacheFiles() const
     {
         std::vector<std::string> files;
         Poco::File directory(options.offlineCachePath);
-        if (!directory.exists()) return files;
+        if (!directory.exists())
+            return files;
         for (Poco::DirectoryIterator it(directory); it != Poco::DirectoryIterator(); ++it)
             if (it->isFile() && it.name().find(".otlp.json") != std::string::npos)
                 files.push_back(it.path().toString());
@@ -501,13 +582,15 @@ private:
                 Poco::File(files.front()).remove();
                 files.erase(files.begin());
             }
-            const std::string file = options.offlineCachePath + "/" +
-                std::to_string(nowUnixNano()) + ".otlp.json";
+            const std::string file =
+                options.offlineCachePath + "/" + std::to_string(nowUnixNano()) + ".otlp.json";
             Poco::FileOutputStream output(file, std::ios::binary);
             output << payload;
             output.close();
         }
-        catch (...) {}
+        catch (...)
+        {
+        }
     }
 
     void replayCache(std::chrono::milliseconds timeout)
@@ -519,7 +602,8 @@ private:
             Poco::FileInputStream input(file, std::ios::binary);
             std::string payload;
             Poco::StreamCopier::copyToString(input, payload);
-            if (!postPayload(payload, timeout)) break;
+            if (!postPayload(payload, timeout))
+                break;
             input.close();
             Poco::File(file).remove();
             ++replayed;
@@ -527,9 +611,8 @@ private:
         if (replayed)
             addCounter("pdr.metrics.offline.replayed", replayed, {},
                        "Offline metric payloads replayed", "{payload}", false);
-        recordHistogram("pdr.metrics.offline.cache.depth",
-                        static_cast<double>(cacheFiles().size()), {},
-                        "Offline metric payload cache depth", "{payload}", false);
+        recordHistogram("pdr.metrics.offline.cache.depth", static_cast<double>(cacheFiles().size()),
+                        {}, "Offline metric payload cache depth", "{payload}", false);
     }
 
     void exportLoop()
@@ -537,7 +620,8 @@ private:
         std::unique_lock<std::mutex> lock(exportMutex);
         while (active)
         {
-            if (wake.wait_for(lock, options.exportInterval, [this] { return !active.load(); })) break;
+            if (wake.wait_for(lock, options.exportInterval, [this] { return !active.load(); }))
+                break;
             lock.unlock();
             flush(options.exportTimeout);
             lock.lock();
@@ -549,10 +633,13 @@ private:
     std::unordered_map<std::string, MetricPoint> points;
     std::uint64_t droppedSeries{0};
     std::mutex instrumentMutex;
-    std::unordered_map<std::string, otel::nostd::unique_ptr<otel::metrics::Counter<std::uint64_t>>> counters;
-    std::unordered_map<std::string, otel::nostd::unique_ptr<otel::metrics::Histogram<double>>> histograms;
+    std::unordered_map<std::string, otel::nostd::unique_ptr<otel::metrics::Counter<std::uint64_t>>>
+        counters;
+    std::unordered_map<std::string, otel::nostd::unique_ptr<otel::metrics::Histogram<double>>>
+        histograms;
     otel::nostd::shared_ptr<otel::metrics::MeterProvider> provider;
     otel::nostd::shared_ptr<otel::metrics::Meter> meter;
+    std::shared_ptr<MetricExportStatus> exportStatus;
     std::atomic<bool> active{false};
     std::thread exporter;
     std::mutex exportMutex;
@@ -565,19 +652,23 @@ Metrics& Metrics::global()
     return metrics;
 }
 
-Metrics::Metrics(): _impl(std::make_unique<Impl>()) {}
+Metrics::Metrics() : _impl(std::make_unique<Impl>()) {}
 Metrics::~Metrics() = default;
 void Metrics::initialize(MetricsOptions options) { _impl->initialize(std::move(options)); }
 void Metrics::shutdown() noexcept { _impl->shutdown(); }
 bool Metrics::initialized() const noexcept { return _impl->isActive(); }
-void Metrics::addCounter(const std::string& name, std::uint64_t value,
-                         MetricAttributes attributes, const std::string& description,
-                         const std::string& unit, bool recordWithSdk)
-{ _impl->addCounter(name, value, std::move(attributes), description, unit, recordWithSdk); }
-void Metrics::recordHistogram(const std::string& name, double value,
-                              MetricAttributes attributes, const std::string& description,
-                              const std::string& unit, bool recordWithSdk)
-{ _impl->recordHistogram(name, value, std::move(attributes), description, unit, recordWithSdk); }
+void Metrics::addCounter(const std::string& name, std::uint64_t value, MetricAttributes attributes,
+                         const std::string& description, const std::string& unit,
+                         bool recordWithSdk)
+{
+    _impl->addCounter(name, value, std::move(attributes), description, unit, recordWithSdk);
+}
+void Metrics::recordHistogram(const std::string& name, double value, MetricAttributes attributes,
+                              const std::string& description, const std::string& unit,
+                              bool recordWithSdk)
+{
+    _impl->recordHistogram(name, value, std::move(attributes), description, unit, recordWithSdk);
+}
 std::vector<MetricPoint> Metrics::snapshot() const { return _impl->snapshot(); }
 std::string Metrics::snapshotJson() const { return _impl->json(); }
 bool Metrics::forceFlush(std::chrono::milliseconds timeout) { return _impl->flush(timeout); }
@@ -586,13 +677,16 @@ ScopedMetricTimer::ScopedMetricTimer(std::string metric, MetricAttributes attrib
                                      std::string description, std::string unit)
     : _metric(std::move(metric)), _attributes(std::move(attributes)),
       _description(std::move(description)), _unit(std::move(unit)),
-      _started(std::chrono::steady_clock::now()) {}
+      _started(std::chrono::steady_clock::now())
+{
+}
 
 ScopedMetricTimer::~ScopedMetricTimer()
 {
-    const auto duration = std::chrono::duration<double, std::milli>(
-        std::chrono::steady_clock::now() - _started).count();
-    Metrics::global().recordHistogram(_metric, duration, std::move(_attributes),
-                                      _description, _unit, true);
+    const auto duration =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _started)
+            .count();
+    Metrics::global().recordHistogram(_metric, duration, std::move(_attributes), _description,
+                                      _unit, true);
 }
-}
+} // namespace PocoDDS::Observability

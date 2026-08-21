@@ -1,9 +1,12 @@
-add_library(PDRFastDDS
+add_library(PDRFastDDS SHARED
     src/EnvelopeTopicDataType.cpp
     src/Runtime.cpp
     src/DeviceBridge.cpp
     src/ServiceEndpoint.cpp)
 add_library(PocoDDS::FastDDS ALIAS PDRFastDDS)
+
+set_target_properties(PDRFastDDS PROPERTIES
+    WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 target_include_directories(PDRFastDDS
     PUBLIC
@@ -19,7 +22,17 @@ if(PDR_ENABLE_OBSERVABILITY)
     target_compile_definitions(PDRFastDDS PUBLIC PDR_ENABLE_OBSERVABILITY=1)
 endif()
 
+pdr_isolate_embedded_static_dependencies(PDRFastDDS)
+
 pdr_set_warnings(PDRFastDDS)
+
+if(BUILD_TESTING)
+    add_custom_command(TARGET PDRFastDDS POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${PDR_TEST_OUTPUT_DIRECTORY}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:PDRFastDDS>"
+            "${PDR_TEST_OUTPUT_DIRECTORY}/$<TARGET_FILE_NAME:PDRFastDDS>")
+endif()
 
 add_executable(pdr-fastdds-device-smoke
     tests/DeviceSmoke.cpp)
@@ -30,7 +43,7 @@ if(BUILD_TESTING)
     if(WIN32)
         set_tests_properties(fastdds-device-smoke PROPERTIES
             ENVIRONMENT_MODIFICATION
-                "PATH=path_list_prepend:${PDR_INSTALL_PREFIX}/bin")
+                "PATH=path_list_prepend:${PDR_INSTALL_PREFIX}/bin;PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
     endif()
 endif()
 
@@ -49,5 +62,7 @@ if(PDR_ENABLE_OBSERVABILITY)
 endif()
 
 install(TARGETS PDRFastDDS
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

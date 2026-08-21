@@ -1,0 +1,14 @@
+pdr_sim_bridge:
+  ros__parameters:
+    use_sim_time: true
+    simulator_name: gazebo
+    frame_id: odom
+    publish_period_ms: 20
+    command_topic: robot/sim/command
+    frame_topic: robot/sim/frame
+    cmd_vel_topic: /model/pdr_bot/cmd_vel
+    odometry_topic: /model/pdr_bot/odometry
+    joint_state_topic: /world/pdr_world/model/pdr_bot/joint_state
+    joint_command_topic: /pdr_bot/joint_commands
+    joint_command_mode: velocity
+    joint_names: [left_wheel_joint, right_wheel_joint]

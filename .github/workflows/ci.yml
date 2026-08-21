@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:
@@ -9,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: lukka/get-cmake@latest
       - name: Validate contracts
         run: cmake -DSOURCE_DIR=${{ github.workspace }} -P cmake/ValidateContracts.cmake
@@ -29,19 +33,122 @@ jobs:
       - name: Check formatting
         shell: bash
         run: |
-          git ls-files -z -- application platform services server SubSystem |
+          base_ref="${{ github.base_ref }}"
+          base_ref="${base_ref:-main}"
+          base_sha="$(git merge-base HEAD "origin/${base_ref}")"
+          git diff --name-only -z "${base_sha}" HEAD -- \
+            application platform robotics services server SubSystem |
             grep -zE '\.(h|hpp|cpp)$' |
-            xargs -0 clang-format --dry-run --Werror
+            xargs -0 -r clang-format --dry-run --Werror
 
-  linux-full-stack:
+  robotics-portable:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - name: Configure robotics core
+        run: cmake --preset robotics -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Build robotics core
+        run: cmake --build --preset robotics
+      - name: Analyze robotics core
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          find robotics/src robotics/apps robotics/tests robotics/examples -name '*.cpp' -print0 |
+            xargs -0 clang-tidy -p build/robotics --quiet \
+              --checks='-*,clang-analyzer-*,bugprone-*,performance-*,-bugprone-easily-swappable-parameters,-bugprone-exception-escape' \
+              --warnings-as-errors='clang-analyzer-*,bugprone-*,-bugprone-exception-escape'
+      - name: Test robotics core
+        run: ctest --preset robotics -C Release --output-on-failure
+      - name: Install robotics SDK
+        run: cmake --install build/robotics --config Release
+
+  ros2-robotics:
+    runs-on: ubuntu-latest
+    container: ros:jazzy-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential cmake \
+            python3-colcon-common-extensions ros-jazzy-ament-cmake-gtest
+      - name: Build and install portable core
+        shell: bash
+        run: |
+          cmake --preset robotics
+          cmake --build --preset robotics
+          ctest --preset robotics -C Release --output-on-failure
+          cmake --install build/robotics --config Release
+      - name: Build ROS 2 messages and runtime adapter
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd robotics/ros2_ws
+          colcon build --merge-install --event-handlers console_direct+ --cmake-args \
+            -DCMAKE_PREFIX_PATH=${GITHUB_WORKSPACE}/build/install
+      - name: Test ROS 2 workspace
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd robotics/ros2_ws
+          colcon test --merge-install --event-handlers console_direct+
+          colcon test-result --verbose
+
+  gazebo-sil:
+    runs-on: ubuntu-latest
+    container: ros:jazzy-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Gazebo Harmonic and build tools
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential cmake \
+            python3-colcon-common-extensions ros-jazzy-ament-cmake-gtest \
+            ros-jazzy-ros-gz
+      - name: Build robotics core and Gazebo SIL workspace
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cmake --preset robotics
+          cmake --build --preset robotics
+          cmake --install build/robotics --config Release
+          cd robotics/ros2_ws
+          colcon build --merge-install --packages-up-to pdr_robot_bringup \
+            --event-handlers console_direct+ --cmake-args \
+            -DCMAKE_PREFIX_PATH=${GITHUB_WORKSPACE}/build/install
+      - name: Run Gazebo closed-loop SIL acceptance
+        shell: bash
+        run: |
+          set -eo pipefail
+          source /opt/ros/jazzy/setup.bash
+          source robotics/ros2_ws/install/setup.bash
+          set -u
+          ros2 launch pdr_robot_bringup gazebo_sil.launch.py \
+            >/tmp/pdr-gazebo-sil.log 2>&1 &
+          launch_pid=$!
+          cleanup() {
+            kill "${launch_pid}" 2>/dev/null || true
+            wait "${launch_pid}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          if ! timeout 60 ros2 run pdr_robot_bringup gazebo_sil_check.py; then
+            cat /tmp/pdr-gazebo-sil.log
+            exit 1
+          fi
+
+  linux-fastdds-asan:
+    name: linux-fastdds-asan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: lukka/get-cmake@latest
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.8.2'
-          cache: true
       - uses: actions/cache@v4
         id: native-dependencies
         with:
@@ -52,16 +159,107 @@ jobs:
         run: |
           cmake -S cmake -B build/dependencies
           cmake --build build/dependencies --config Release --parallel 2
+      - name: Configure direct Fast-DDS compatibility sanitizer
+        run: >-
+          cmake -S . -B build/asan -DCMAKE_BUILD_TYPE=Debug
+          -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
+          -DPDR_ENABLE_OBSERVABILITY=ON
+          -DPDR_BUILD_QT3D=OFF
+          -DMYIOT_ENABLE_DATA_MODULES=OFF
+          -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address"
+      - name: Build direct Fast-DDS smoke target
+        run: cmake --build build/asan --target pdr-fastdds-device-smoke --parallel 2
+      - name: Run direct Fast-DDS memory-safety acceptance
+        shell: bash
+        env:
+          ASAN_OPTIONS: abort_on_error=1:detect_leaks=0:strict_string_checks=1
+        run: |
+          set +e
+          ctest --test-dir build/asan -R '^fastdds-device-smoke$' --output-on-failure
+          result=$?
+          set -e
+          if [[ ${result} -eq 0 ]]; then
+            exit 0
+          fi
+          if ! command -v gdb >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends gdb
+          fi
+          gdb --batch --quiet \
+            -ex run \
+            -ex "thread apply all backtrace full" \
+            --args build/asan/test/pdr-fastdds-device-smoke
+          exit "${result}"
+      - name: Configure direct Fast-DDS release lifecycle diagnostics
+        run: >-
+          cmake -S . -B build/lifecycle-debug -DCMAKE_BUILD_TYPE=Release
+          -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
+          -DPDR_ENABLE_OBSERVABILITY=ON
+          -DPDR_BUILD_QT3D=OFF
+          -DMYIOT_ENABLE_DATA_MODULES=OFF
+          -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -g"
+      - name: Build direct Fast-DDS release lifecycle target
+        run: >-
+          cmake --build build/lifecycle-debug
+          --target pdr-fastdds-device-smoke --parallel 2
+      - name: Run direct Fast-DDS release lifecycle acceptance
+        shell: bash
+        run: |
+          if build/lifecycle-debug/test/pdr-fastdds-device-smoke; then
+            exit 0
+          fi
+          if ! command -v gdb >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends gdb
+          fi
+          gdb --batch --quiet \
+            -ex run \
+            -ex "thread apply all backtrace" \
+            --args build/lifecycle-debug/test/pdr-fastdds-device-smoke
+          exit 1
+
+  linux-full-stack:
+    name: linux-non-qt-full-stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - uses: actions/cache@v4
+        id: native-dependencies
+        with:
+          path: build/install
+          key: native-dependencies-${{ runner.os }}-${{ hashFiles('cmake/*.cmake') }}
+      - name: Bootstrap native dependencies
+        if: steps.native-dependencies.outputs.cache-hit != 'true'
+        run: |
+          cmake -S cmake -B build/dependencies
+          cmake --build build/dependencies --config Release --parallel 2
+      - name: Save native dependency cache
+        if: steps.native-dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build/install
+          key: native-dependencies-${{ runner.os }}-${{ hashFiles('cmake/*.cmake') }}
       - name: Configure full stack
         run: >-
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
           -DPDR_ENABLE_OBSERVABILITY=ON
+          -DPDR_BUILD_QT3D=OFF
           -DMYIOT_ENABLE_DATA_MODULES=OFF
       - name: Build full stack
         run: cmake --build build --config Release --parallel 2
       - name: Run full acceptance suite
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: Upload full-stack acceptance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-non-qt-full-stack-reports
+          path: build/reports/*.json
+          if-no-files-found: warn
       - name: Install reusable SDK
         run: cmake --install build --prefix ${{ github.workspace }}/build/sdk
       - name: Generate release hashes and SPDX SBOM

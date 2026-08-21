@@ -25,7 +25,7 @@ function(myiot_add_osp_bundle target_name output_name)
         # symbols locally so ELF interposition does not merge independent
         # static objects with identical names across the executable and DSOs,
         # which otherwise causes duplicate atexit destruction on unload.
-        target_link_options(${target_name} PRIVATE "-Wl,-Bsymbolic")
+        pdr_isolate_embedded_static_dependencies(${target_name})
     endif()
     if(BUNDLE_INCLUDE_DIRS)
         target_include_directories(${target_name} PRIVATE ${BUNDLE_INCLUDE_DIRS})

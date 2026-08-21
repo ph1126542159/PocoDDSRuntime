@@ -1,0 +1,10 @@
+- ros_topic_name: "robot/cmd_vel"
+  gz_topic_name: "/model/pdr_robot/cmd_vel"
+  ros_type_name: "geometry_msgs/msg/Twist"
+  gz_type_name: "gz.msgs.Twist"
+  direction: ROS_TO_GZ
+- ros_topic_name: "robot/scan"
+  gz_topic_name: "/world/default/model/pdr_robot/link/lidar/sensor/lidar/scan"
+  ros_type_name: "sensor_msgs/msg/LaserScan"
+  gz_type_name: "gz.msgs.LaserScan"
+  direction: GZ_TO_ROS

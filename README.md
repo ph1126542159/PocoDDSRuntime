@@ -9,6 +9,33 @@ PocoDDSRuntime 是面向复杂 C++ 应用的通用运行时框架，以多进程
 The project deliberately does not contain RemotingNG-generated `RemoteObject`,
 `Skeleton`, `ServerHelper` or `EventDispatcher` code.
 
+## Experimental embodied robotics runtime
+
+The `robotics-runtime` development branch adds a transport-neutral robot core
+and a ROS 2 workspace without changing the stable legacy-runtime default. Use
+the `robotics` CMake preset to build Lifecycle, Action, behavior orchestration,
+simulation/hardware ports and fail-closed safety logic with Qt, WebUI, Poco/OSP
+and direct Fast-DDS integrations disabled. See
+[docs/architecture/robotics-runtime.md](docs/architecture/robotics-runtime.md).
+The preset also builds `pdr-robot-sim`, a no-Qt deterministic local robot SIL
+scenario that is included in CTest. `pdr-business-sim` provides replaceable
+warehouse, inspection and pick/place workflows; run
+`python robotics/tools/robotics_web_server.py` and open the runtime's existing
+`/tracing/` page to execute those real C++ workflows alongside the original
+runtime traces and inspect every node's parameters, status, duration and logs.
+On Windows, the checked-in launcher starts whichever of the runtime and
+simulation services is missing, waits for all health probes and optionally
+opens the integrated page:
+
+```powershell
+.\robotics\tools\start_robotics_webui.ps1 -OpenBrowser
+```
+
+The standalone page on port 9096 remains a diagnostic fallback. Each mission is
+also shown as an OpenTelemetry trace
+with standard Trace/Span IDs, parentage, a timing waterfall, W3C `traceparent`
+and optional OTLP/HTTP JSON export to a Collector.
+
 ## Directory layout
 
 - `platform/` — migrated platform/runtime infrastructure:

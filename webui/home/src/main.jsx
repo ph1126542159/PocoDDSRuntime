@@ -17,12 +17,13 @@ const pageMeta = {
   processes: ["进程管理", "当前运行时挂载的进程"],
   devices: ["设备", "当前运行时已装载的设备适配器"],
   plugins: ["插件治理", "外部插件兼容性、依赖与生命周期"],
-  metrics: ["指标中心", "按运行域查看 OpenTelemetry Counter 与 Histogram"]
+  metrics: ["指标中心", "按运行域查看 OpenTelemetry Counter 与 Histogram"],
+  tracing: ["业务追踪", "机器人仿真与 OpenTelemetry 业务流程"]
 };
 
 const navItems = [
   ["overview", Activity], ["processes", AppWindow], ["devices", Cpu],
-  ["plugins", Boxes], ["metrics", Activity]
+  ["plugins", Boxes], ["metrics", Activity], ["tracing", GitBranch, "/tracing/"]
 ];
 
 async function request(path, options = {}) {
@@ -594,7 +595,9 @@ function BusinessExecutionList({ process }) {
       try {
         const data = await request("/api/v1/heartbeat-businesses");
         if (active) {
-          setExecutions((data.records || []).slice(0, 1000));
+          setExecutions((data.records || [])
+            .filter(item => item.businessName !== "主子进程Fast-DDS心跳")
+            .slice(0, 1000));
           setAvailable(true);
         }
       } catch {
@@ -1621,8 +1624,12 @@ function App() {
         <span className={`command-online ${health?.ready === false ? "degraded" : ""}`}><i />{health?.ready === false ? "异常" : "已连接"}</span></div>
     </header>
     <aside className={menuOpen ? "open" : ""}>
-      <nav>{navItems.map(([id, Icon]) => <button key={id} className={page === id ? "active" : ""}
-        onClick={() => { setPage(id); setMenuOpen(false); }}><Icon size={18} /><span>{pageMeta[id][0]}</span><ChevronRight size={15} /></button>)}</nav>
+      <nav>{navItems.map(([id, Icon, href]) => <button key={id} className={page === id ? "active" : ""}
+        onClick={() => {
+          setMenuOpen(false);
+          if (href) window.location.assign(href);
+          else setPage(id);
+        }}><Icon size={18} /><span>{pageMeta[id][0]}</span><ChevronRight size={15} /></button>)}</nav>
       <div className={`runtime-state ${health?.ready === false ? "degraded" : ""}`}><i /><div>
         <b>{health?.ready === false ? "Runtime 异常" : "Runtime 在线"}</b>
         <small>{topology.host || "本地主机"}</small></div></div>

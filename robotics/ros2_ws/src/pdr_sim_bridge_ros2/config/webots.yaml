@@ -1,0 +1,13 @@
+pdr_sim_bridge:
+  ros__parameters:
+    simulator_name: webots
+    frame_id: world
+    publish_period_ms: 20
+    command_topic: robot/sim/command
+    frame_topic: robot/sim/frame
+    cmd_vel_topic: cmd_vel
+    odometry_topic: odom
+    joint_state_topic: joint_states
+    joint_command_topic: joint_controller/commands
+    joint_command_mode: position
+    # Omit joint_names for a base-only model.
