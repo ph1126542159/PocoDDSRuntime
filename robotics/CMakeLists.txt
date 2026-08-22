@@ -23,13 +23,20 @@ add_library(PDRRoboticsRuntime
 add_library(PocoDDS::RoboticsRuntime ALIAS PDRRoboticsRuntime)
 set_target_properties(PDRRoboticsRuntime PROPERTIES EXPORT_NAME RoboticsRuntime)
 
+if(NOT TARGET PocoDDS::RuntimeCore)
+    message(FATAL_ERROR
+        "PDRRoboticsRuntime requires the transport-neutral PDRRuntimeCore target")
+endif()
+
 target_include_directories(PDRRoboticsRuntime
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 target_compile_features(PDRRoboticsRuntime PUBLIC cxx_std_17)
-target_link_libraries(PDRRoboticsRuntime PRIVATE ${CMAKE_DL_LIBS})
+target_link_libraries(PDRRoboticsRuntime
+    PUBLIC PocoDDS::RuntimeCore
+    PRIVATE ${CMAKE_DL_LIBS})
 pdr_set_warnings(PDRRoboticsRuntime)
 
 add_executable(pdr-robot-sim apps/RobotSimulation.cpp)
@@ -170,7 +177,8 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/test_robotics_web_server.py"
                 --server "${CMAKE_CURRENT_SOURCE_DIR}/tools/robotics_web_server.py"
                 --binary "$<TARGET_FILE:pdr-business-sim>"
-                --static-dir "${CMAKE_CURRENT_SOURCE_DIR}/webui")
+                --static-dir "${CMAKE_CURRENT_SOURCE_DIR}/webui"
+                --framework-manifest "${PDR_FRAMEWORK_MODEL_MANIFEST}")
         set_tests_properties(robotics-business-webui PROPERTIES
             LABELS "robotics;business;simulation;webui;sil"
             PASS_REGULAR_EXPRESSION "PDR_ROBOTICS_WEB_TEST_PASS"

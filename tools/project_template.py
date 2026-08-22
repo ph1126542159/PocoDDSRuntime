@@ -15,8 +15,8 @@ from typing import Any, Iterator
 
 
 TEMPLATE_ID = "pdr-product"
-CURRENT_TEMPLATE_VERSION = 3
-SUPPORTED_TEMPLATE_VERSIONS = {1, 2, 3}
+CURRENT_TEMPLATE_VERSION = 4
+SUPPORTED_TEMPLATE_VERSIONS = {1, 2, 3, 4}
 STATE_PATH = Path(".pdr/template-state.json")
 BACKUP_DIRECTORY = Path(".pdr/template-backups")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -44,11 +44,13 @@ def pretty_json(document: Any) -> bytes:
     return (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
-def template_context(project: dict[str, Any]) -> dict[str, str]:
+def template_context(project: dict[str, Any]) -> dict[str, Any]:
     return {
         "displayName": project["displayName"],
         "profile": project["runtime"]["profile"],
         "runtimeVersion": project["runtime"]["version"],
+        "host": project["runtime"]["host"],
+        "transports": project["runtime"]["transports"],
     }
 
 
@@ -59,18 +61,26 @@ def render_template(project: dict[str, Any], version: int) -> dict[str, str]:
     profile = project["runtime"]["profile"]
     runtime_version = project["runtime"]["version"]
     robotics_default = "ON" if profile == "robotics" else "OFF"
-    management_default = "OFF" if profile == "robotics" else "ON"
+    management_default = (
+        "ON" if profile in {"embedded", "edge-industrial", "edge-test", "server"}
+        else "OFF"
+    )
     template_marker = (
         "" if version == 1 else f"set(PDR_PROJECT_TEMPLATE_VERSION {version})\n"
     )
+    runtime_core = "" if version < 4 else f'''find_package(PDRRuntimeCore {runtime_version.replace("x", "0")} CONFIG REQUIRED)
+set(PDR_PROJECT_HOST_MODEL "{project["runtime"]["host"]}")
+set(PDR_PROJECT_TRANSPORTS {' '.join(project["runtime"]["transports"])})
+'''
     cmake = f'''cmake_minimum_required(VERSION 3.24)
 project({name} LANGUAGES CXX)
 {template_marker}
 include(CTest)
 option(PDR_PROJECT_BUILD_ROBOTICS "Build robotics control-plane components" {robotics_default})
+option(PDR_PROJECT_BUILD_APPLICATION "Build transport-neutral modules and services" ON)
 option(PDR_PROJECT_BUILD_MANAGEMENT "Build application and management-plane components" {management_default})
 
-if(PDR_PROJECT_BUILD_ROBOTICS)
+{runtime_core}if(PDR_PROJECT_BUILD_ROBOTICS)
     find_package(PDRRoboticsRuntime {runtime_version.replace("x", "0")} CONFIG REQUIRED)
 endif()
 if(PDR_PROJECT_BUILD_MANAGEMENT)
@@ -79,22 +89,24 @@ endif()
 
 include("${{CMAKE_CURRENT_SOURCE_DIR}}/pdr-project.components.cmake")
 '''
-    presets = '''{
+    build_configuration = ', "configuration": "Release"' if version >= 4 else ""
+    test_configuration = '\n    "configuration": "Release",' if version >= 4 else ""
+    presets = f'''{{
   "version": 5,
-  "configurePresets": [{
+  "configurePresets": [{{
     "name": "default",
-    "binaryDir": "${sourceDir}/build",
-    "cacheVariables": {
+    "binaryDir": "${{sourceDir}}/build",
+    "cacheVariables": {{
       "CMAKE_BUILD_TYPE": "Release",
-      "CMAKE_PREFIX_PATH": "$env{PDR_SDK_PREFIX}",
-      "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install",
+      "CMAKE_PREFIX_PATH": "$env{{PDR_SDK_PREFIX}}",
+      "CMAKE_INSTALL_PREFIX": "${{sourceDir}}/build/install",
       "BUILD_TESTING": "ON"
-    }
-  }],
-  "buildPresets": [{"name": "default", "configurePreset": "default", "jobs": 2}],
-  "testPresets": [{"name": "default", "configurePreset": "default",
-    "output": {"outputOnFailure": true}}]
-}
+    }}
+  }}],
+  "buildPresets": [{{"name": "default", "configurePreset": "default", "jobs": 2{build_configuration}}}],
+  "testPresets": [{{"name": "default", "configurePreset": "default",{test_configuration}
+    "output": {{"outputOnFailure": true}}}}]
+}}
 '''
     cli = "python tools/pdr.py" if version == 1 else "python $Pdr"
     cli_prelude = "" if version == 1 else '$Pdr = "$env:PDR_SDK_PREFIX/bin/pdr.py"\n'
@@ -132,6 +144,14 @@ protocol; unowned and immutable changes fail closed during `project config plan`
 Components created by `pdr new` carry `.pdr-component.json`. `project validate` rejects
 outdated or drifted framework-owned component build metadata while leaving business source
 files product-owned. Resolve component conflicts with `pdr component upgrade <path>`.
+'''
+    if version >= 4:
+        readme += f'''
+Framework model: `{profile}`; Host: `{project["runtime"]["host"]}`; Transports:
+`{", ".join(project["runtime"]["transports"])}`. Business modules depend on
+`PocoDDS::RuntimeCore`; only project adapter components may include DDS, ROS 2, MQTT,
+HTTP or device SDK headers. See the installed framework-model selection guide before
+adding a transport.
 '''
     gitignore = "build/\ninstall/\n*.user\n"
     if version >= 2:
@@ -224,9 +244,19 @@ def validate_state(document: dict[str, Any], project: dict[str, Any]) -> dict[st
     if document["project"] != project["name"]:
         raise ValueError("project template state belongs to another project")
     context = document["context"]
-    if (not isinstance(context, dict)
-            or set(context) != {"displayName", "profile", "runtimeVersion"}
-            or any(not isinstance(value, str) or not value for value in context.values())):
+    context_required = {"displayName", "profile", "runtimeVersion"}
+    context_allowed = context_required | {"host", "transports"}
+    if (not isinstance(context, dict) or not context_required.issubset(context)
+            or set(context) - context_allowed
+            or any(not isinstance(context[key], str) or not context[key]
+                   for key in context_required)
+            or ("host" in context and
+                (not isinstance(context["host"], str) or not context["host"]))
+            or ("transports" in context and
+                (not isinstance(context["transports"], list) or
+                 not context["transports"] or
+                 any(not isinstance(item, str) or not item
+                     for item in context["transports"])))):
         raise ValueError("project template state has an invalid context")
 
     managed: list[dict[str, str]] = []

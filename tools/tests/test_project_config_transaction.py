@@ -34,7 +34,9 @@ class ProjectConfigTransactionTests(unittest.TestCase):
         )
 
     def create_project(self, root: Path, name: str = "TransactionRobot") -> Path:
-        result = self.run_tool("project", "create", name, "--output", str(root))
+        result = self.run_tool(
+            "project", "create", name, "--output", str(root), "--profile", "robotics"
+        )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         project = root / name
         agent = project / "config/transaction-agent.py"

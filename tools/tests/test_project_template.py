@@ -52,10 +52,13 @@ class ProjectTemplateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             project = self.create_project(Path(directory))
             manifest = json.loads((project / "pdr-project.yaml").read_text(encoding="utf-8"))
-            self.assertEqual(manifest["template"], {"id": "pdr-product", "version": 3})
+            self.assertEqual(manifest["template"], {"id": "pdr-product", "version": 4})
             state = json.loads((project / ".pdr/template-state.json").read_text(encoding="utf-8"))
-            self.assertEqual(state["appliedVersion"], 3)
+            self.assertEqual(state["appliedVersion"], 4)
             self.assertEqual(len(state["managedFiles"]), 4)
+            presets = json.loads((project / "CMakePresets.json").read_text(encoding="utf-8"))
+            self.assertEqual(presets["buildPresets"][0]["configuration"], "Release")
+            self.assertEqual(presets["testPresets"][0]["configuration"], "Release")
             status = self.run_tool(
                 "project", "template", "status", str(project / "pdr-project.yaml"),
                 "--check", "--json",
@@ -87,8 +90,8 @@ class ProjectTemplateTests(unittest.TestCase):
             )
             self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
             document = json.loads(manifest.read_text(encoding="utf-8"))
-            self.assertEqual(document["template"]["version"], 3)
-            self.assertIn("PDR_PROJECT_TEMPLATE_VERSION 3",
+            self.assertEqual(document["template"]["version"], 4)
+            self.assertIn("PDR_PROJECT_TEMPLATE_VERSION 4",
                           (project / "CMakeLists.txt").read_text(encoding="utf-8"))
             self.assertIn("project template status",
                           (project / "README.md").read_text(encoding="utf-8"))

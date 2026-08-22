@@ -12,6 +12,7 @@ import "./flow-layout.css";
 import "./bright-theme.css";
 import "./business-summary.css";
 import "./typography.css";
+import { DEFAULT_FRAMEWORK_MODEL, loadFrameworkModel, navigationEnabled } from "./framework-model.js";
 
 const pageMeta = {
   overview: ["运行态势", "实时掌握运行时状态与资源"],
@@ -25,10 +26,14 @@ const pageMeta = {
 };
 
 const navItems = [
-  ["overview", Activity], ["processes", AppWindow], ["devices", Cpu],
-  ["plugins", Boxes], ["metrics", Activity], ["governance", ShieldCheck],
-  ["terminal", Terminal],
-  ["tracing", GitBranch, "/tracing/"]
+  { id: "overview", Icon: Activity, capability: "runtimeOverview" },
+  { id: "processes", Icon: AppWindow, capability: "processManagement" },
+  { id: "devices", Icon: Cpu, capability: "deviceProtocols" },
+  { id: "plugins", Icon: Boxes, capability: "bundleGovernance" },
+  { id: "metrics", Icon: Activity, capability: "metrics" },
+  { id: "governance", Icon: ShieldCheck, capability: "runtimeGovernance" },
+  { id: "terminal", Icon: Terminal, capability: "diagnosticTerminal" },
+  { id: "tracing", Icon: GitBranch, capability: "businessTracing", href: "/tracing/" }
 ];
 
 async function request(path, options = {}) {
@@ -1758,6 +1763,7 @@ function DiagnosticTerminalPage({ host }) {
 function App() {
   const initialPage = new URLSearchParams(window.location.search).get("page");
   const [page, setPage] = useState(pageMeta[initialPage] && initialPage !== "tracing" ? initialPage : "overview");
+  const [frameworkModel, setFrameworkModel] = useState(DEFAULT_FRAMEWORK_MODEL);
   const [processSection, setProcessSection] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
   const [topology, setTopology] = useState({ processes: [], services: [], bundles: [], hostResources: {} });
@@ -1774,6 +1780,21 @@ function App() {
   const [alertSinks, setAlertSinks] = useState({ count: 0, sinks: [] });
   const [updated, setUpdated] = useState(null);
   const [toast, setToast] = useState(null);
+  const visibleNavigation = useMemo(() => navItems.filter(item => navigationEnabled(frameworkModel, item)), [frameworkModel]);
+  useEffect(() => {
+    let mounted = true;
+    loadFrameworkModel().then(model => { if (mounted) setFrameworkModel(model); });
+    return () => { mounted = false; };
+  }, []);
+  useEffect(() => {
+    if (visibleNavigation.some(item => item.id === page)) return;
+    const fallback = visibleNavigation.find(item => !item.href)?.id || "overview";
+    setPage(fallback);
+    const url = new URL(window.location.href);
+    if (fallback === "overview") url.searchParams.delete("page");
+    else url.searchParams.set("page", fallback);
+    window.history.replaceState({}, "", url);
+  }, [frameworkModel, page, visibleNavigation]);
   const refresh = useCallback(async () => {
     const [data, mainDetail, monitoring, healthDetail, metricData, devices, protocols, diagnostics, alerts, history, sinks] = await Promise.all([
       request("/api/v1/topology"),
@@ -1867,7 +1888,8 @@ function App() {
   return <div className="app-shell precision-shell">
     <header className="command-bar">
       <button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)}><Menu size={20} /></button>
-      <div className="command-brand"><span><Box size={23} /></span><b>PocoDDS Runtime</b></div>
+      <div className="command-brand"><span><Box size={23} /></span><div><b>{frameworkModel.framework.displayName}</b>
+        <small>{frameworkModel.framework.profile} · {frameworkModel.framework.model}</small></div></div>
       <i className="command-divider" />
       <strong className="command-title">{pageMeta[page][0]}</strong>
       <div className="command-actions"><span className="last-update">最后刷新：{updated ? updated.toLocaleString() : "连接中"}</span>
@@ -1875,7 +1897,7 @@ function App() {
         <span className={`command-online ${health?.ready === false ? "degraded" : ""}`}><i />{health?.ready === false ? "异常" : "已连接"}</span></div>
     </header>
     <aside className={menuOpen ? "open" : ""}>
-      <nav>{navItems.map(([id, Icon, href]) => <button key={id} className={page === id ? "active" : ""}
+      <nav>{visibleNavigation.map(({ id, Icon, href }) => <button key={id} className={page === id ? "active" : ""}
         onClick={() => {
           setMenuOpen(false);
           if (href) window.location.assign(href);
@@ -1889,7 +1911,7 @@ function App() {
         }}><Icon size={18} /><span>{pageMeta[id][0]}</span><ChevronRight size={15} /></button>)}</nav>
       <div className={`runtime-state ${health?.ready === false ? "degraded" : ""}`}><i /><div>
         <b>{health?.ready === false ? "Runtime 异常" : "Runtime 在线"}</b>
-        <small>{topology.host || "本地主机"}</small></div></div>
+        <small>{topology.host || "本地主机"} · {frameworkModel.framework.family}</small></div></div>
     </aside>
     <main>
       <div className="content">

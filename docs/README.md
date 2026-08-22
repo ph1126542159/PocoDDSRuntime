@@ -9,7 +9,7 @@
 3. [设备网关服务](components/services/device-gateway/README.md)
 4. 按需阅读具体协议、设备或业务服务文档
 5. 需要追踪业务链路时阅读[业务追踪](BUSINESS_TRACING.md)
-6. 平台治理入口：[分层规则](architecture/layering-rules.md)、[可扩展框架边界](architecture/extensibility.md)、[部署 Profile](architecture/deployment-profiles.md)、[稳定性与设备验收矩阵](operations/acceptance-matrix.md)、[ADR](adr/README.md)
+6. 平台治理入口：[框架模型选择与项目适配](architecture/framework-model-selection.md)、[分层规则](architecture/layering-rules.md)、[可扩展框架边界](architecture/extensibility.md)、[部署 Profile](architecture/deployment-profiles.md)、[稳定性与设备验收矩阵](operations/acceptance-matrix.md)、[ADR](adr/README.md)
 7. 运维入口：[运行手册](operations/runbook.md)、[故障排查](operations/troubleshooting.md)、[恢复手册](operations/recovery.md)
 8. 基于框架开发新产品时阅读：[产品项目工作区](development/project-workspaces.md)、[产品配置治理](development/project-configuration.md)、[项目模板升级](development/project-templates.md)、[组件模板升级](development/component-templates.md)、[统一资格流水线](development/project-pipelines.md)、[产品项目打包与验包](development/project-delivery.md)、[公共 SDK 与脚手架](development/sdk-and-scaffolding.md)、[机器人性能预算](architecture/performance-budgets.md)
 9. 生产部署和发布前阅读：[安全基线](security/README.md)、[下一版本发布说明](releases/NEXT.md)、[迁移指南](migration/0.1.0-development.md)

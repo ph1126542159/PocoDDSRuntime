@@ -1,4 +1,6 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
+find_dependency(PDRRuntimeCore @PROJECT_VERSION@ CONFIG)
 include("${CMAKE_CURRENT_LIST_DIR}/PDRRoboticsRuntimeTargets.cmake")
 check_required_components(PDRRoboticsRuntime)

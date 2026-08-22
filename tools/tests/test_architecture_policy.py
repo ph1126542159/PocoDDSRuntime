@@ -17,9 +17,14 @@ class ArchitecturePolicyTests(unittest.TestCase):
         for relative in POLICY.SCANNED_DIRECTORIES:
             directory = root / relative
             directory.mkdir(parents=True)
+            include = ("PocoDDS/Robotics/Types.h" if relative.startswith("robotics/")
+                       else "PocoDDS/RuntimeCore/Transport.h")
             (directory / "Safe.cpp").write_text(
-                '#include "PocoDDS/Robotics/Types.h"\n', encoding="utf-8"
+                f'#include "{include}"\n', encoding="utf-8"
             )
+        (root / "runtime-core/CMakeLists.txt").write_text(
+            "add_library(PDRRuntimeCore src/Safe.cpp)\n", encoding="utf-8"
+        )
         (root / "robotics/CMakeLists.txt").write_text(
             "add_library(PDRRoboticsRuntime src/Safe.cpp)\n", encoding="utf-8"
         )

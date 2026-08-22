@@ -1,5 +1,5 @@
 file(READ "${SOURCE_DIR}/CMakePresets.json" presets)
-foreach(profile embedded edge-test server)
+foreach(profile desktop-lite desktop-distributed embedded edge-industrial edge-test server robotics)
     string(JSON preset_count LENGTH "${presets}" configurePresets)
     math(EXPR last "${preset_count} - 1")
     set(found false)

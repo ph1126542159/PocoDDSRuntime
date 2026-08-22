@@ -108,8 +108,12 @@ option(PDR_ENABLE_OBSERVABILITY
     "Build the OpenTelemetry business observability module" ON)
 option(PDR_AUTO_BOOTSTRAP_DEPENDENCIES
     "Build missing third-party dependencies during project configuration" ON)
-set(PDR_PROFILE "custom" CACHE STRING "Deployment profile: embedded, edge-test, server or custom")
-set_property(CACHE PDR_PROFILE PROPERTY STRINGS embedded edge-test server custom)
+set(PDR_PROFILE "custom" CACHE STRING
+    "Deployment profile: desktop-lite, desktop-distributed, embedded, edge-industrial, edge-test, server, robotics or custom")
+set_property(CACHE PDR_PROFILE PROPERTY STRINGS
+    desktop-lite desktop-distributed embedded edge-industrial edge-test server robotics custom)
+option(PDR_BUILD_RUNTIME_CORE
+    "Build the transport-neutral runtime core and in-process transport" ON)
 option(PDR_BUILD_WEBUI "Build and package administration WebUI page bundles" ON)
 option(PDR_BUILD_LAUNCHER "Build the independent runtime watchdog launcher" ON)
 option(PDR_BUILD_DIAGNOSTIC_AGENT "Build the independent runtime diagnostic agent" ON)
@@ -119,14 +123,89 @@ option(PDR_BUILD_LEGACY_RUNTIME
     "Build the existing Poco/OSP runtime and direct Fast-DDS integrations" ON)
 option(PDR_BUILD_ROBOTICS_RUNTIME
     "Build the transport-neutral embodied robotics runtime core" OFF)
-set(PDR_COMM_BACKEND "FASTDDS" CACHE STRING
-    "Inter-process communication backend: FASTDDS or ROS2")
-set_property(CACHE PDR_COMM_BACKEND PROPERTY STRINGS FASTDDS ROS2)
-if(NOT PDR_COMM_BACKEND MATCHES "^(FASTDDS|ROS2)$")
-    message(FATAL_ERROR "Unsupported PDR_COMM_BACKEND: ${PDR_COMM_BACKEND}")
-endif()
-if(NOT PDR_PROFILE MATCHES "^(embedded|edge-test|server|custom)$")
+set(PDR_HOST_MODEL "auto" CACHE STRING
+    "Runtime host model: auto, static, desktop, osp, service or robotics")
+set_property(CACHE PDR_HOST_MODEL PROPERTY STRINGS auto static desktop osp service robotics)
+set(PDR_TRANSPORTS "" CACHE STRING
+    "Composable transports: inproc;ipc;http;websocket;grpc;mqtt;fastdds;ros2;modbus;can;serial")
+if(NOT PDR_PROFILE MATCHES
+   "^(desktop-lite|desktop-distributed|embedded|edge-industrial|edge-test|server|robotics|custom)$")
     message(FATAL_ERROR "Unsupported PDR_PROFILE: ${PDR_PROFILE}")
+endif()
+if(PDR_HOST_MODEL STREQUAL "auto")
+    if(PDR_PROFILE STREQUAL "desktop-lite")
+        set(PDR_HOST_MODEL "static")
+    elseif(PDR_PROFILE STREQUAL "desktop-distributed")
+        set(PDR_HOST_MODEL "desktop")
+    elseif(PDR_PROFILE STREQUAL "embedded")
+        set(PDR_HOST_MODEL "service")
+    elseif(PDR_PROFILE STREQUAL "robotics")
+        set(PDR_HOST_MODEL "robotics")
+    else()
+        set(PDR_HOST_MODEL "osp")
+    endif()
+endif()
+if(NOT PDR_HOST_MODEL MATCHES "^(static|desktop|osp|service|robotics)$")
+    message(FATAL_ERROR "Unsupported PDR_HOST_MODEL: ${PDR_HOST_MODEL}")
+endif()
+if(NOT PDR_TRANSPORTS)
+    if(PDR_PROFILE STREQUAL "desktop-lite")
+        set(PDR_TRANSPORTS "inproc")
+    elseif(PDR_PROFILE STREQUAL "desktop-distributed")
+        set(PDR_TRANSPORTS "inproc;ipc;http;websocket")
+    elseif(PDR_PROFILE STREQUAL "embedded")
+        set(PDR_TRANSPORTS "inproc;fastdds;modbus;can;serial")
+    elseif(PDR_PROFILE STREQUAL "edge-industrial")
+        set(PDR_TRANSPORTS "inproc;http;mqtt;fastdds;modbus;can;serial")
+    elseif(PDR_PROFILE STREQUAL "robotics")
+        set(PDR_TRANSPORTS "inproc;ros2")
+    else()
+        set(PDR_TRANSPORTS "inproc;http;websocket;mqtt;fastdds")
+    endif()
+endif()
+set(_pdr_supported_transports
+    inproc ipc http websocket grpc mqtt fastdds ros2 modbus can serial)
+foreach(_pdr_transport IN LISTS PDR_TRANSPORTS)
+    string(TOLOWER "${_pdr_transport}" _pdr_transport_normalized)
+    if(NOT _pdr_transport_normalized IN_LIST _pdr_supported_transports)
+        message(FATAL_ERROR "Unsupported PDR transport: ${_pdr_transport}")
+    endif()
+    if(NOT _pdr_transport_normalized IN_LIST PDR_RESOLVED_TRANSPORTS)
+        list(APPEND PDR_RESOLVED_TRANSPORTS "${_pdr_transport_normalized}")
+    endif()
+endforeach()
+unset(_pdr_supported_transports)
+unset(_pdr_transport)
+unset(_pdr_transport_normalized)
+
+# Named profiles are auditable contracts, not loose collections of hints.
+if(PDR_PROFILE STREQUAL "desktop-lite")
+    if(PDR_BUILD_LEGACY_RUNTIME OR PDR_BUILD_ROBOTICS_RUNTIME OR
+       NOT PDR_HOST_MODEL STREQUAL "static" OR
+       NOT PDR_RESOLVED_TRANSPORTS STREQUAL "inproc")
+        message(FATAL_ERROR
+            "desktop-lite requires static host, inproc only, and no Legacy/Robotics runtime")
+    endif()
+elseif(PDR_PROFILE STREQUAL "desktop-distributed")
+    if(PDR_BUILD_LEGACY_RUNTIME OR PDR_BUILD_ROBOTICS_RUNTIME OR
+       NOT PDR_HOST_MODEL STREQUAL "desktop")
+        message(FATAL_ERROR
+            "desktop-distributed requires desktop host and RuntimeCore-only composition")
+    endif()
+elseif(PDR_PROFILE STREQUAL "robotics")
+    if(PDR_BUILD_LEGACY_RUNTIME OR NOT PDR_BUILD_ROBOTICS_RUNTIME OR
+       NOT PDR_HOST_MODEL STREQUAL "robotics")
+        message(FATAL_ERROR
+            "robotics requires robotics host, Robotics Runtime ON and Legacy Runtime OFF")
+    endif()
+elseif(PDR_PROFILE STREQUAL "embedded")
+    if(NOT PDR_BUILD_LEGACY_RUNTIME OR NOT PDR_HOST_MODEL STREQUAL "service")
+        message(FATAL_ERROR "embedded requires service host and Legacy Runtime ON")
+    endif()
+elseif(PDR_PROFILE MATCHES "^(edge-industrial|edge-test|server)$")
+    if(NOT PDR_BUILD_LEGACY_RUNTIME OR NOT PDR_HOST_MODEL STREQUAL "osp")
+        message(FATAL_ERROR "${PDR_PROFILE} requires osp host and Legacy Runtime ON")
+    endif()
 endif()
 
 # External plugins carry this contract in their Bundle manifest. API versions use
@@ -145,6 +224,26 @@ set(SHARED_LIBRARY_VERSION 1 CACHE STRING "Compatibility version for migrated pl
 include(PDRWarnings)
 include(PDRProcessLayout)
 include(PDRComponents)
+include(PDRFrameworkModel)
+
+pdr_configure_framework_model(PDR_FRAMEWORK_MODEL_MANIFEST)
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/docs/architecture/framework-model-selection.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/PocoDDSRuntime")
+if(BUILD_TESTING)
+    add_test(NAME framework-model-contract
+        COMMAND "${CMAKE_COMMAND}"
+            -DMODEL_MANIFEST=${PDR_FRAMEWORK_MODEL_MANIFEST}
+            -DEXPECTED_PROFILE=${PDR_PROFILE}
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ValidateFrameworkModel.cmake")
+    set_tests_properties(framework-model-contract PROPERTIES
+        LABELS "contract;framework;webui")
+endif()
+
+if(PDR_BUILD_RUNTIME_CORE)
+    set(CMAKE_FOLDER "Runtime Core")
+    add_subdirectory(runtime-core)
+endif()
 
 if(PDR_BUILD_ROBOTICS_RUNTIME)
     set(CMAKE_FOLDER "Robotics")
@@ -152,25 +251,19 @@ if(PDR_BUILD_ROBOTICS_RUNTIME)
 endif()
 
 if(NOT PDR_BUILD_LEGACY_RUNTIME)
-    if(NOT PDR_BUILD_ROBOTICS_RUNTIME)
+    if(NOT PDR_BUILD_RUNTIME_CORE AND NOT PDR_BUILD_ROBOTICS_RUNTIME)
         message(FATAL_ERROR
-            "PDR_BUILD_LEGACY_RUNTIME=OFF requires PDR_BUILD_ROBOTICS_RUNTIME=ON")
-    endif()
-    if(PDR_COMM_BACKEND STREQUAL "FASTDDS")
-        message(WARNING
-            "The standalone robotics core uses an in-process test transport. "
-            "Select PDR_COMM_BACKEND=ROS2 and build robotics/ros2_ws with colcon "
-            "to enable inter-process ROS 2 communication.")
+            "At least PDR_BUILD_RUNTIME_CORE or PDR_BUILD_ROBOTICS_RUNTIME must remain enabled")
     endif()
     unset(CMAKE_FOLDER)
     pdr_configure_test_output_tree("${CMAKE_CURRENT_SOURCE_DIR}")
     return()
 endif()
 
-if(NOT PDR_COMM_BACKEND STREQUAL "FASTDDS")
+if(NOT "fastdds" IN_LIST PDR_RESOLVED_TRANSPORTS)
     message(FATAL_ERROR
-        "The legacy runtime still requires PDR_COMM_BACKEND=FASTDDS. "
-        "Use the robotics preset for the ROS2 migration path.")
+        "The legacy OSP runtime currently requires the optional fastdds adapter. "
+        "Use PDR_BUILD_LEGACY_RUNTIME=OFF for transport-neutral desktop or robotics cores.")
 endif()
 
 include(PDRDependencies)

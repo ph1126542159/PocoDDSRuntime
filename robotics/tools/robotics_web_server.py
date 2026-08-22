@@ -72,6 +72,34 @@ SENSITIVE_ATTRIBUTE_FRAGMENTS = (
     "privatekey",
 )
 
+DEFAULT_ROBOTICS_FRAMEWORK_MODEL: dict[str, Any] = {
+    "schemaVersion": 1,
+    "framework": {
+        "family": "robotics",
+        "model": "robotics",
+        "profile": "robotics",
+        "displayName": "PocoDDS Robotics Runtime",
+        "version": "unknown",
+    },
+    "build": {"runtimeCore": True, "legacyRuntime": False, "roboticsRuntime": True, "webui": True},
+    "transports": ["inproc", "ros2"],
+    "transportResolution": {"builtIn": ["inproc"], "externalAdapters": ["ros2"]},
+    "capabilities": {"robotics": True, "roboticsSimulation": True, "roboticsRos2": False},
+    "navigation": ["robotics-overview", "robotics-missions", "robotics-traces"],
+}
+
+
+def load_framework_model(path: Path | None) -> dict[str, Any]:
+    if path is None or not path.is_file():
+        return copy.deepcopy(DEFAULT_ROBOTICS_FRAMEWORK_MODEL)
+    value = json.loads(path.read_text(encoding="utf-8"))
+    framework = value.get("framework") if isinstance(value, dict) else None
+    if (value.get("schemaVersion") != 1 or not isinstance(framework, dict) or
+            framework.get("family") not in {"robotics", "hybrid"} or
+            not value.get("capabilities", {}).get("robotics")):
+        raise ValueError("framework manifest is not compatible with the robotics WebUI")
+    return value
+
 
 def now_microseconds() -> int:
     return time.time_ns() // 1_000
@@ -647,11 +675,13 @@ class RoboticsWebServer(ThreadingHTTPServer):
         address: tuple[str, int],
         manager: SimulationManager,
         static_dir: Path,
+        framework_model: dict[str, Any],
         allowed_origins: set[str] | None = None,
     ) -> None:
         super().__init__(address, RoboticsRequestHandler)
         self.manager = manager
         self.static_dir = static_dir.resolve()
+        self.framework_model = copy.deepcopy(framework_model)
         self.allowed_origins = allowed_origins or set()
 
 
@@ -717,6 +747,8 @@ class RoboticsRequestHandler(BaseHTTPRequestHandler):
         path = unquote(urlsplit(self.path).path)
         if path == "/health/live":
             self._json({"live": True, "service": "pdr-robotics-web-sim"})
+        elif path == "/framework-model.json":
+            self._json(self.server.framework_model)
         elif path == "/api/v1/robotics-simulation/catalog":
             self._json(self.server.manager.catalog())
         elif path == "/api/v1/robotics-simulation/runs":
@@ -798,11 +830,17 @@ def parse_arguments() -> argparse.Namespace:
     source_static = repository / "robotics" / "webui"
     installed_static = script_dir.parent / "webui"
     default_static = source_static if source_static.is_dir() else installed_static
+    manifest_candidates = [
+        repository / "build" / "robotics" / "pdr-framework-model.json",
+        installed_prefix / "share" / "PocoDDSRuntime" / "pdr-framework-model.json",
+    ]
+    default_manifest = next((candidate for candidate in manifest_candidates if candidate.is_file()), None)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=9096)
     parser.add_argument("--binary", type=Path, default=default_binary)
     parser.add_argument("--static-dir", type=Path, default=default_static)
+    parser.add_argument("--framework-manifest", type=Path, default=default_manifest)
     default_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
     if not default_otlp_endpoint and os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
         default_otlp_endpoint = os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"].rstrip("/") + "/v1/traces"
@@ -822,6 +860,7 @@ def main() -> int:
     if not 0 <= arguments.port <= 65_535:
         raise SystemExit("--port must be in [0, 65535]")
     manager = SimulationManager(arguments.binary, otlp_http_endpoint=arguments.otlp_http_endpoint)
+    framework_model = load_framework_model(arguments.framework_manifest)
     allowed_origins = {
         "http://127.0.0.1:9080",
         "http://localhost:9080",
@@ -832,7 +871,7 @@ def main() -> int:
         *arguments.webui_origin,
     }
     server = RoboticsWebServer(
-        (arguments.host, arguments.port), manager, arguments.static_dir, allowed_origins
+        (arguments.host, arguments.port), manager, arguments.static_dir, framework_model, allowed_origins
     )
     host, port = server.server_address[:2]
     url = f"http://{host}:{port}/"

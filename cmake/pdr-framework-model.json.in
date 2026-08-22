@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "framework": {
+    "family": "@PDR_FRAMEWORK_FAMILY@",
+    "model": "@PDR_HOST_MODEL@",
+    "profile": "@PDR_PROFILE@",
+    "displayName": "@PDR_FRAMEWORK_DISPLAY_NAME@",
+    "version": "@PROJECT_VERSION@"
+  },
+  "build": {
+    "runtimeCore": @PDR_FRAMEWORK_RUNTIME_CORE@,
+    "legacyRuntime": @PDR_FRAMEWORK_LEGACY_RUNTIME@,
+    "roboticsRuntime": @PDR_FRAMEWORK_ROBOTICS_RUNTIME@,
+    "webui": @PDR_FRAMEWORK_WEBUI@,
+    "observability": @PDR_FRAMEWORK_OBSERVABILITY@,
+    "dataModules": @PDR_FRAMEWORK_DATA_MODULES@
+  },
+  "transports": [@PDR_FRAMEWORK_TRANSPORTS_JSON@],
+  "transportResolution": {
+    "builtIn": [@PDR_FRAMEWORK_BUILTIN_TRANSPORTS_JSON@],
+    "externalAdapters": [@PDR_FRAMEWORK_EXTERNAL_TRANSPORTS_JSON@]
+  },
+  "capabilities": {
+    "runtimeOverview": @PDR_CAP_RUNTIME_OVERVIEW@,
+    "processManagement": @PDR_CAP_PROCESS_MANAGEMENT@,
+    "deviceProtocols": @PDR_CAP_DEVICE_PROTOCOLS@,
+    "bundleGovernance": @PDR_CAP_BUNDLE_GOVERNANCE@,
+    "metrics": @PDR_CAP_METRICS@,
+    "runtimeGovernance": @PDR_CAP_RUNTIME_GOVERNANCE@,
+    "diagnosticTerminal": @PDR_CAP_DIAGNOSTIC_TERMINAL@,
+    "businessTracing": @PDR_CAP_BUSINESS_TRACING@,
+    "robotics": @PDR_CAP_ROBOTICS@,
+    "roboticsSimulation": @PDR_CAP_ROBOTICS_SIMULATION@,
+    "roboticsRos2": @PDR_CAP_ROBOTICS_ROS2@
+  },
+  "navigation": [@PDR_FRAMEWORK_NAVIGATION_JSON@]
+}

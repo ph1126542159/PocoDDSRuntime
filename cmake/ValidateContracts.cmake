@@ -2,6 +2,7 @@ set(required_files
     "${SOURCE_DIR}/contracts/schemas/component-template-state.schema.json"
     "${SOURCE_DIR}/contracts/schemas/component-template-transaction.schema.json"
     "${SOURCE_DIR}/contracts/schemas/runtime-config.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/framework-model.schema.json"
     "${SOURCE_DIR}/contracts/schemas/pdr-project.schema.json"
     "${SOURCE_DIR}/contracts/schemas/project-config-capabilities.schema.json"
     "${SOURCE_DIR}/contracts/schemas/project-config-plan.schema.json"

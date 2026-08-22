@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "framework": {
+    "family": "generic",
+    "model": "osp",
+    "profile": "server",
+    "displayName": "PocoDDS Runtime",
+    "version": "0.1.0"
+  },
+  "build": {
+    "runtimeCore": true,
+    "legacyRuntime": true,
+    "roboticsRuntime": false,
+    "webui": true,
+    "observability": true,
+    "dataModules": true
+  },
+  "transports": ["inproc", "http", "websocket", "mqtt", "fastdds"],
+  "transportResolution": {
+    "builtIn": ["inproc", "fastdds"],
+    "externalAdapters": ["http", "websocket", "mqtt"]
+  },
+  "capabilities": {
+    "runtimeOverview": true,
+    "processManagement": true,
+    "deviceProtocols": true,
+    "bundleGovernance": true,
+    "metrics": true,
+    "runtimeGovernance": true,
+    "diagnosticTerminal": true,
+    "businessTracing": true,
+    "robotics": false,
+    "roboticsSimulation": false,
+    "roboticsRos2": false
+  },
+  "navigation": ["overview", "processes", "devices", "plugins", "metrics", "governance", "terminal", "tracing"]
+}

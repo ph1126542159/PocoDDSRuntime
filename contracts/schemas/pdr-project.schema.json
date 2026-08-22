@@ -20,8 +20,14 @@
     "runtime": {
       "type": "object", "additionalProperties": false, "required": ["profile", "version"],
       "properties": {
-        "profile": {"enum": ["robotics", "embedded", "edge-test", "server"]},
-        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.([0-9]+|x)([-+][0-9A-Za-z.-]+)?$"}
+        "profile": {"enum": ["desktop-lite", "desktop-distributed", "robotics", "embedded", "edge-industrial", "edge-test", "server"]},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.([0-9]+|x)([-+][0-9A-Za-z.-]+)?$"},
+        "host": {"enum": ["static", "desktop", "osp", "service", "robotics"]},
+        "transports": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "contains": {"const": "inproc"},
+          "items": {"enum": ["inproc", "ipc", "http", "websocket", "grpc", "mqtt", "fastdds", "ros2", "modbus", "can", "serial"]}
+        }
       }
     },
     "robot": {
@@ -92,6 +98,30 @@
       }
     },
     "then": {"required": ["robot"]}
+  }, {
+    "if": {
+      "properties": {
+        "runtime": {"properties": {"profile": {"const": "desktop-lite"}}}
+      }
+    },
+    "then": {
+      "properties": {
+        "runtime": {
+          "properties": {
+            "host": {"const": "static"},
+            "transports": {"const": ["inproc"]}
+          }
+        },
+        "components": {
+          "properties": {
+            "devices": {"maxItems": 0},
+            "workflows": {"maxItems": 0},
+            "bundles": {"maxItems": 0},
+            "subprocesses": {"maxItems": 0}
+          }
+        }
+      }
+    }
   }],
   "$defs": {
     "paths": {

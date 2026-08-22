@@ -1,5 +1,5 @@
 const apiRoot = "/api/v1/robotics-simulation";
-const state = { catalog: null, runs: [], activeRun: null, selectedNode: "", module: "warehouse", timer: null };
+const state = { framework: null, catalog: null, runs: [], activeRun: null, selectedNode: "", module: "warehouse", timer: null };
 
 const $ = id => document.getElementById(id);
 const statusText = { queued: "排队中", pending: "待执行", running: "执行中", success: "成功", failed: "失败", cancelled: "已取消" };
@@ -372,7 +372,13 @@ async function cancelRun() {
 
 async function init() {
   try {
-    state.catalog = await request(`${apiRoot}/catalog`);
+    [state.framework, state.catalog] = await Promise.all([
+      request("/framework-model.json"),
+      request(`${apiRoot}/catalog`)
+    ]);
+    const framework = state.framework?.framework || {};
+    $("framework-model-name").textContent = `${framework.displayName || "PocoDDS Robotics Runtime"} · ${framework.profile || "robotics"} · ${framework.model || "robotics"}`;
+    document.title = `${framework.displayName || "PocoDDS Robotics Runtime"} · 机器人仿真中心`;
     renderCatalog();
     await refresh();
     state.timer = setInterval(refresh, 500);

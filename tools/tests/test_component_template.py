@@ -71,10 +71,10 @@ class ComponentTemplateTests(unittest.TestCase):
                     encoding="utf-8"
                 ))
                 self.assertEqual(state["kind"], kind)
-                self.assertEqual(state["appliedVersion"], 2)
+                self.assertEqual(state["appliedVersion"], 3)
                 self.assertTrue(state["managedFiles"])
                 cmake = component / "CMakeLists.txt"
-                self.assertIn("PDR_COMPONENT_TEMPLATE_VERSION 2",
+                self.assertIn("PDR_COMPONENT_TEMPLATE_VERSION 3",
                               cmake.read_text(encoding="utf-8"))
 
                 project_file = state["projectFiles"][0]["path"]
@@ -138,7 +138,7 @@ class ComponentTemplateTests(unittest.TestCase):
             upgraded = self.run_tool("component", "upgrade", str(component))
             self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
             self.assertEqual(source.read_bytes(), custom_source)
-            self.assertIn("PDR_COMPONENT_TEMPLATE_VERSION 2",
+            self.assertIn("PDR_COMPONENT_TEMPLATE_VERSION 3",
                           (component / "CMakeLists.txt").read_text(encoding="utf-8"))
             after = self.run_tool(
                 "component", "status", str(component), "--check", "--json"

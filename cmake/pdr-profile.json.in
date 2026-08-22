@@ -2,6 +2,11 @@
   "schemaVersion": 1,
   "name": "@PDR_PROFILE@",
   "version": "@PROJECT_VERSION@",
+  "framework": {
+    "family": "@PDR_FRAMEWORK_FAMILY@",
+    "model": "@PDR_HOST_MODEL@",
+    "manifest": "share/PocoDDSRuntime/pdr-framework-model.json"
+  },
   "features": {
     "webui": @PDR_PROFILE_WEBUI@,
     "launcher": @PDR_PROFILE_LAUNCHER@,

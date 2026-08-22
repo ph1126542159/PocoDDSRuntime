@@ -165,6 +165,13 @@ to verify the page, API, complete warehouse flow, OpenTelemetry identifiers and
 parentage, a captured six-span OTLP payload, parameters, logs, watchdog and
 cancellation contract.
 
+The robotics Web service reads the CMake-generated `pdr-framework-model.json`
+and publishes it as `GET /framework-model.json`. A pure `robotics` preset
+therefore identifies itself as the robotics family, while a build containing
+both the OSP and robotics runtimes identifies itself as `hybrid`. Branding and
+available navigation come from this manifest instead of a second hard-coded
+product switch in JavaScript.
+
 ## Build the ROS 2 adapter
 
 After installing and sourcing a supported ROS 2 distribution:

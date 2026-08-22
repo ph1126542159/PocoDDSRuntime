@@ -12,7 +12,33 @@ from typing import Any
 
 
 SCHEMA_VERSION = 1
-PROFILES = {"robotics", "embedded", "edge-test", "server"}
+PROFILE_MODELS = {
+    "desktop-lite": {"host": "static", "transports": ["inproc"]},
+    "desktop-distributed": {
+        "host": "desktop", "transports": ["inproc", "ipc", "http", "websocket"],
+    },
+    "embedded": {
+        "host": "service", "transports": ["inproc", "fastdds", "modbus", "can", "serial"],
+    },
+    "edge-industrial": {
+        "host": "osp",
+        "transports": ["inproc", "http", "mqtt", "fastdds", "modbus", "can", "serial"],
+    },
+    "edge-test": {
+        "host": "osp",
+        "transports": ["inproc", "http", "websocket", "mqtt", "fastdds", "modbus", "can", "serial"],
+    },
+    "server": {
+        "host": "osp", "transports": ["inproc", "http", "websocket", "mqtt", "fastdds"],
+    },
+    "robotics": {"host": "robotics", "transports": ["inproc", "ros2"]},
+}
+PROFILES = set(PROFILE_MODELS)
+HOST_MODELS = {"static", "desktop", "osp", "service", "robotics"}
+TRANSPORTS = {
+    "inproc", "ipc", "http", "websocket", "grpc", "mqtt", "fastdds", "ros2",
+    "modbus", "can", "serial",
+}
 BACKENDS = {"in_memory", "mock_hardware", "topic_simulation", "topic_hardware"}
 COMPONENT_LISTS = {
     "robotModules", "robotProcesses", "modules", "services", "devices", "workflows",
@@ -20,9 +46,8 @@ COMPONENT_LISTS = {
 }
 ADAPTER_LISTS = {"hardware", "simulation", "ros2"}
 ROBOTICS_COMPONENT_LISTS = {"robotModules", "robotProcesses"}
-MANAGEMENT_COMPONENT_LISTS = {
-    "modules", "services", "devices", "workflows", "bundles", "subprocesses"
-}
+APPLICATION_COMPONENT_LISTS = {"modules", "services"}
+MANAGEMENT_COMPONENT_LISTS = {"devices", "workflows", "bundles", "subprocesses"}
 COMPONENT_KIND_FIELDS = {
     "robot-module": ("robotModules",),
     "robot-process": ("robotProcesses",),
@@ -124,6 +149,23 @@ def validate_string_list(value: Any, field: str) -> list[str]:
     return result
 
 
+def validate_runtime_transports(value: Any) -> list[str]:
+    if not isinstance(value, list) or not value:
+        raise ValueError("runtime.transports must be a non-empty array")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or item not in TRANSPORTS:
+            raise ValueError(
+                "runtime.transports entries must be one of: " + ", ".join(sorted(TRANSPORTS))
+            )
+        if item in result:
+            raise ValueError(f"runtime.transports contains duplicate entry: {item}")
+        result.append(item)
+    if "inproc" not in result:
+        raise ValueError("runtime.transports must include inproc for local Service delivery")
+    return result
+
+
 def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
     manifest = path.resolve()
     if not manifest.is_file():
@@ -163,7 +205,7 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
     runtime = document.get("runtime")
     if not isinstance(runtime, dict):
         raise ValueError("runtime must be an object")
-    if set(runtime) - {"profile", "version"}:
+    if set(runtime) - {"profile", "version", "host", "transports"}:
         raise ValueError("runtime contains unknown fields")
     profile = require_string(runtime, "profile", "runtime.profile")
     if profile not in PROFILES:
@@ -171,6 +213,15 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
     version = require_string(runtime, "version", "runtime.version")
     if not re.fullmatch(r"\d+\.\d+\.(?:\d+|x)(?:[-+][0-9A-Za-z.-]+)?", version):
         raise ValueError("runtime.version must be a semantic version or patch wildcard")
+    defaults = PROFILE_MODELS[profile]
+    host = runtime.get("host", defaults["host"])
+    if host not in HOST_MODELS:
+        raise ValueError("runtime.host must be one of: " + ", ".join(sorted(HOST_MODELS)))
+    transports = validate_runtime_transports(runtime.get("transports", defaults["transports"]))
+    if profile == "desktop-lite" and (host != "static" or transports != ["inproc"]):
+        raise ValueError("desktop-lite requires host=static and transports=[inproc]")
+    if profile == "robotics" and host != "robotics":
+        raise ValueError("robotics profile requires runtime.host=robotics")
 
     robot = document.get("robot")
     normalized_robot: dict[str, Any] | None = None
@@ -208,6 +259,18 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
         field: validate_string_list(adapters.get(field, []), f"components.adapters.{field}")
         for field in sorted(ADAPTER_LISTS)
     }
+    if normalized_components["adapters"]["ros2"] and "ros2" not in transports:
+        raise ValueError("registered ROS 2 adapters require runtime.transports to include ros2")
+    if profile == "desktop-lite":
+        unsupported = sorted(
+            field for field in MANAGEMENT_COMPONENT_LISTS
+            if normalized_components[field]
+        )
+        if unsupported:
+            raise ValueError(
+                "desktop-lite supports modules and services only; use desktop-distributed "
+                "or an OSP profile for: " + ", ".join(unsupported)
+            )
     all_component_paths = [
         relative for field in sorted(COMPONENT_LISTS)
         for relative in normalized_components[field]
@@ -364,7 +427,8 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
         "schemaVersion": SCHEMA_VERSION,
         "name": name,
         "displayName": document["displayName"],
-        "runtime": {"profile": profile, "version": version},
+        "runtime": {"profile": profile, "version": version, "host": host,
+                    "transports": transports},
         "components": normalized_components,
         "config": {
             "version": config_version, "layers": layers, "migrations": migrations,
@@ -409,6 +473,11 @@ def composition_lines(project: dict[str, Any], manifest_sha256: str) -> list[str
     lines = [
         "# Generated by pdr project sync. Do not edit by hand.",
         f'set(PDR_PROJECT_MANIFEST_SHA256 "{manifest_sha256}")',
+        f'set(PDR_PROJECT_PROFILE "{project["runtime"]["profile"]}")',
+        f'set(PDR_PROJECT_HOST_MODEL "{project["runtime"]["host"]}")',
+        'set(PDR_PROJECT_TRANSPORTS ' + " ".join(
+            f'"{item}"' for item in project["runtime"]["transports"]
+        ) + ')',
         'file(SHA256 "${CMAKE_CURRENT_LIST_DIR}/pdr-project.yaml" _pdr_manifest_sha256)',
         'if(NOT _pdr_manifest_sha256 STREQUAL PDR_PROJECT_MANIFEST_SHA256)',
         '    message(FATAL_ERROR "pdr-project.yaml changed; run: pdr project sync pdr-project.yaml")',
@@ -454,6 +523,7 @@ def composition_lines(project: dict[str, Any], manifest_sha256: str) -> list[str
     if adapter_ordinal == 0:
         lines.append("    # No registered in-process robotics adapters.")
     lines.extend(["endif()", ""])
+    append_group("PDR_PROJECT_BUILD_APPLICATION", APPLICATION_COMPONENT_LISTS)
     append_group("PDR_PROJECT_BUILD_MANAGEMENT", MANAGEMENT_COMPONENT_LISTS)
     lines.append("unset(_pdr_project_root)")
     return lines
@@ -562,7 +632,12 @@ def create_project(args: Any) -> int:
         "name": slug,
         "displayName": args.name,
         "version": args.version,
-        "runtime": {"profile": args.profile, "version": args.runtime_version},
+        "runtime": {
+            "profile": args.profile,
+            "version": args.runtime_version,
+            "host": PROFILE_MODELS[args.profile]["host"],
+            "transports": PROFILE_MODELS[args.profile]["transports"],
+        },
         "template": {
             "id": project_template.TEMPLATE_ID,
             "version": project_template.CURRENT_TEMPLATE_VERSION,
@@ -587,7 +662,11 @@ def create_project(args: Any) -> int:
     ) | {
         "config/base/project.json": json.dumps({
             "version": 1,
-            "values": {"runtime": {"profile": args.profile}},
+            "values": {"runtime": {
+                "profile": args.profile,
+                "host": PROFILE_MODELS[args.profile]["host"],
+                "transports": PROFILE_MODELS[args.profile]["transports"],
+            }},
         }, indent=2) + "\n",
         "config/robot/project.json": json.dumps({
             "version": 1,

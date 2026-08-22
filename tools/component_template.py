@@ -14,8 +14,8 @@ import project_template
 
 
 TEMPLATE_ID = "pdr-component"
-CURRENT_TEMPLATE_VERSION = 2
-SUPPORTED_TEMPLATE_VERSIONS = {1, 2}
+CURRENT_TEMPLATE_VERSION = 3
+SUPPORTED_TEMPLATE_VERSIONS = {1, 2, 3}
 COMPONENT_KINDS = {
     "module", "service", "device", "workflow", "bundle", "plugin", "subprocess",
     "robot-module", "robot-hardware-adapter", "robot-simulation-adapter",
@@ -60,6 +60,14 @@ def render_component_template(kind: str, name: str, base_renderer: BaseRenderer,
             raise ValueError(f"component template CMake entry has no minimum version: {path}")
         lines.insert(1, f"set(PDR_COMPONENT_TEMPLATE_VERSION {version})\n")
         rendered[path] = "".join(lines)
+    if version >= 3 and kind in {"module", "service"}:
+        cmake = rendered["CMakeLists.txt"]
+        legacy_package = "find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED COMPONENTS SDK)"
+        if legacy_package not in cmake or "PocoDDS::SDK" not in cmake:
+            raise ValueError(f"{kind} scaffold no longer matches the version-3 migration")
+        rendered["CMakeLists.txt"] = cmake.replace(
+            legacy_package, "find_package(PDRRuntimeCore 0.1 CONFIG REQUIRED)"
+        ).replace("PocoDDS::SDK", "PocoDDS::RuntimeCore")
     if "README.md" in rendered:
         rendered["README.md"] = rendered["README.md"].rstrip() + f'''
 
@@ -70,6 +78,14 @@ be checked with `pdr component status . --check` and upgraded with
 `pdr component upgrade .`. Files under `src/`, `include/`, `tests/`, `launch/` and
 `config/` remain product-owned and are never overwritten by template upgrades.
 '''
+    if version >= 3 and kind in {"module", "service"}:
+        rendered["README.md"] = rendered["README.md"].replace(
+            "uses only the public `PocoDDS::SDK` target",
+            "uses only the transport-neutral `PocoDDS::RuntimeCore` target",
+        ).replace(
+            "installed SDK in an isolated build",
+            "installed RuntimeCore package in an isolated build",
+        )
     return rendered
 
 

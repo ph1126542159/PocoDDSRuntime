@@ -8,6 +8,7 @@
 - `schemas/release-pipeline.schema.json`：框架发布和产品项目共用的哈希绑定阶段计划；可选 metadata 明确计划类型及自动/外部验收边界。
 - `schemas/external-acceptance.schema.json`：候选、附件和可选约束绑定的外部验收；项目 SIL/HIL/长稳使用独立签名类型。
 - `schemas/runtime-config.schema.json`：运行时配置类型、范围和必填项。
+- `schemas/framework-model.schema.json`：CMake 解析后的框架族、Host 模型、传输、能力和 WebUI 导航契约。
 - `schemas/runtime-resource.schema.json`：Host → Runtime → Process → Bundle → Service 的作用域、所有权和生命周期所有者公共契约。
 - `schemas/pdr-project.schema.json`：产品项目组合、机器人 Backend、组件路径、配置层和验收要求。
 - `schemas/project-config-capabilities.schema.json`：组件配置所有权、热更新能力、顺序依赖及无 shell 执行协议入口。

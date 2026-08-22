@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/contracts/framework-model.schema.json",
+  "title": "PocoDDSRuntime CMake framework model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "framework", "build", "transports", "transportResolution", "capabilities", "navigation"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "framework": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "model", "profile", "displayName", "version"],
+      "properties": {
+        "family": { "enum": ["generic", "robotics", "hybrid", "core"] },
+        "model": { "enum": ["static", "desktop", "osp", "service", "robotics"] },
+        "profile": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" },
+      "required": ["runtimeCore", "legacyRuntime", "roboticsRuntime", "webui", "observability", "dataModules"]
+    },
+    "transports": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["inproc", "ipc", "http", "websocket", "grpc", "mqtt", "fastdds", "ros2", "modbus", "can", "serial"] }
+    },
+    "transportResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["builtIn", "externalAdapters"],
+      "properties": {
+        "builtIn": {"$ref": "#/$defs/transports"},
+        "externalAdapters": {"$ref": "#/$defs/transports"}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" },
+      "required": ["runtimeOverview", "processManagement", "deviceProtocols", "bundleGovernance", "metrics", "runtimeGovernance", "diagnosticTerminal", "businessTracing", "robotics", "roboticsSimulation", "roboticsRos2"]
+    },
+    "navigation": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "transports": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["inproc", "ipc", "http", "websocket", "grpc", "mqtt", "fastdds", "ros2", "modbus", "can", "serial"] }
+    }
+  }
+}

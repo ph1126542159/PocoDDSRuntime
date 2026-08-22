@@ -58,6 +58,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--server", type=Path, required=True)
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--static-dir", type=Path, required=True)
+    parser.add_argument("--framework-manifest", type=Path)
     return parser.parse_args()
 
 
@@ -69,8 +70,7 @@ def main() -> int:
     collector_thread = threading.Thread(target=collector.serve_forever, daemon=True)
     collector_thread.start()
     collector_url = f"http://127.0.0.1:{collector.server_address[1]}/v1/traces"
-    process = subprocess.Popen(
-        [
+    command = [
             sys.executable,
             str(options.server),
             "--port",
@@ -81,7 +81,11 @@ def main() -> int:
             str(options.static_dir),
             "--otlp-http-endpoint",
             collector_url,
-        ],
+        ]
+    if options.framework_manifest:
+        command.extend(["--framework-manifest", str(options.framework_manifest)])
+    process = subprocess.Popen(
+        command,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -96,7 +100,11 @@ def main() -> int:
         base_url = ready.split()[1].rstrip("/")
         health = request(f"{base_url}/health/live")
         catalog = request(f"{base_url}/api/v1/robotics-simulation/catalog")
+        framework = request(f"{base_url}/framework-model.json")
         assert health == {"live": True, "service": "pdr-robotics-web-sim"}
+        assert framework["schemaVersion"] == 1
+        assert framework["framework"]["family"] in {"robotics", "hybrid"}
+        assert framework["capabilities"]["robotics"] is True
         assert {item["module"] for item in catalog["scenarios"]} == {
             "warehouse",
             "inspection",
@@ -109,6 +117,7 @@ def main() -> int:
         with urlopen(f"{base_url}/", timeout=5) as response:
             page = response.read().decode("utf-8")
             assert response.status == 200 and "机器人仿真中心" in page
+            assert "framework-model-name" in page
             assert "OPENTELEMETRY TRACE" in page and "OpenTelemetry Span 详情" in page
 
         started = request(

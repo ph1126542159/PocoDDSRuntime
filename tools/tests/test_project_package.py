@@ -77,7 +77,7 @@ class ProjectPackageTests(unittest.TestCase):
                 sbom = json.loads(archive.read("metadata/project.spdx.json"))
                 package_manifest = json.loads(archive.read("metadata/package-manifest.json"))
                 self.assertEqual(package_manifest["template"],
-                                 {"id": "pdr-product", "version": 3})
+                                 {"id": "pdr-product", "version": 4})
                 package_names = {item["name"] for item in sbom["packages"]}
                 self.assertIn("PocoDDSRuntime", package_names)
                 self.assertIn("VendorSDK", package_names)

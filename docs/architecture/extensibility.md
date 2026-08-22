@@ -21,8 +21,8 @@ PocoDDSRuntime 的稳定性来自固定依赖方向，而不是把所有能力�
 
 | 单元 | 适用场景 | 允许依赖 | 禁止事项 |
 | --- | --- | --- | --- |
-| Module | 算法、策略、领域模型、可复用库 | `PocoDDS::SDK` 或更小的公开组件 | 直接依赖 Runtime 主程序 |
-| Service | 稳定业务接口和用例实现 | Module、Application、公开 Port | 在接口层绑定 Qt、Fast DDS 或设备实现 |
+| Module | 算法、策略、领域模型、可复用库 | 优先 `PocoDDS::RuntimeCore` 或更小的公开组件 | 直接依赖 Runtime 主程序 |
+| Service | 稳定业务接口和用例实现 | RuntimeCore、Module、Application、公开 Port | 在接口层绑定 Qt、Fast DDS、ROS 2 或设备实现 |
 | Bundle | 运行时发现、OSP 生命周期和服务注册 | Service 与 `PocoDDS::Plugins` | 在 Activator 中实现业务流程 |
 | Subprocess | 原生崩溃隔离、独立资源/生命周期 | SDK、DDS、HTTP、公开协议 | 访问主进程内 Service Registry |
 
@@ -55,7 +55,7 @@ PocoDDSRuntime/
 ./tools/pdr.ps1 new robot-hardware-adapter CanDrive --output product/adapters/hardware
 ```
 
-项目创建、清单校验和源码摘要锁定的完整流程见[产品项目工作区](../development/project-workspaces.md)。
+项目创建、清单校验和源码摘要锁定的完整流程见[产品项目工作区](../development/project-workspaces.md)；新项目先按[框架模型选择与项目适配](framework-model-selection.md)选择 Profile、Host 和 Transport。
 
 `bundle` 是受治理的外部 OSP Plugin Bundle 别名，仍使用 `pdr.plugin.*` 命名并经过 API/ABI、签名、隔离和回退门禁。生成器默认拒绝覆盖非空目录。
 

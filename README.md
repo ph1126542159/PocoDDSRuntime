@@ -1,13 +1,30 @@
 # PocoDDSRuntime
 
-PocoDDSRuntime is a C++17 OSP service container derived from the macchina.io
-composition model. OSP owns local Bundle lifecycle and service registration;
-Fast DDS replaces the former RemotingNG cross-process proxy/skeleton layer.
+PocoDDSRuntime is a C++17 modular runtime family. Its transport-neutral
+`RuntimeCore` supports small applications, while optional OSP, Fast DDS,
+robotics and process-management layers serve larger deployments.
 
-PocoDDSRuntime 是面向复杂 C++ 应用的通用运行时框架，以多进程隔离、OSP Bundle 模块化和 Fast DDS 分布式通信为核心，支持桌面、边缘、设备控制及分布式服务系统快速构建。
+PocoDDSRuntime 是面向复杂 C++ 应用的通用运行时框架。普通桌面程序默认只使用
+`RuntimeCore + inproc`；大型工业应用可按需组合 OSP Bundle、受管子进程、Fast DDS、
+现场协议和可观测性；机器人项目独立组合 Robotics Core 与外置 ROS 2 Adapter。
 
 The project deliberately does not contain RemotingNG-generated `RemoteObject`,
 `Skeleton`, `ServerHelper` or `EventDispatcher` code.
+
+## Choose a framework model
+
+```powershell
+cmake --preset desktop-lite         # ordinary single-process desktop application
+cmake --preset desktop-distributed  # desktop plus project-owned IPC/HTTP adapters
+cmake --preset edge-industrial      # OSP management plane and industrial adapters
+cmake --preset server               # full data and observability runtime
+cmake --preset robotics             # transport-neutral robotics core
+```
+
+See the [framework model selection guide](docs/architecture/framework-model-selection.md)
+for the complete project matrix, boundaries and scaffold commands. Selecting `ros2`,
+Fast DDS or MQTT is explicit; business Modules and Services do not inherit those
+dependencies.
 
 ## Experimental embodied robotics runtime
 
@@ -38,6 +55,8 @@ and optional OTLP/HTTP JSON export to a Collector.
 
 ## Directory layout
 
+- `runtime-core/` — transport-neutral contracts and built-in in-process transport;
+- `robotics/` — transport-neutral robotics lifecycle, actions, behavior and simulation;
 - `platform/` — migrated platform/runtime infrastructure:
   - `DDS`, `observability`, `CodeGeneration`, `Geo`, `OSP`, `Serial` and
     `WebTunnel`;

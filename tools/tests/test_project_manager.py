@@ -101,6 +101,33 @@ class ProjectManagerTests(unittest.TestCase):
             self.assertNotEqual(created.returncode, 0)
             self.assertEqual((destination / "owned.txt").read_text(encoding="utf-8"), "keep")
 
+    def test_desktop_lite_records_minimal_model_and_rejects_management_components(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            created = self.run_tool(
+                "project", "create", "DesktopTool", "--output", str(root),
+                "--profile", "desktop-lite",
+            )
+            self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
+            manifest = root / "DesktopTool/pdr-project.yaml"
+            document = json.loads(manifest.read_text(encoding="utf-8"))
+            self.assertEqual(document["runtime"]["host"], "static")
+            self.assertEqual(document["runtime"]["transports"], ["inproc"])
+            cmake = (manifest.parent / "CMakeLists.txt").read_text(encoding="utf-8")
+            self.assertIn("PDR_PROJECT_BUILD_APPLICATION", cmake)
+
+            device = manifest.parent / "devices/HeavyDevice"
+            device.mkdir(parents=True)
+            (device / "CMakeLists.txt").write_text(
+                "add_library(HeavyDevice INTERFACE)\n", encoding="utf-8"
+            )
+            document["components"]["devices"] = ["devices/HeavyDevice"]
+            manifest.write_text(json.dumps(document), encoding="utf-8")
+            rejected = self.run_tool("project", "validate", str(manifest))
+            self.assertEqual(rejected.returncode, 1)
+            self.assertIn("desktop-lite supports modules and services only",
+                          rejected.stdout + rejected.stderr)
+
     def test_validation_rejects_incomplete_component_structure(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -127,7 +154,10 @@ class ProjectManagerTests(unittest.TestCase):
     def test_new_component_auto_registers_and_remove_preserves_source(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            created = self.run_tool("project", "create", "ComposableRobot", "--output", str(root))
+            created = self.run_tool(
+                "project", "create", "ComposableRobot", "--output", str(root),
+                "--profile", "robotics",
+            )
             self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
             project = root / "ComposableRobot"
             generated = self.run_tool(

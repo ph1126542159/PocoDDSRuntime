@@ -3105,8 +3105,12 @@ def parser() -> argparse.ArgumentParser:
     )
     project_create.add_argument("name", type=valid_name)
     project_create.add_argument("--output", default=".")
-    project_create.add_argument("--profile", choices=("robotics", "embedded", "edge-test", "server"),
-                                default="robotics")
+    project_create.add_argument(
+        "--profile",
+        choices=("desktop-lite", "desktop-distributed", "embedded", "edge-industrial",
+                 "edge-test", "server", "robotics"),
+        default="desktop-lite",
+    )
     project_create.add_argument("--runtime-version", default="0.1.x")
     project_create.add_argument("--version", default="0.1.0")
     project_create.add_argument("--force", action="store_true")
