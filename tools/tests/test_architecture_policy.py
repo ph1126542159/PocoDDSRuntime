@@ -22,12 +22,10 @@ class ArchitecturePolicyTests(unittest.TestCase):
             (directory / "Safe.cpp").write_text(
                 f'#include "{include}"\n', encoding="utf-8"
             )
-        (root / "runtime-core/CMakeLists.txt").write_text(
-            "add_library(PDRRuntimeCore src/Safe.cpp)\n", encoding="utf-8"
-        )
-        (root / "robotics/CMakeLists.txt").write_text(
-            "add_library(PDRRoboticsRuntime src/Safe.cpp)\n", encoding="utf-8"
-        )
+        for relative in POLICY.SCANNED_CMAKE:
+            cmake = root / relative
+            cmake.parent.mkdir(parents=True, exist_ok=True)
+            cmake.write_text("add_library(PortableComponent src/Safe.cpp)\n", encoding="utf-8")
 
     def test_accepts_transport_neutral_core(self):
         with tempfile.TemporaryDirectory() as directory:

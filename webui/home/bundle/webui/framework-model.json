@@ -9,6 +9,7 @@
   },
   "build": {
     "runtimeCore": true,
+    "nativeProcessHost": false,
     "legacyRuntime": true,
     "roboticsRuntime": false,
     "webui": true,
@@ -17,8 +18,8 @@
   },
   "transports": ["inproc", "http", "websocket", "mqtt", "fastdds"],
   "transportResolution": {
-    "builtIn": ["inproc", "fastdds"],
-    "externalAdapters": ["http", "websocket", "mqtt"]
+    "builtIn": ["inproc", "mqtt", "fastdds"],
+    "externalAdapters": ["http", "websocket"]
   },
   "capabilities": {
     "runtimeOverview": true,

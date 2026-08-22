@@ -30,7 +30,10 @@ if(BUILD_TESTING)
     find_program(PDR_OPENSSL_EXECUTABLE openssl
         HINTS "${OPENSSL_ROOT_DIR}/bin"
               "${OPENSSL_INCLUDE_DIR}/../bin")
-    if(PDR_OPENSSL_EXECUTABLE AND Python3_EXECUTABLE)
+    # The end-to-end probe asserts the SystemMonitoring /api/v1/protocols view.
+    # Keep the standalone MQTT/TLS probe available in lean profiles, but only
+    # register this management-plane integration when that API is packaged.
+    if(PDR_ENABLE_OBSERVABILITY AND PDR_OPENSSL_EXECUTABLE AND Python3_EXECUTABLE)
         add_test(NAME mqtt-tls-integration
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_SOURCE_DIR}/tools/mqtt_tls_integration.py"

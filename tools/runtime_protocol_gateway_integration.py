@@ -593,6 +593,7 @@ def main() -> int:
         "--post-interval-override", f"{configuration_post_index + 27}=4",
         "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start"}',
         "--post-request-id", f"{configuration_post_index + 28}=async-task-final-observation",
+        "--post-interval-override", f"{configuration_post_index + 28}=6",
         "--post", '/api/v1/bundle-lifecycle={"id":"pdr.alert.webhook","action":"start","async":true,"startTimeoutMilliseconds":120000,"notBeforeMilliseconds":60000}',
         "--post-response-status", f"{configuration_post_index + 29}=202",
         "--post-request-id", f"{configuration_post_index + 29}=async-task-interrupted-proof",

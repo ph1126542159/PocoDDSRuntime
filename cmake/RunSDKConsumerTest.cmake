@@ -9,6 +9,7 @@ set(install_dir "${PDR_BINARY_DIR}/sdk-consumer-install")
 set(consumer_build_dir "${PDR_BINARY_DIR}/sdk-consumer-build")
 set(foundation_build_dir "${PDR_BINARY_DIR}/sdk-foundation-consumer-build")
 set(unknown_build_dir "${PDR_BINARY_DIR}/sdk-unknown-component-build")
+set(transport_build_dir "${PDR_BINARY_DIR}/transport-consumer-build")
 set(consumer_prefix_path "${install_dir}\\;${PDR_DEPENDENCY_PREFIX}")
 
 execute_process(
@@ -50,6 +51,47 @@ execute_process(
     RESULT_VARIABLE run_result)
 if(NOT run_result EQUAL 0)
     message(FATAL_ERROR "External SDK consumer run failed: ${run_result}")
+endif()
+
+# Optional distributed transports must be consumable from the installed package,
+# not only from targets in the framework source tree.
+set(transport_configure_command "${CMAKE_COMMAND}"
+    -S "${PDR_SOURCE_DIR}/tests/transport-consumer"
+    -B "${transport_build_dir}"
+    -G "${PDR_GENERATOR}"
+    "-DCMAKE_PREFIX_PATH=${consumer_prefix_path}"
+    "-DPoco_DIR=${PDR_DEPENDENCY_PREFIX}/cmake"
+    "-DPDR_TEST_MQTT_TRANSPORT=${PDR_TEST_MQTT_TRANSPORT}"
+    "-DPDR_TEST_FASTDDS_TRANSPORT=${PDR_TEST_FASTDDS_TRANSPORT}")
+if(PDR_GENERATOR_PLATFORM)
+    list(APPEND transport_configure_command -A "${PDR_GENERATOR_PLATFORM}")
+endif()
+execute_process(COMMAND ${transport_configure_command}
+    RESULT_VARIABLE transport_configure_result)
+if(NOT transport_configure_result EQUAL 0)
+    message(FATAL_ERROR
+        "Installed transport consumer configure failed: ${transport_configure_result}")
+endif()
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" --build "${transport_build_dir}"
+        --config "${PDR_CONFIG}"
+    RESULT_VARIABLE transport_build_result)
+if(NOT transport_build_result EQUAL 0)
+    message(FATAL_ERROR
+        "Installed transport consumer build failed: ${transport_build_result}")
+endif()
+set(transport_executable "${transport_build_dir}/pdr-transport-consumer")
+if(WIN32)
+    set(transport_executable
+        "${transport_build_dir}/${PDR_CONFIG}/pdr-transport-consumer.exe")
+endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+    "PATH=${install_dir}/bin\;${PDR_DEPENDENCY_PREFIX}/bin\;$ENV{PATH}"
+    "${transport_executable}"
+    RESULT_VARIABLE transport_run_result)
+if(NOT transport_run_result EQUAL 0)
+    message(FATAL_ERROR
+        "Installed transport consumer run failed: ${transport_run_result}")
 endif()
 
 # A foundation-only consumer must not need the optional Paho dependency.

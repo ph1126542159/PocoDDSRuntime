@@ -15,7 +15,7 @@ The project deliberately does not contain RemotingNG-generated `RemoteObject`,
 
 ```powershell
 cmake --preset desktop-lite         # ordinary single-process desktop application
-cmake --preset desktop-distributed  # desktop plus project-owned IPC/HTTP adapters
+cmake --preset desktop-distributed  # desktop plus built-in local IPC and project HTTP adapters
 cmake --preset edge-industrial      # OSP management plane and industrial adapters
 cmake --preset server               # full data and observability runtime
 cmake --preset robotics             # transport-neutral robotics core
@@ -55,7 +55,11 @@ and optional OTLP/HTTP JSON export to a Collector.
 
 ## Directory layout
 
-- `runtime-core/` — transport-neutral contracts and built-in in-process transport;
+- `runtime-core/` — transport-neutral contracts, bounded executors, Host SPI, transport registry and in-process transport;
+- `transports/local-ipc/` — Windows Named Pipe / Linux Unix Domain Socket Adapter for desktop multi-process products;
+- `transports/mqtt/` — Broker-based RuntimeCore transport for cloud, telemetry and weak-link integration;
+- `transports/fastdds/` — generic cross-participant RuntimeCore transport over the isolated FastDDSCore data plane;
+- `process/native/` — lightweight Windows Job Object / POSIX process-group supervisor for the desktop host;
 - `robotics/` — transport-neutral robotics lifecycle, actions, behavior and simulation;
 - `platform/` — migrated platform/runtime infrastructure:
   - `DDS`, `observability`, `CodeGeneration`, `Geo`, `OSP`, `Serial` and

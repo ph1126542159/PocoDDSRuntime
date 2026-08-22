@@ -1,0 +1,5 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(PDRRuntimeCore CONFIG)
+include("${CMAKE_CURRENT_LIST_DIR}/PDRLocalIpcTargets.cmake")

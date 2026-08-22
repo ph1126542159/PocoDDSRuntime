@@ -28,7 +28,9 @@ if(BUILD_TESTING)
     add_executable(pdr-ros-tls-probe tests/RosTlsProbe.cpp)
     target_link_libraries(pdr-ros-tls-probe PRIVATE PocoDDS::ROS)
     pdr_set_warnings(pdr-ros-tls-probe)
-    if(PDR_OPENSSL_EXECUTABLE AND Python3_EXECUTABLE)
+    # The end-to-end probe asserts the SystemMonitoring /api/v1/protocols view.
+    # The rosbridge client/probe tests above remain profile-independent.
+    if(PDR_ENABLE_OBSERVABILITY AND PDR_OPENSSL_EXECUTABLE AND Python3_EXECUTABLE)
         add_test(NAME ros-tls-integration
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_SOURCE_DIR}/tools/ros_tls_integration.py"

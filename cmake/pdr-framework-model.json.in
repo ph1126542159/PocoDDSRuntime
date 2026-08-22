@@ -9,6 +9,7 @@
   },
   "build": {
     "runtimeCore": @PDR_FRAMEWORK_RUNTIME_CORE@,
+    "nativeProcessHost": @PDR_FRAMEWORK_NATIVE_PROCESS@,
     "legacyRuntime": @PDR_FRAMEWORK_LEGACY_RUNTIME@,
     "roboticsRuntime": @PDR_FRAMEWORK_ROBOTICS_RUNTIME@,
     "webui": @PDR_FRAMEWORK_WEBUI@,

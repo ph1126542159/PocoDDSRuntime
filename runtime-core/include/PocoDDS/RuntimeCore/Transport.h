@@ -1,5 +1,9 @@
 #pragma once
 
+#include "PocoDDS/RuntimeCore/Contract.h"
+#include "PocoDDS/RuntimeCore/Export.h"
+
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -9,16 +13,6 @@
 
 namespace PocoDDS::RuntimeCore
 {
-#if defined(_WIN32) && !defined(PDR_RUNTIME_CORE_STATIC)
-#if defined(PDRRuntimeCore_EXPORTS)
-#define PDR_RUNTIME_CORE_API __declspec(dllexport)
-#else
-#define PDR_RUNTIME_CORE_API __declspec(dllimport)
-#endif
-#else
-#define PDR_RUNTIME_CORE_API
-#endif
-
 using Payload = std::vector<std::uint8_t>;
 
 enum class Delivery
@@ -42,6 +36,7 @@ struct Message
     std::string schemaVersion{"1"};
     std::shared_ptr<const Payload> payload;
     std::unordered_map<std::string, std::string> headers;
+    MessageContext context;
 };
 
 struct TransportCapabilities
@@ -56,13 +51,15 @@ struct TransportCapabilities
 
 struct PublishResult
 {
+    std::size_t accepted{0};
     std::size_t delivered{0};
     std::size_t failed{0};
+    std::size_t dropped{0};
 };
 
 class PDR_RUNTIME_CORE_API Subscription
 {
-public:
+  public:
     Subscription() = default;
     explicit Subscription(std::function<void()> cancel);
     ~Subscription();
@@ -75,13 +72,13 @@ public:
     void reset() noexcept;
     explicit operator bool() const noexcept;
 
-private:
+  private:
     std::function<void()> _cancel;
 };
 
 class PDR_RUNTIME_CORE_API IMessageTransport
 {
-public:
+  public:
     using Handler = std::function<void(const TopicSpec&, const Message&)>;
 
     virtual ~IMessageTransport() = default;

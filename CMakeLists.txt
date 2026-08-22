@@ -245,6 +245,22 @@ if(PDR_BUILD_RUNTIME_CORE)
     add_subdirectory(runtime-core)
 endif()
 
+if("ipc" IN_LIST PDR_RESOLVED_TRANSPORTS)
+    if(NOT PDR_BUILD_RUNTIME_CORE)
+        message(FATAL_ERROR "The local IPC transport requires PDR_BUILD_RUNTIME_CORE=ON")
+    endif()
+    set(CMAKE_FOLDER "Transports/Local IPC")
+    add_subdirectory(transports/local-ipc)
+endif()
+
+if(PDR_HOST_MODEL STREQUAL "desktop")
+    if(NOT PDR_BUILD_RUNTIME_CORE)
+        message(FATAL_ERROR "The native desktop process host requires PDR_BUILD_RUNTIME_CORE=ON")
+    endif()
+    set(CMAKE_FOLDER "Hosts/Native Process")
+    add_subdirectory(process/native)
+endif()
+
 if(PDR_BUILD_ROBOTICS_RUNTIME)
     set(CMAKE_FOLDER "Robotics")
     add_subdirectory(robotics)
@@ -331,6 +347,11 @@ add_subdirectory(platform/ProcessManagement)
 set(CMAKE_FOLDER "Protocols")
 add_subdirectory(platform/protocols)
 
+if("mqtt" IN_LIST PDR_RESOLVED_TRANSPORTS)
+    set(CMAKE_FOLDER "Transports/MQTT")
+    add_subdirectory(transports/mqtt)
+endif()
+
 set(CMAKE_FOLDER "Devices")
 add_subdirectory(platform/devices)
 
@@ -339,6 +360,10 @@ add_subdirectory(application)
 
 set(CMAKE_FOLDER "Communication")
 add_subdirectory(platform/DDS)
+if("fastdds" IN_LIST PDR_RESOLVED_TRANSPORTS)
+    set(CMAKE_FOLDER "Transports/Fast DDS")
+    add_subdirectory(transports/fastdds)
+endif()
 
 set(CMAKE_FOLDER "Services")
 add_subdirectory(services)
@@ -376,6 +401,8 @@ if(BUILD_TESTING)
             -DPDR_GENERATOR=${CMAKE_GENERATOR}
             -DPDR_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
             -DPDR_DEPENDENCY_PREFIX=${PDR_INSTALL_PREFIX}
+            -DPDR_TEST_MQTT_TRANSPORT=$<TARGET_EXISTS:PDRMqttTransport>
+            -DPDR_TEST_FASTDDS_TRANSPORT=$<TARGET_EXISTS:PDRFastDdsTransport>
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunSDKConsumerTest.cmake")
     if(Python3_Interpreter_FOUND)
       add_test(NAME generated-device-consumer
@@ -406,6 +433,7 @@ if(BUILD_TESTING)
             -DPDR_RUNTIME_FILE_NAME=$<TARGET_FILE_NAME:pdr-runtime>
             -DPDR_PLUGIN_HOST_FILE_NAME=$<TARGET_FILE_NAME:pdr-plugin-host>
             -DPDR_LAUNCHER_FILE_NAME=$<TARGET_FILE_NAME:pdr-launcher>
+            -DPDR_TEST_MANAGEMENT_API=${PDR_ENABLE_OBSERVABILITY}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunGeneratedPluginTest.cmake")
       set_tests_properties(generated-plugin-consumer PROPERTIES
           LABELS "sdk;plugin;runtime;integration" RESOURCE_LOCK pdr_runtime_http TIMEOUT 120)
@@ -784,6 +812,11 @@ if(BUILD_TESTING)
                     RESOURCE_LOCK pdr_runtime_http
                     TIMEOUT 30)
             endif()
+            # These integrations exercise the SystemMonitoring management API.
+            # Resource-constrained profiles intentionally omit that Bundle when
+            # observability is disabled, so they must not advertise or run its
+            # /api/v1 management contract.
+            if(PDR_ENABLE_OBSERVABILITY)
             add_test(NAME runtime-protocol-gateway-integration
                 COMMAND "${Python3_EXECUTABLE}"
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_protocol_gateway_integration.py"
@@ -1020,6 +1053,7 @@ if(BUILD_TESTING)
                 LABELS "runtime;device;release"
                 RESOURCE_LOCK pdr_runtime_http
                 TIMEOUT 45)
+            endif()
         endif()
         set_tests_properties(security-config security-policy PROPERTIES LABELS "security")
         set_tests_properties(release-policy release-artifacts dependency-lock release-matrix upgrade-rollback
@@ -1079,10 +1113,12 @@ install(DIRECTORY DESTINATION "${CMAKE_INSTALL_BINDIR}/codeCache")
 if(WIN32)
     # The official OTLP/HTTP exporter uses the shared curl/OpenSSL runtime on
     # Windows. Package every third-party runtime DLL from the unified prefix;
-    # project-owned DLLs are installed from their targets below.
+    # every project-owned PDR DLL is installed from the active profile's targets
+    # below. Copying one from a shared dependency prefix can silently mix ABIs
+    # between profiles and overwrite the just-installed target.
     file(GLOB pdr_third_party_runtime_dlls "${PDR_INSTALL_PREFIX}/bin/*.dll")
     list(FILTER pdr_third_party_runtime_dlls EXCLUDE REGEX
-        "/(PDRObservability|PDRBundleManagement|PDRProcessManagement)\\.dll$")
+        "/PDR[^/]*\\.dll$")
     install(FILES ${pdr_third_party_runtime_dlls}
         DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()

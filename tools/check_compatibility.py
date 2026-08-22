@@ -56,7 +56,10 @@ def asyncapi_channels(text: str) -> dict[str, str]:
 
 
 def public_types(text: str) -> list[str]:
-    pattern = r"(?m)^\s*(?:class|struct|enum\s+class)\s+([A-Za-z_][A-Za-z0-9_]*)"
+    pattern = (
+        r"(?m)^\s*(?:template\s*<[^>]*>\s*)?(?:class|struct|enum\s+class)\s+"
+        r"(?:(?:PDR_[A-Z0-9_]+_API)\s+)?([A-Za-z_][A-Za-z0-9_]*)"
+    )
     return sorted(set(re.findall(pattern, text)))
 
 
@@ -84,6 +87,25 @@ def schema_surface(document: dict[str, Any]) -> dict[str, Any]:
 def current_surface(root: Path) -> dict[str, Any]:
     header_paths = [
         "application/include/PocoDDS/Application/Application.h",
+        "runtime-core/include/PocoDDS/RuntimeCore/Contract.h",
+        "runtime-core/include/PocoDDS/RuntimeCore/Codec.h",
+        "runtime-core/include/PocoDDS/RuntimeCore/Executor.h",
+        "runtime-core/include/PocoDDS/RuntimeCore/Host.h",
+        "runtime-core/include/PocoDDS/RuntimeCore/InProcessTransport.h",
+        "runtime-core/include/PocoDDS/RuntimeCore/Process.h",
+        "runtime-core/include/PocoDDS/RuntimeCore/StaticHost.h",
+        "runtime-core/include/PocoDDS/RuntimeCore/Transport.h",
+        "runtime-core/include/PocoDDS/RuntimeCore/TransportRegistry.h",
+        "runtime-core/testing/include/PocoDDS/RuntimeCore/Testing/TransportConformance.h",
+        "transports/local-ipc/include/PocoDDS/LocalIpc/LocalIpcTransport.h",
+        "transports/local-ipc/include/PocoDDS/LocalIpc/Registration.h",
+        "transports/fastdds/include/PocoDDS/FastDdsTransport/FastDdsTransport.h",
+        "transports/fastdds/include/PocoDDS/FastDdsTransport/Registration.h",
+        "transports/mqtt/include/PocoDDS/MqttTransport/MqttTransport.h",
+        "transports/mqtt/include/PocoDDS/MqttTransport/Registration.h",
+        "process/native/include/PocoDDS/NativeProcess/NativeProcessSupervisor.h",
+        "platform/DDS/include/PocoDDS/DDS/Envelope.h",
+        "platform/DDS/include/PocoDDS/DDS/Runtime.h",
         "platform/configuration/include/PocoDDS/Configuration/ConfigurationValidator.h",
         "platform/configuration/include/PocoDDS/Configuration/IndexedConfiguration.h",
         "platform/devices/Devices/include/PocoDDS/Devices/Device.h",
@@ -137,6 +159,13 @@ def current_surface(root: Path) -> dict[str, Any]:
         },
         "cmakeTargets": [
             "PocoDDS::Application",
+            "PocoDDS::RuntimeCore",
+            "PocoDDS::RuntimeCoreTesting",
+            "PocoDDS::LocalIpc",
+            "PocoDDS::FastDDSTransport",
+            "PocoDDS::FastDDSCore",
+            "PocoDDS::MQTTTransport",
+            "PocoDDS::NativeProcess",
             "PocoDDS::Configuration",
             "PocoDDS::DeviceCore",
             "PocoDDS::Health",

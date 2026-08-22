@@ -1,6 +1,7 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
+find_dependency(PDRRuntimeCore CONFIG)
 
 set(PocoDDSRuntime_PLUGIN_API_VERSION "@PDR_PLUGIN_API_VERSION@")
 set(PocoDDSRuntime_PLUGIN_ABI_VERSION "@PDR_PLUGIN_ABI_VERSION@")
@@ -16,9 +17,10 @@ if(NOT PocoDDSRuntime_FIND_COMPONENTS)
 endif()
 
 set(_pdr_known_components
-    SDK Security Plugins Protocols BtLE CAN Modbus MQTT ROS SerialProtocol UDP WebTunnelProtocol XBee)
+    SDK Security Plugins Protocols BtLE CAN FastDDSCore FastDDSTransport Modbus MQTT MQTTTransport ROS SerialProtocol UDP WebTunnelProtocol XBee)
 set(_pdr_poco_components Foundation Util)
 set(_pdr_need_paho FALSE)
+set(_pdr_need_fastdds FALSE)
 foreach(_pdr_component IN LISTS PocoDDSRuntime_FIND_COMPONENTS)
     if(NOT _pdr_component IN_LIST _pdr_known_components)
         set(PocoDDSRuntime_${_pdr_component}_FOUND FALSE)
@@ -45,8 +47,12 @@ foreach(_pdr_component IN LISTS PocoDDSRuntime_FIND_COMPONENTS)
        _pdr_component STREQUAL "WebTunnelProtocol")
         list(APPEND _pdr_poco_components NetSSL)
     endif()
-    if(_pdr_component STREQUAL "Protocols" OR _pdr_component STREQUAL "MQTT")
+    if(_pdr_component STREQUAL "Protocols" OR _pdr_component STREQUAL "MQTT" OR
+       _pdr_component STREQUAL "MQTTTransport")
         set(_pdr_need_paho TRUE)
+    endif()
+    if(_pdr_component STREQUAL "FastDDSCore" OR _pdr_component STREQUAL "FastDDSTransport")
+        set(_pdr_need_fastdds TRUE)
     endif()
 endforeach()
 list(REMOVE_DUPLICATES _pdr_poco_components)
@@ -54,6 +60,9 @@ find_dependency(Poco 1.15.3 CONFIG COMPONENTS ${_pdr_poco_components})
 if(_pdr_need_paho)
     find_dependency(OpenSSL REQUIRED)
     find_dependency(eclipse-paho-mqtt-c CONFIG REQUIRED)
+endif()
+if(_pdr_need_fastdds)
+    find_dependency(fastdds 3 CONFIG REQUIRED)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/PocoDDSRuntimeTargets.cmake")
@@ -65,8 +74,11 @@ set(_pdr_component_targets
     Protocols PocoDDS::Protocols
     BtLE PocoDDS::BtLE
     CAN PocoDDS::CAN
+    FastDDSCore PocoDDS::FastDDSCore
+    FastDDSTransport PocoDDS::FastDDSTransport
     Modbus PocoDDS::Modbus
     MQTT PocoDDS::MQTT
+    MQTTTransport PocoDDS::MQTTTransport
     ROS PocoDDS::ROS
     SerialProtocol PocoDDS::SerialProtocol
     UDP PocoDDS::UDP
@@ -93,4 +105,5 @@ endif()
 unset(_pdr_component_targets)
 unset(_pdr_known_components)
 unset(_pdr_need_paho)
+unset(_pdr_need_fastdds)
 unset(_pdr_poco_components)

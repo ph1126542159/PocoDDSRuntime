@@ -5,6 +5,9 @@ foreach(required PDR_CMAKE PDR_CTEST PDR_PYTHON PDR_SOURCE_DIR PDR_BINARY_DIR
         message(FATAL_ERROR "RunGeneratedPluginTest.cmake requires ${required}")
     endif()
 endforeach()
+if(NOT DEFINED PDR_TEST_MANAGEMENT_API)
+    set(PDR_TEST_MANAGEMENT_API ON)
+endif()
 
 set(root "${PDR_BINARY_DIR}/generated-plugin-consumer")
 set(module_root "${root}/source")
@@ -170,14 +173,17 @@ if(NOT faulty_bundle_count EQUAL 1)
     message(FATAL_ERROR "Faulty plugin did not produce exactly one Bundle")
 endif()
 
-execute_process(
-    COMMAND "${PDR_PYTHON}" "${PDR_SOURCE_DIR}/tools/runtime_smoke.py"
+set(runtime_smoke_command
+    "${PDR_PYTHON}" "${PDR_SOURCE_DIR}/tools/runtime_smoke.py"
         --executable "${install}/bin/${PDR_RUNTIME_FILE_NAME}"
         --working-directory "${install}/bin"
         --config "${install}/bin/pdr-runtime.properties"
         --timeout 20 --stability-window 1 --clear-code-cache
         --path "${PDR_DEPENDENCY_PREFIX}/bin" --path "${install}/bin"
         --endpoint "/health/live"
+        --require-log "ExamplePlugin plugin started")
+if(PDR_TEST_MANAGEMENT_API)
+    list(APPEND runtime_smoke_command
         --endpoint "/api/v1/process-detail"
         --require-body "\\\"id\\\":\\\"pdr.plugin.exampleplugin\\\""
         --require-body "\\\"governanceStatus\\\":\\\"ready\\\""
@@ -189,30 +195,32 @@ execute_process(
         --require-body "plugin ABI mismatch"
         --require-body "\\\"state\\\":\\\"missing\\\""
         --post "/api/v1/bundle-lifecycle={\"id\":\"pdr.plugin.brokenplugin\",\"action\":\"start\"}"
-        --post-response-status "1=409"
-        --require-log "ExamplePlugin plugin started"
+        --post-response-status "1=409")
+endif()
+list(APPEND runtime_smoke_command
         --report "${root}/runtime-report.json"
-        --log "${root}/runtime.log"
-    RESULT_VARIABLE runtime_result)
+        --log "${root}/runtime.log")
+execute_process(COMMAND ${runtime_smoke_command} RESULT_VARIABLE runtime_result)
 if(NOT runtime_result EQUAL 0)
     message(FATAL_ERROR "Generated plugin did not load in Runtime: ${runtime_result}")
 endif()
 
-file(COPY ${faulty_bundles} DESTINATION "${install}/bin/bundles")
-
-execute_process(
-    COMMAND "${PDR_PYTHON}" "${PDR_SOURCE_DIR}/tools/runtime_plugin_quarantine_integration.py"
-        --executable "${install}/bin/${PDR_RUNTIME_FILE_NAME}"
-        --working-directory "${install}/bin"
-        --config "${install}/bin/pdr-runtime.properties"
-        --plugin-id "pdr.plugin.faultyplugin"
-        --workspace "${root}/quarantine-workspace"
-        --path "${PDR_DEPENDENCY_PREFIX}/bin" --path "${install}/bin"
-        --report "${root}/quarantine-report.json"
-    RESULT_VARIABLE quarantine_result)
-if(NOT quarantine_result EQUAL 0)
-    message(FATAL_ERROR
-        "Plugin quarantine integration failed: ${quarantine_result}; report=${root}/quarantine-report.json")
+if(PDR_TEST_MANAGEMENT_API)
+    file(COPY ${faulty_bundles} DESTINATION "${install}/bin/bundles")
+    execute_process(
+        COMMAND "${PDR_PYTHON}" "${PDR_SOURCE_DIR}/tools/runtime_plugin_quarantine_integration.py"
+            --executable "${install}/bin/${PDR_RUNTIME_FILE_NAME}"
+            --working-directory "${install}/bin"
+            --config "${install}/bin/pdr-runtime.properties"
+            --plugin-id "pdr.plugin.faultyplugin"
+            --workspace "${root}/quarantine-workspace"
+            --path "${PDR_DEPENDENCY_PREFIX}/bin" --path "${install}/bin"
+            --report "${root}/quarantine-report.json"
+        RESULT_VARIABLE quarantine_result)
+    if(NOT quarantine_result EQUAL 0)
+        message(FATAL_ERROR
+            "Plugin quarantine integration failed: ${quarantine_result}; report=${root}/quarantine-report.json")
+    endif()
 endif()
 
 file(GLOB core_bundles "${install}/bin/bundles/osp.core_*.bndl")
@@ -276,21 +284,30 @@ execute_process(
 if(NOT isolated_list_result EQUAL 0)
     message(FATAL_ERROR "Isolated plugin lifecycle list failed: ${isolated_list_result}")
 endif()
-execute_process(
-    COMMAND "${PDR_PYTHON}" "${PDR_SOURCE_DIR}/tools/runtime_smoke.py"
+set(isolated_runtime_command
+    "${PDR_PYTHON}" "${PDR_SOURCE_DIR}/tools/runtime_smoke.py"
         --executable "${install}/bin/${PDR_RUNTIME_FILE_NAME}"
         --working-directory "${install}/bin"
         --config "${install}/bin/pdr-runtime.properties"
         --timeout 20 --stability-window 1 --probe-delay 1 --clear-code-cache
         --path "${PDR_DEPENDENCY_PREFIX}/bin" --path "${install}/bin"
-        --set "pdr.subprocess.configuration=${isolated_subprocess_config}"
+        --set "pdr.subprocess.configuration=${isolated_subprocess_config}")
+if(PDR_TEST_MANAGEMENT_API)
+    list(APPEND isolated_runtime_command
         --endpoint "/api/v1/process-detail?id=generated-example-isolated&name=generated-example-isolated"
         --require-body "\"id\":\"pdr.plugin.exampleplugin\""
         --require-body "\"isolation\":\"process\""
-        --require-body "\"plugin\":true"
+        --require-body "\"plugin\":true")
+else()
+    list(APPEND isolated_runtime_command
+        --endpoint "/health/live"
+        --require-log "Starting local subprocess 'generated-example-isolated'"
+        --require-log "ExamplePlugin plugin started")
+endif()
+list(APPEND isolated_runtime_command
         --report "${root}/isolated-runtime-web-report.json"
-        --log "${root}/isolated-runtime-web.log"
-    RESULT_VARIABLE isolated_web_result)
+        --log "${root}/isolated-runtime-web.log")
+execute_process(COMMAND ${isolated_runtime_command} RESULT_VARIABLE isolated_web_result)
 if(NOT isolated_web_result EQUAL 0)
     message(FATAL_ERROR
         "Isolated plugin was not visible through Runtime process detail: ${isolated_web_result}")

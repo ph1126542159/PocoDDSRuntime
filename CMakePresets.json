@@ -145,7 +145,7 @@
   "buildPresets": [
     { "name": "desktop-lite", "configurePreset": "desktop-lite", "configuration": "Release", "jobs": 2 },
     { "name": "desktop-distributed", "configurePreset": "desktop-distributed", "configuration": "Release", "jobs": 2 },
-    { "name": "embedded", "configurePreset": "embedded" },
+    { "name": "embedded", "configurePreset": "embedded", "configuration": "Release", "jobs": 2 },
     { "name": "edge-industrial", "configurePreset": "edge-industrial" },
     { "name": "edge-test", "configurePreset": "edge-test" },
     { "name": "server", "configurePreset": "server" },

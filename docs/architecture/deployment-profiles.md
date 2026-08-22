@@ -5,7 +5,7 @@
 | Profile | CMake Preset | Host | Legacy/OSP | Robotics | Web UI | 典型用途 |
 | --- | --- | --- | ---: | ---: | ---: | --- |
 | Desktop Lite | `desktop-lite` | static | 关 | 关 | 关 | 普通单进程桌面应用 |
-| Desktop Distributed | `desktop-distributed` | desktop | 关 | 关 | 关 | 项目自带 IPC/HTTP Adapter 的桌面应用 |
+| Desktop Distributed | `desktop-distributed` | desktop | 关 | 关 | 关 | 内置本机 IPC、项目自带 HTTP Adapter 的桌面应用 |
 | Embedded | `embedded` | service | 开 | 关 | 关 | PetaLinux、资源受限设备 |
 | Edge Industrial | `edge-industrial` | osp | 开 | 关 | 开 | 工业网关、边缘控制器 |
 | Edge/Test | `edge-test` | osp | 开 | 关 | 开 | 测试台、现场上位机 |
@@ -38,6 +38,8 @@ Web Bundle 的 `/home/framework-model.json`。WebUI 只显示清单中 `navigati
 `GET /framework-model.json` 暴露相同契约。
 
 OSP Profile 包含独立的 `pdr.platform.health` 轻量 Bundle，并统一提供 `/health/live`、`/health/ready` 和 `/health/detail`。纯 Core 与 Robotics Profile 不带 HTTP Host，其健康状态由产品入口或机器人控制面暴露。
+DiagnosticTerminal 依赖指标与 TraceStore，仅在 `PDR_ENABLE_OBSERVABILITY=ON` 的 Profile 中构建；
+`embedded` 关闭该模块时，框架能力清单中的 `diagnosticTerminal` 必须为 `false`。
 
 仓库测试 `deployment-profiles` 会校验 Preset 与能力矩阵。每个 Profile 还应在自己的构建目录运行：
 
@@ -45,7 +47,10 @@ OSP Profile 包含独立的 `pdr.platform.health` 轻量 Bundle，并统一提�
 ctest --test-dir build/profiles/embedded -C Release --output-on-failure
 ```
 
-Desktop Lite/Distributed 安装只应包含 RuntimeCore；Embedded 包中不应出现 `pdr.webui.*.bndl` 或 Qt3D 子进程；Edge/Test 应包含 Web UI Bundle，但不包含 Qt3D Demo；Server 应包含 Web UI 和数据模块；Robotics 应包含 RuntimeCore 与 Robotics Runtime，不应包含 OSP Bundle。
+Desktop Lite 安装只应包含 RuntimeCore；Desktop Distributed 应包含 RuntimeCore 与
+LocalIpc；Embedded 包中不应出现 `pdr.webui.*.bndl` 或 Qt3D 子进程；Edge/Test 应包含
+Web UI Bundle，但不包含 Qt3D Demo；Server 应包含 Web UI 和数据模块；Robotics 应包含
+RuntimeCore 与 Robotics Runtime，不应包含 OSP Bundle。
 
 全新安装包必须能够直接启动，且 `bin/logs`、`bin/data`、`bin/codeCache` 三个可写目录必须存在。可用随机端口执行真实运行验证：
 

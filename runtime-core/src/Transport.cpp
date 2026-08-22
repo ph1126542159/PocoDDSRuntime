@@ -5,18 +5,11 @@
 namespace PocoDDS::RuntimeCore
 {
 
-Subscription::Subscription(std::function<void()> cancel):
-    _cancel(std::move(cancel))
-{
-}
+Subscription::Subscription(std::function<void()> cancel) : _cancel(std::move(cancel)) {}
 
-Subscription::~Subscription()
-{
-    reset();
-}
+Subscription::~Subscription() { reset(); }
 
-Subscription::Subscription(Subscription&& other) noexcept:
-    _cancel(std::move(other._cancel))
+Subscription::Subscription(Subscription&& other) noexcept : _cancel(std::move(other._cancel))
 {
     other._cancel = {};
 }
@@ -47,9 +40,6 @@ void Subscription::reset() noexcept
     }
 }
 
-Subscription::operator bool() const noexcept
-{
-    return static_cast<bool>(_cancel);
-}
+Subscription::operator bool() const noexcept { return static_cast<bool>(_cancel); }
 
 } // namespace PocoDDS::RuntimeCore

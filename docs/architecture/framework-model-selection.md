@@ -8,7 +8,7 @@ Transport。ROS 2、Fast DDS、MQTT 都是可选适配器，不是业务模块�
 | 项目类型                       | Profile / Preset      | Host       | 默认传输策略                                     | 默认框架部分                        |
 | -------------------------- | --------------------- | ---------- | ------------------------------------------ | ----------------------------- |
 | 单机 Qt/Win32/CLI、配置器、离线算法   | `desktop-lite`        | `static`   | `inproc`                                   | `RuntimeCore`                 |
-| 桌面多进程、局域网协作、HTTP/WebSocket | `desktop-distributed` | `desktop`  | `inproc` + 项目 IPC/HTTP/WebSocket Adapter   | `RuntimeCore`                 |
+| 桌面多进程、局域网协作、HTTP/WebSocket | `desktop-distributed` | `desktop`  | 内置 `inproc`/本机 IPC + 项目 HTTP/WebSocket Adapter | `RuntimeCore` + `LocalIpc` |
 | 嵌入式 Linux、PetaLinux、设备守护进程 | `embedded`            | `service`  | `inproc` + Fast DDS/现场总线 Adapter           | 裁剪后的完整 Runtime                |
 | 工业网关、边缘控制器、协议汇聚            | `edge-industrial`     | `osp`      | `inproc`、HTTP、MQTT、Fast DDS、现场总线           | OSP 管理面与可观测性                  |
 | 测试台、桌面运维站、集成验证平台           | `edge-test`           | `osp`      | `inproc`、HTTP/WebSocket、MQTT、Fast DDS、现场总线 | 完整管理与测试能力                     |
@@ -38,15 +38,16 @@ UI / CLI / Bundle / Process Host
                 |
        IMessageTransport
         /       |       \
-    inproc   project IPC   ROS 2 / Fast DDS / MQTT
-   built-in    adapter          adapter
+    inproc   local IPC    MQTT / Fast DDS    ROS 2 / HTTP
+   built-in   built-in       adapter          external
 ```
 
 `PDR_TRANSPORTS` 是项目允许并计划组合的传输集合，不等于所有 Adapter 都已随 CMake
 生成。配置产生的 `pdr-framework-model.json` 会进一步记录：
 
-- `transportResolution.builtIn`：本次构建已有实现；轻量 Core 提供 `inproc`，原有完整
-  Runtime 保留兼容的 Fast DDS 路径；
+- `transportResolution.builtIn`：本次构建已有实现；轻量 Core 提供 `inproc`，选择 `ipc`
+  时构建 Windows Named Pipe / Linux Unix Domain Socket Adapter；完整 Runtime 选择 `mqtt`
+  或 `fastdds` 时会构建对应的 `IMessageTransport` 与 Registry Factory；
 - `transportResolution.externalAdapters`：必须由项目或外部工作区构建、部署并验收；
 - `capabilities`：只有本次构建可以证明的运行能力才为 `true`。仅把 `ros2` 写入
   `PDR_TRANSPORTS`，不会伪造“ROS 2 已构建”的证据。
@@ -82,18 +83,27 @@ cmake --install build/profiles/desktop-lite --config Release `
 ### `desktop-distributed`：桌面多进程/联网模型
 
 当桌面应用需要渲染进程、算法进程、插件沙箱或局域网访问时使用。Core 仍保持轻量，
-IPC/HTTP/WebSocket 由产品 Adapter 实现并通过 `IMessageTransport` 或业务 Port 注入。
+本机 IPC 使用仓库内置 `PocoDDS::LocalIpc`；HTTP/WebSocket 仍由产品 Adapter 实现并通过
+`IMessageTransport` 或业务 Port 注入。
 
 ```powershell
 cmake --preset desktop-distributed
 cmake --build --preset desktop-distributed
+ctest --preset desktop-distributed -C Release --output-on-failure
 ./tools/pdr.ps1 project create InspectionStation `
   --output E:/Products --profile desktop-distributed
 ```
 
-该 Preset 声明允许的 IPC/HTTP/WebSocket 边界，但仓库当前只内置 `inproc` 实现。项目需
-自行提供 Adapter 构建、协议版本、重连、背压、鉴权和端到端验收证据。若需 Runtime
-统一监管多个 Bundle/子进程，直接选 `edge-test`，不要在 Desktop Host 中复制 OSP。
+该 Preset 内置 `inproc` 与本机 IPC。Windows 端点映射为 Named Pipe，Linux 端点映射为
+Unix Domain Socket；API、帧协议和消息上下文一致。HTTP/WebSocket 仍需项目 Adapter。
+IPC 令牌只用于本机端点的应用级误连接隔离，不替代操作系统 ACL，也不能用于跨主机。
+生产配置、限制和验收见[本机 IPC Adapter](local-ipc.md)。若需 Runtime 统一监管多个
+Bundle/子进程，直接选 `edge-test`，不要在 Desktop Host 中复制 OSP。
+
+同机算法、渲染或插件沙箱进程使用 `PocoDDS::NativeProcess`：Windows 由 Job Object 回收
+进程树，Linux 由 Process Group 回收；支持依赖排序、失败回滚和有限重启预算。详细配置见
+[Native Desktop Process Supervisor](../../process/native/README.md)。它只管理 OS Process，
+不会把 OSP Bundle 或主进程 Service Registry 带入轻量桌面模型。
 
 ### `embedded`：资源受限服务模型
 
@@ -104,6 +114,10 @@ cmake --build --preset desktop-distributed
 cmake --preset embedded
 cmake --build --preset embedded
 ```
+
+跨站点弱连接遥测优先使用 [MQTT Transport](../../transports/mqtt/README.md)；需要发现、低延迟
+跨主机发布订阅时使用 [Fast DDS Transport](../../transports/fastdds/README.md)。两者都复用
+`PDRM/1`，但 QoS、持久化和最大帧边界不同，不能只替换配置名而跳过项目验收。
 
 ### `edge-industrial` / `edge-test`：大型工业应用模型
 
@@ -191,7 +205,7 @@ ctest --preset robotics -C Release --output-on-failure
 
 1. 实现 `IMessageTransport` 或清晰的业务 Port Adapter；
 2. Core 与业务头文件中不出现第三方中间件头文件；
-3. 明确消息类型、Schema 版本、QoS、超时、取消、重连和背压；
+3. 跨边界消息复用 `PDRM/1`，并明确消息类型、Schema 版本、QoS、超时、取消、重连和背压；
 4. 提供进程内单测、跨进程集成测试和故障注入；
 5. 分开报告构建、Adapter 启动、消息闭环和目标环境验收；
 6. 在项目清单登记 Transport，并让框架模型反映真实 built-in/external 状态。

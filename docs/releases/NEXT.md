@@ -2,10 +2,15 @@
 
 状态：**开发候选，尚未批准发布**。
 
-当前 Windows Release 基线已完成 97/97 项 CTest；这只证明本地构建、契约、工具和模拟运行路径通过。工作区仍有未提交改动，PetaLinux 目标、真实协议设备、生产身份、现场网络以及 24/72 小时长稳证据尚未全部签署，因此不得把本说明当作生产放行记录。
+当前 Windows Release 基线已完成多 Profile 构建、契约、安装消费者与 CTest 验证；精确结果以候选提交对应的 CI 和资格报告为准。这些证据仍只覆盖本地构建、工具和模拟运行路径。PetaLinux 目标、真实协议设备、生产身份、现场网络以及 24/72 小时长稳证据尚未全部签署，因此不得把本说明当作生产放行记录。
 
 ## 本轮变化
 
+- 多模型框架：形成 `desktop-lite`、`desktop-distributed`、`embedded`、`edge-industrial`、`edge-test`、`server` 与 `robotics` Profile；构建清单明确 Host、Runtime、WebUI、能力和内置/外部 Transport，不再让普通桌面程序隐式依赖 ROS 2。
+- RuntimeCore：新增稳定的 Host/Component、消息契约、`PDRM/1` 编解码、同步/有界异步 Executor、依赖排序与失败回滚、Transport Registry 和一致性测试边界。
+- 传输适配：新增进程内、本机 IPC、MQTT 与 Fast DDS 的统一 `IMessageTransport` 实现；Windows Named Pipe、Linux Unix Domain Socket、MQTT Broker 和 Fast DDS Participant 均复用同一消息帧契约。
+- 进程模型：`desktop-distributed` 新增 Native Process Supervisor；Windows 使用 Job Object，Linux 使用 Process Group，并提供根目录约束、依赖排序、优雅停止、进程树回收和有限重启预算。
+- 工程化：新增安装后 Transport/IPC 消费者、架构与兼容面检查、跨平台 CI、部署模型文档和进程内性能预算；ROS 2 保持为机器人工作区的外部 Adapter，不伪装成通用底层通信。
 - 通用开发：提供可安装 CMake package、公共 SDK、版本信息和插件脚手架；默认配置不主动连接物理设备或外部协议。
 - 插件治理：增加 API/ABI 与依赖检查、发布者签名和信任策略、隔离宿主、资源边界、隔离部署以及事务回滚/恢复。
 - 稳定性：管理任务、幂等请求、审计、告警历史和插件隔离状态可持久化；设备与协议具备重连、超时、退避、诊断和 readiness 联动。

@@ -1,4 +1,24 @@
-# 机器人性能预算
+# 性能预算
+
+## RuntimeCore 进程内消息基线
+
+通用模型使用 `pdr-runtime-core-inproc-performance` 对 Inline Executor、单订阅者、256 字节
+Payload 执行 2000 次预热和 100000 次测量。开发/CI 默认预算为平均不超过 50 us、p99 不超过
+200 us，并输出吞吐、最大延迟和完整预算。可按目标硬件覆盖：
+
+```powershell
+cmake --preset desktop-lite `
+  -DPDR_RUNTIME_CORE_INPROC_AVERAGE_BUDGET_US=50 `
+  -DPDR_RUNTIME_CORE_INPROC_P99_BUDGET_US=200
+cmake --build --preset desktop-lite
+ctest --preset desktop-lite -C Release -R runtime-core-inproc-performance-budget -V
+```
+
+该基线用于发现进程内分发性能回退，不代表 IPC、MQTT、Fast DDS、磁盘、网络或 UI 端到端
+性能。跨边界 Adapter 必须按目标拓扑另设 Payload 大小、并发度、吞吐、p99/p999、丢包恢复和
+资源占用预算。
+
+## 机器人性能预算
 
 “使用 C++”或“测试运行很快”不能证明框架高性能。机器人路径使用可重复的性能门禁记录热路径
 平均延迟、p99、最大值和吞吐量，并明确它不是硬实时或真实机器人时序证明。

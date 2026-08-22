@@ -1,6 +1,28 @@
-add_library(PDRFastDDS SHARED
+add_library(PDRFastDDSCore SHARED
     src/EnvelopeTopicDataType.cpp
-    src/Runtime.cpp
+    src/Runtime.cpp)
+add_library(PocoDDS::FastDDSCore ALIAS PDRFastDDSCore)
+set_target_properties(PDRFastDDSCore PROPERTIES
+    EXPORT_NAME FastDDSCore
+    WINDOWS_EXPORT_ALL_SYMBOLS ON)
+target_compile_definitions(PDRFastDDSCore PRIVATE PDRFastDDS_EXPORTS)
+target_include_directories(PDRFastDDSCore
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>)
+target_link_libraries(PDRFastDDSCore PUBLIC fastdds)
+if(PDR_ENABLE_OBSERVABILITY)
+    target_include_directories(PDRFastDDSCore PRIVATE
+        $<TARGET_PROPERTY:PDRObservability,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_link_libraries(PDRFastDDSCore PRIVATE
+        $<TARGET_LINKER_FILE:PDRObservability>)
+    add_dependencies(PDRFastDDSCore PDRObservability)
+    target_compile_definitions(PDRFastDDSCore PRIVATE PDR_ENABLE_OBSERVABILITY=1)
+endif()
+pdr_isolate_embedded_static_dependencies(PDRFastDDSCore)
+pdr_set_warnings(PDRFastDDSCore)
+
+add_library(PDRFastDDS SHARED
     src/DeviceBridge.cpp
     src/ServiceEndpoint.cpp)
 add_library(PocoDDS::FastDDS ALIAS PDRFastDDS)
@@ -15,8 +37,8 @@ target_include_directories(PDRFastDDS
 
 target_link_libraries(PDRFastDDS
     PUBLIC
-        PocoDDS::Devices
-        fastdds)
+        PocoDDS::FastDDSCore
+        PocoDDS::DeviceCore)
 if(PDR_ENABLE_OBSERVABILITY)
     target_link_libraries(PDRFastDDS PUBLIC PocoDDS::Observability)
     target_compile_definitions(PDRFastDDS PUBLIC PDR_ENABLE_OBSERVABILITY=1)
@@ -37,6 +59,7 @@ endif()
 add_executable(pdr-fastdds-device-smoke
     tests/DeviceSmoke.cpp)
 target_link_libraries(pdr-fastdds-device-smoke PRIVATE PocoDDS::FastDDS)
+target_link_libraries(pdr-fastdds-device-smoke PRIVATE PocoDDS::SimulationDevice)
 pdr_set_warnings(pdr-fastdds-device-smoke)
 if(BUILD_TESTING)
     add_executable(pdr-fastdds-runtime-snapshot-smoke tests/RuntimeSnapshotSmoke.cpp)
@@ -71,6 +94,10 @@ if(PDR_ENABLE_OBSERVABILITY)
 endif()
 
 install(TARGETS PDRFastDDS
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(TARGETS PDRFastDDSCore EXPORT PocoDDSRuntimeTargets
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

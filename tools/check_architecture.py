@@ -15,10 +15,15 @@ FORBIDDEN_INCLUDES = (
 )
 SCANNED_DIRECTORIES = (
     "runtime-core/include", "runtime-core/src", "runtime-core/tests",
+    "process/native/include", "process/native/src", "process/native/tests",
+    "transports/local-ipc/include", "transports/local-ipc/src", "transports/local-ipc/tests",
     "robotics/include", "robotics/src", "robotics/apps", "robotics/tests",
     "robotics/examples",
 )
-SCANNED_CMAKE = ("runtime-core/CMakeLists.txt", "robotics/CMakeLists.txt")
+SCANNED_CMAKE = (
+    "runtime-core/CMakeLists.txt", "process/native/CMakeLists.txt",
+    "transports/local-ipc/CMakeLists.txt", "robotics/CMakeLists.txt",
+)
 
 
 def scan(root: Path) -> list[dict[str, object]]:

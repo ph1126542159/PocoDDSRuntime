@@ -8,9 +8,11 @@
 #include <MQTTClient.h>
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <mutex>
 #include <string>
 
 namespace PocoDDS::Protocols::MQTT
@@ -36,7 +38,7 @@ using ClientDiagnostics = PocoDDS::Protocols::ProtocolDiagnostics;
 class MqttClient final : public PocoDDS::Protocols::DiagnosticProtocol,
                          public PocoDDS::Protocols::FailureDiagnosticProtocol
 {
-public:
+  public:
     struct Options
     {
         std::string serverUri;
@@ -65,9 +67,7 @@ public:
     void close() noexcept override;
     bool isOpen() const noexcept override;
 
-    void publish(const std::string& topic,
-                 const std::string& payload,
-                 QoS qos = QoS::atLeastOnce,
+    void publish(const std::string& topic, const std::string& payload, QoS qos = QoS::atLeastOnce,
                  bool retained = false);
     void subscribe(const std::string& topic, QoS qos = QoS::atLeastOnce);
     void unsubscribe(const std::string& topic);
@@ -75,11 +75,9 @@ public:
     ClientDiagnostics diagnostics() const override;
     PocoDDS::Reliability::Failure failure() const override;
 
-private:
+  private:
     static void onConnectionLost(void* context, char* cause);
-    static int onMessageArrived(void* context,
-                                char* topicName,
-                                int topicLength,
+    static int onMessageArrived(void* context, char* topicName, int topicLength,
                                 MQTTClient_message* message);
     static void onDeliveryComplete(void* context, MQTTClient_deliveryToken token);
     static void requireSuccess(int result, const char* operation);
@@ -90,8 +88,12 @@ private:
     MQTTClient _client{nullptr};
     mutable std::atomic<bool> _connected{false};
     std::atomic<bool> _intentionalDisconnect{false};
+    std::atomic<bool> _closing{false};
     std::atomic<std::int64_t> _ignoreLossUntilNanoseconds{0};
     bool _everConnected{false};
+    mutable std::mutex _callbackMutex;
+    std::condition_variable _callbacksIdle;
+    std::size_t _activeCallbacks{0};
     mutable Poco::FastMutex _operationMutex;
     mutable Poco::FastMutex _mutex;
     MessageHandler _handler;

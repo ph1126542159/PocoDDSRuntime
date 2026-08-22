@@ -51,9 +51,45 @@ jobs:
           base_ref="${base_ref:-main}"
           base_sha="$(git merge-base HEAD "origin/${base_ref}")"
           git diff --name-only -z "${base_sha}" HEAD -- \
-            application platform robotics services server SubSystem |
+            application platform robotics runtime-core transports services server SubSystem |
             grep -zE '\.(h|hpp|cpp)$' |
             xargs -0 -r clang-format --dry-run --Werror
+
+  runtime-core-portable:
+    name: runtime-core-${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - name: Configure desktop distributed core
+        run: cmake --preset desktop-distributed -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Build desktop distributed core
+        run: cmake --build --preset desktop-distributed
+      - name: Analyze RuntimeCore and LocalIpc
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          find runtime-core/src runtime-core/tests process/native/src process/native/tests \
+            transports/local-ipc/src transports/local-ipc/tests -name '*.cpp' -print0 |
+            xargs -0 clang-tidy -p build/profiles/desktop-distributed --quiet \
+              --checks='-*,clang-analyzer-*,bugprone-*,performance-*,-bugprone-easily-swappable-parameters,-bugprone-exception-escape' \
+              --warnings-as-errors='clang-analyzer-*,bugprone-*,-bugprone-exception-escape'
+      - name: Test desktop distributed core
+        run: ctest --preset desktop-distributed -C Release --output-on-failure
+      - name: Install desktop distributed SDK
+        run: >-
+          cmake --install build/profiles/desktop-distributed --config Release
+          --prefix ${{ github.workspace }}/build/install-desktop-distributed
+      - name: Configure installed LocalIpc consumer
+        run: >-
+          cmake -S tests/local-ipc-consumer -B build/local-ipc-consumer
+          -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build/install-desktop-distributed
+      - name: Build installed LocalIpc consumer
+        run: cmake --build build/local-ipc-consumer --config Release
 
   robotics-portable:
     strategy:
