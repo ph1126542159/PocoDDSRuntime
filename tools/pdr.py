@@ -23,12 +23,180 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-KINDS = ("module", "service", "device", "workflow", "bundle", "plugin", "subprocess")
+KINDS = (
+    "module", "service", "device", "workflow", "bundle", "plugin", "subprocess",
+    "robot-module", "robot-hardware-adapter", "robot-simulation-adapter", "robot-process",
+    "ros2-node",
+)
+EXTERNAL_ACCEPTANCE_TYPES = (
+    "petalinux-target", "physical-protocols", "production-identity", "site-network",
+    "soak-24h", "soak-72h", "project-sil", "project-hil", "project-soak",
+)
 PERSISTENCE_KINDS = {"tasks": "tasks", "idempotency": "requests"}
 
 
 def tool_root() -> Path:
     return Path(__file__).resolve().parents[1]
+
+
+def load_project_manager():
+    path = Path(__file__).resolve().with_name("project_manager.py")
+    spec = importlib.util.spec_from_file_location("pdr_project_manager_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project manager: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def create_project(args: argparse.Namespace) -> int:
+    return load_project_manager().create_project(args)
+
+
+def validate_project(args: argparse.Namespace) -> int:
+    return load_project_manager().validate_project(args)
+
+
+def resolve_project(args: argparse.Namespace) -> int:
+    return load_project_manager().resolve_project(args)
+
+
+def set_project_version(args: argparse.Namespace) -> int:
+    return load_project_manager().set_project_version(args)
+
+
+def add_project_component(args: argparse.Namespace) -> int:
+    return load_project_manager().add_project_component(args)
+
+
+def remove_project_component(args: argparse.Namespace) -> int:
+    return load_project_manager().remove_project_component(args)
+
+
+def list_project_components(args: argparse.Namespace) -> int:
+    return load_project_manager().list_project_components(args)
+
+
+def sync_project(args: argparse.Namespace) -> int:
+    return load_project_manager().sync_project(args)
+
+
+def load_project_config():
+    path = Path(__file__).resolve().with_name("project_config.py")
+    spec = importlib.util.spec_from_file_location("pdr_project_config_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project config resolver: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def resolve_project_config(args: argparse.Namespace) -> int:
+    return load_project_config().resolve_project_config(args)
+
+
+def load_project_config_transaction():
+    path = Path(__file__).resolve().with_name("project_config_transaction.py")
+    spec = importlib.util.spec_from_file_location("pdr_project_config_transaction_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project configuration transaction tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def plan_project_config(args: argparse.Namespace) -> int:
+    return load_project_config_transaction().plan_command(args)
+
+
+def apply_project_config(args: argparse.Namespace) -> int:
+    return load_project_config_transaction().apply_command(args)
+
+
+def recover_project_config(args: argparse.Namespace) -> int:
+    return load_project_config_transaction().recover_command(args)
+
+
+def load_project_template():
+    path = Path(__file__).resolve().with_name("project_template.py")
+    spec = importlib.util.spec_from_file_location("pdr_project_template_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project template tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def project_template_status(args: argparse.Namespace) -> int:
+    return load_project_template().status_command(args)
+
+
+def adopt_project_template(args: argparse.Namespace) -> int:
+    return load_project_template().adopt_command(args)
+
+
+def upgrade_project_template(args: argparse.Namespace) -> int:
+    return load_project_template().upgrade_command(args)
+
+
+def recover_project_template(args: argparse.Namespace) -> int:
+    return load_project_template().recover_command(args)
+
+
+def load_component_template():
+    path = Path(__file__).resolve().with_name("component_template.py")
+    spec = importlib.util.spec_from_file_location("pdr_component_template_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load component template tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def component_template_status(args: argparse.Namespace) -> int:
+    return load_component_template().status_command(args, templates)
+
+
+def adopt_component_template(args: argparse.Namespace) -> int:
+    return load_component_template().adopt_command(args, templates)
+
+
+def upgrade_component_template(args: argparse.Namespace) -> int:
+    return load_component_template().upgrade_command(args, templates)
+
+
+def recover_component_template(args: argparse.Namespace) -> int:
+    return load_component_template().recover_command(args)
+
+
+def add_project_dependency(args: argparse.Namespace) -> int:
+    return load_project_manager().add_project_dependency(args)
+
+
+def remove_project_dependency(args: argparse.Namespace) -> int:
+    return load_project_manager().remove_project_dependency(args)
+
+
+def list_project_dependencies(args: argparse.Namespace) -> int:
+    return load_project_manager().list_project_dependencies(args)
+
+
+def load_project_package():
+    path = Path(__file__).resolve().with_name("project_package.py")
+    spec = importlib.util.spec_from_file_location("pdr_project_package_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project package tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def create_project_package(args: argparse.Namespace) -> int:
+    return load_project_package().create_project_package(args)
+
+
+def verify_project_package(args: argparse.Namespace) -> int:
+    return load_project_package().verify_project_package(args)
 
 
 def load_upgrade_manager():
@@ -163,6 +331,32 @@ def release_pipeline_status(args: argparse.Namespace) -> int:
     return load_release_pipeline().status(args)
 
 
+def load_project_pipeline():
+    path = Path(__file__).resolve().with_name("project_pipeline.py")
+    spec = importlib.util.spec_from_file_location("pdr_project_pipeline_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project pipeline tool: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def create_project_pipeline(args: argparse.Namespace) -> int:
+    return load_project_pipeline().create_plan(args)
+
+
+def run_project_pipeline(args: argparse.Namespace) -> int:
+    return load_project_pipeline().execute(args, False)
+
+
+def resume_project_pipeline(args: argparse.Namespace) -> int:
+    return load_project_pipeline().execute(args, True)
+
+
+def project_pipeline_status(args: argparse.Namespace) -> int:
+    return load_project_pipeline().status(args)
+
+
 def add_release_qualification_arguments(command: argparse.ArgumentParser) -> None:
     command.add_argument("--source", required=True, type=Path)
     command.add_argument("--build", required=True, type=Path)
@@ -193,6 +387,14 @@ def named_qualification_path(value: str) -> tuple[str, Path]:
     if not separator or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name):
         raise argparse.ArgumentTypeError("expected NAME=PATH")
     return name, Path(raw_path)
+
+
+def named_requirement(value: str) -> tuple[str, str]:
+    name, separator, requirement = value.partition("=")
+    if (not separator or not re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]*", name)
+            or not requirement or "\x00" in requirement):
+        raise argparse.ArgumentTypeError("expected REQUIREMENT=VALUE")
+    return name, requirement
 
 
 def _file_sha256(path: Path) -> str:
@@ -620,6 +822,7 @@ def valid_name(value: str) -> str:
 
 def plugin_templates(name: str, requested_kind: str = "plugin") -> dict[str, str]:
     lowered = name.lower()
+    target_stem = f"pdr_generated_{requested_kind}_{snake_name(name)}"
     namespace = f"PocoDDS::Generated::{name}"
     symbolic = f"pdr.plugin.{lowered}"
     cmake = f'''cmake_minimum_required(VERSION 3.24)
@@ -627,23 +830,28 @@ project({name}Plugin LANGUAGES CXX)
 find_package(PocoDDSRuntime 0.1 CONFIG REQUIRED COMPONENTS Plugins)
 include(CTest)
 
-add_library({name}Core STATIC src/StatusService.cpp)
-set_target_properties({name}Core PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_include_directories({name}Core PUBLIC
+add_library({target_stem}_core STATIC src/StatusService.cpp)
+set_target_properties({target_stem}_core PROPERTIES
+    POSITION_INDEPENDENT_CODE ON OUTPUT_NAME "{name}Core")
+target_include_directories({target_stem}_core PUBLIC
     $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>)
-target_link_libraries({name}Core PUBLIC PocoDDS::Plugins)
+target_link_libraries({target_stem}_core PUBLIC PocoDDS::Plugins)
 
-pdr_add_osp_bundle({name}Bundle
+pdr_add_osp_bundle({target_stem}_bundle
     SYMBOLIC_NAME {symbolic}
     BUNDLE_SPEC ${{CMAKE_CURRENT_SOURCE_DIR}}/{name}.bndlspec
     SOURCES ${{CMAKE_CURRENT_SOURCE_DIR}}/src/BundleActivator.cpp
-    LINK_LIBS {name}Core
+    LINK_LIBS {target_stem}_core
     INCLUDE_DIRS ${{CMAKE_CURRENT_SOURCE_DIR}}/include)
 
+install(DIRECTORY "${{{target_stem}_bundle_BUNDLE_DIRECTORY}}/"
+    DESTINATION bin/bundles FILES_MATCHING PATTERN "*.bndl")
+
 if(BUILD_TESTING)
-    add_executable({name}Smoke tests/{name}Smoke.cpp)
-    target_link_libraries({name}Smoke PRIVATE {name}Core)
-    add_test(NAME {lowered}-plugin-smoke COMMAND {name}Smoke)
+    add_executable({target_stem}_smoke tests/{name}Smoke.cpp)
+    set_target_properties({target_stem}_smoke PROPERTIES OUTPUT_NAME "{name}Smoke")
+    target_link_libraries({target_stem}_smoke PRIVATE {target_stem}_core)
+    add_test(NAME {requested_kind}-{lowered}-smoke COMMAND {target_stem}_smoke)
 endif()
 '''
     header = f'''#pragma once
@@ -794,8 +1002,510 @@ Never overwrite an existing symbolic name without an explicit compatibility and 
     }
 
 
+def kebab_name(name: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "-", name).lower()
+
+
+def snake_name(name: str) -> str:
+    return kebab_name(name).replace("-", "_")
+
+
+def robot_module_templates(name: str) -> dict[str, str]:
+    slug = kebab_name(name)
+    module_id = snake_name(name)
+    namespace = f"PocoDDS::Generated::{name}"
+    target_stem = f"pdr_robot_module_{snake_name(name)}"
+    cmake = f'''cmake_minimum_required(VERSION 3.24)
+project({name}RobotModule LANGUAGES CXX)
+find_package(PDRRoboticsRuntime 0.1 CONFIG REQUIRED)
+include(CTest)
+
+add_library({target_stem}_core STATIC src/{name}.cpp)
+set_target_properties({target_stem}_core PROPERTIES
+    POSITION_INDEPENDENT_CODE ON OUTPUT_NAME "{name}Core")
+target_include_directories({target_stem}_core PUBLIC
+    $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>)
+target_link_libraries({target_stem}_core PUBLIC PocoDDS::RoboticsRuntime)
+
+add_library({target_stem}_plugin MODULE src/Plugin.cpp)
+target_link_libraries({target_stem}_plugin PRIVATE {target_stem}_core)
+set_target_properties({target_stem}_plugin PROPERTIES
+    PREFIX "" OUTPUT_NAME "pdr-robot-{slug}-plugin")
+
+if(BUILD_TESTING)
+    add_executable({target_stem}_smoke tests/{name}Smoke.cpp)
+    set_target_properties({target_stem}_smoke PROPERTIES OUTPUT_NAME "{name}Smoke")
+    target_link_libraries({target_stem}_smoke PRIVATE {target_stem}_core)
+    add_test(NAME {slug}-robot-module-smoke COMMAND {target_stem}_smoke)
+endif()
+
+install(TARGETS {target_stem}_plugin
+    LIBRARY DESTINATION lib/pdr/robotics/plugins
+    RUNTIME DESTINATION bin/robotics/plugins)
+'''
+    header = f'''#pragma once
+
+#include <PocoDDS/Robotics/Business.h>
+
+namespace {namespace}
+{{
+class {name} final : public PocoDDS::Robotics::RobotBusinessModule
+{{
+public:
+    std::string name() const override;
+    std::vector<std::string> missions() const override;
+    std::unique_ptr<PocoDDS::Robotics::Behavior>
+        createMission(const std::string& mission,
+                      PocoDDS::Robotics::BusinessContext& context) const override;
+}};
+}}
+'''
+    source = f'''#include <PocoDDS/Generated/{name}/{name}.h>
+
+namespace {namespace}
+{{
+std::string {name}::name() const {{ return "{module_id}"; }}
+
+std::vector<std::string> {name}::missions() const {{ return {{"execute"}}; }}
+
+std::unique_ptr<PocoDDS::Robotics::Behavior>
+{name}::createMission(const std::string& mission,
+                      PocoDDS::Robotics::BusinessContext& context) const
+{{
+    if (mission != "execute") return {{}};
+    return PocoDDS::Robotics::makeTracedBusinessStep(
+        context, name(), mission, "complete", "generated=true",
+        std::make_unique<PocoDDS::Robotics::BehaviorTask>(
+            [](PocoDDS::Robotics::BehaviorBlackboard&)
+            {{ return PocoDDS::Robotics::BehaviorStatus::succeeded; }}),
+        [] {{ return std::string("result=completed"); }});
+}}
+}}
+'''
+    plugin = f'''#include <PocoDDS/Generated/{name}/{name}.h>
+#include <PocoDDS/Robotics/BusinessPlugin.h>
+
+namespace
+{{
+PocoDDS::Robotics::RobotBusinessModule* createModule()
+{{
+    return new {namespace}::{name};
+}}
+
+void destroyModule(PocoDDS::Robotics::RobotBusinessModule* module) noexcept
+{{
+    delete module;
+}}
+
+const PocoDDS::Robotics::BusinessPluginDescriptor descriptor{{
+    sizeof(PocoDDS::Robotics::BusinessPluginDescriptor),
+    PocoDDS::Robotics::businessPluginAbiVersion,
+    "{module_id}", &createModule, &destroyModule}};
+}}
+
+PDR_BUSINESS_PLUGIN_EXPORT
+const PocoDDS::Robotics::BusinessPluginDescriptor* pdrBusinessPluginV1()
+{{
+    return &descriptor;
+}}
+'''
+    smoke = f'''#include <PocoDDS/Generated/{name}/{name}.h>
+
+#include <algorithm>
+
+int main()
+{{
+    {namespace}::{name} module;
+    const auto missions = module.missions();
+    return module.name() == "{module_id}" &&
+           std::find(missions.begin(), missions.end(), "execute") != missions.end() ? 0 : 1;
+}}
+'''
+    readme = f'''# {name} robot business module
+
+This is a trusted native `RobotBusinessModule` plugin. Build it with the exact
+PDRRoboticsRuntime SDK, compiler, architecture and C++ runtime used by the host.
+Load the resulting library only through an explicit `business_plugins` path and
+list `{module_id}` in `business_modules`; never enable directory auto-scanning.
+
+```text
+pdr verify . --prefix <robotics-install-prefix> --config Release
+```
+'''
+    return {
+        "CMakeLists.txt": cmake,
+        f"include/PocoDDS/Generated/{name}/{name}.h": header,
+        f"src/{name}.cpp": source,
+        "src/Plugin.cpp": plugin,
+        f"tests/{name}Smoke.cpp": smoke,
+        "README.md": readme,
+    }
+
+
+def robot_adapter_templates(name: str, kind: str) -> dict[str, str]:
+    slug = kebab_name(name)
+    namespace = f"PocoDDS::Generated::{name}"
+    simulation = kind == "robot-simulation-adapter"
+    target_stem = f"pdr_{kind.replace('-', '_')}_{snake_name(name)}"
+    base_header = "SimulationAdapter.h" if simulation else "HardwareInterface.h"
+    base_class = "SimulationAdapter" if simulation else "HardwareInterface"
+    cmake = f'''cmake_minimum_required(VERSION 3.24)
+project({name}RobotAdapter LANGUAGES CXX)
+find_package(PDRRoboticsRuntime 0.1 CONFIG REQUIRED)
+include(CTest)
+
+add_library({target_stem} src/{name}.cpp)
+set_target_properties({target_stem} PROPERTIES OUTPUT_NAME "{name}")
+target_include_directories({target_stem} PUBLIC
+    $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>)
+target_link_libraries({target_stem} PUBLIC PocoDDS::RoboticsRuntime)
+
+install(TARGETS {target_stem}
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin)
+install(DIRECTORY include/ DESTINATION include)
+
+if(BUILD_TESTING)
+    add_executable({target_stem}_smoke tests/{name}Smoke.cpp)
+    set_target_properties({target_stem}_smoke PROPERTIES OUTPUT_NAME "{name}Smoke")
+    target_link_libraries({target_stem}_smoke PRIVATE {target_stem})
+    add_test(NAME {kind}-{slug}-smoke COMMAND {target_stem}_smoke)
+endif()
+'''
+    common_members = '''    mutable std::mutex _mutex;
+    bool _configured{false};
+    bool _active{false};
+    PocoDDS::Robotics::RobotFrame _frame;
+    PocoDDS::Robotics::RobotCommand _command;
+    std::uint64_t _readCount{0};
+    std::uint64_t _writeCount{0};'''
+    if simulation:
+        declarations = '''    std::string backendName() const override;
+    bool connect(const std::string& world) override;
+    void reset() override;
+    void applyCommand(const PocoDDS::Robotics::RobotCommand& command) override;
+    PocoDDS::Robotics::RobotFrame step(std::chrono::nanoseconds duration) override;
+    bool connected() const noexcept override;
+    PocoDDS::Robotics::BackendHealth health() const override;'''
+    else:
+        declarations = '''    std::string name() const override;
+    bool configure(const std::string& description) override;
+    bool activate() override;
+    void deactivate() noexcept override;
+    void reset() override;
+    PocoDDS::Robotics::RobotFrame read(std::chrono::nanoseconds period) override;
+    bool write(const PocoDDS::Robotics::RobotCommand& command,
+               std::chrono::nanoseconds period) override;
+    PocoDDS::Robotics::BackendHealth health() const override;'''
+    header = f'''#pragma once
+
+#include <PocoDDS/Robotics/{base_header}>
+
+#include <cstdint>
+#include <mutex>
+
+namespace {namespace}
+{{
+class {name} final : public PocoDDS::Robotics::{base_class}
+{{
+public:
+{declarations}
+
+private:
+{common_members}
+}};
+}}
+'''
+    if simulation:
+        source = f'''#include <PocoDDS/Generated/{name}/{name}.h>
+
+namespace {namespace}
+{{
+std::string {name}::backendName() const {{ return "{slug}"; }}
+bool {name}::connect(const std::string& world)
+{{
+    std::lock_guard lock(_mutex);
+    _configured = !world.empty();
+    return _configured;
+}}
+void {name}::reset()
+{{
+    std::lock_guard lock(_mutex);
+    _frame = {{}}; _command = {{}}; _readCount = 0; _writeCount = 0;
+}}
+void {name}::applyCommand(const PocoDDS::Robotics::RobotCommand& command)
+{{
+    std::lock_guard lock(_mutex); _command = command; ++_writeCount;
+}}
+PocoDDS::Robotics::RobotFrame {name}::step(std::chrono::nanoseconds)
+{{
+    std::lock_guard lock(_mutex); ++_readCount; return _frame;
+}}
+bool {name}::connected() const noexcept
+{{
+    std::lock_guard lock(_mutex); return _configured;
+}}
+PocoDDS::Robotics::BackendHealth {name}::health() const
+{{
+    std::lock_guard lock(_mutex);
+    return {{_configured, _backendActive.load(), _configured && _backendActive.load(),
+             _readCount, _writeCount, _configured ? "ready" : "disconnected"}};
+}}
+}}
+'''
+        smoke_body = f'''{namespace}::{name} adapter;
+    if (!adapter.connect("generated-world") || !adapter.activate()) return 1;
+    PocoDDS::Robotics::RobotCommand command;
+    if (!adapter.write(command, std::chrono::milliseconds(5))) return 2;
+    adapter.read(std::chrono::milliseconds(5));
+    const auto health = adapter.health();
+    adapter.deactivate();
+    return health.ready && health.readCount == 1 && health.writeCount == 1 ? 0 : 3;'''
+    else:
+        source = f'''#include <PocoDDS/Generated/{name}/{name}.h>
+
+namespace {namespace}
+{{
+std::string {name}::name() const {{ return "{slug}"; }}
+bool {name}::configure(const std::string& description)
+{{
+    std::lock_guard lock(_mutex); _configured = !description.empty(); return _configured;
+}}
+bool {name}::activate()
+{{
+    std::lock_guard lock(_mutex); _active = _configured; return _active;
+}}
+void {name}::deactivate() noexcept
+{{
+    std::lock_guard lock(_mutex); _active = false;
+}}
+void {name}::reset()
+{{
+    std::lock_guard lock(_mutex); _frame = {{}}; _command = {{}}; _readCount = 0; _writeCount = 0;
+}}
+PocoDDS::Robotics::RobotFrame {name}::read(std::chrono::nanoseconds)
+{{
+    std::lock_guard lock(_mutex); ++_readCount; return _frame;
+}}
+bool {name}::write(const PocoDDS::Robotics::RobotCommand& command, std::chrono::nanoseconds)
+{{
+    std::lock_guard lock(_mutex);
+    if (!_active) return false;
+    _command = command; ++_writeCount; return true;
+}}
+PocoDDS::Robotics::BackendHealth {name}::health() const
+{{
+    std::lock_guard lock(_mutex);
+    return {{_configured, _active, _configured && _active,
+             _readCount, _writeCount, _active ? "ready" : "inactive"}};
+}}
+}}
+'''
+        smoke_body = f'''{namespace}::{name} adapter;
+    if (adapter.kind() != PocoDDS::Robotics::BackendKind::hardware ||
+        !adapter.configure("generated-hardware") || !adapter.activate()) return 1;
+    PocoDDS::Robotics::RobotCommand command;
+    if (!adapter.write(command, std::chrono::milliseconds(5))) return 2;
+    adapter.read(std::chrono::milliseconds(5));
+    const auto health = adapter.health();
+    adapter.deactivate();
+    return health.ready && health.readCount == 1 && health.writeCount == 1 ? 0 : 3;'''
+    smoke = f'''#include <PocoDDS/Generated/{name}/{name}.h>
+
+#include <chrono>
+
+int main()
+{{
+    {smoke_body}
+}}
+'''
+    adapter_name = "simulation" if simulation else "hardware"
+    readme = f'''# {name} robot {adapter_name} adapter
+
+Generated transport-neutral `{base_class}` implementation. Replace the stub I/O
+with the real simulator or device transport, but keep feedback time-bounded and
+fail closed before activation. Business modules must depend on the public Backend
+contract, never on this concrete adapter type.
+'''
+    return {
+        "CMakeLists.txt": cmake,
+        f"include/PocoDDS/Generated/{name}/{name}.h": header,
+        f"src/{name}.cpp": source,
+        f"tests/{name}Smoke.cpp": smoke,
+        "README.md": readme,
+    }
+
+
+def robot_process_templates(name: str) -> dict[str, str]:
+    target = "pdr-robot-" + kebab_name(name)
+    cmake_target = "pdr_robot_process_" + snake_name(name)
+    cmake = f'''cmake_minimum_required(VERSION 3.24)
+project({name}RobotProcess LANGUAGES CXX)
+find_package(PDRRoboticsRuntime 0.1 CONFIG REQUIRED)
+include(CTest)
+
+add_executable({cmake_target} src/main.cpp)
+target_link_libraries({cmake_target} PRIVATE PocoDDS::RoboticsRuntime)
+set(output "${{CMAKE_BINARY_DIR}}/processes/{target}")
+set_target_properties({cmake_target} PROPERTIES
+    OUTPUT_NAME "{target}" RUNTIME_OUTPUT_DIRECTORY "${{output}}")
+if(CMAKE_CONFIGURATION_TYPES)
+  foreach(configuration IN LISTS CMAKE_CONFIGURATION_TYPES)
+    string(TOUPPER "${{configuration}}" upper)
+    set_target_properties({cmake_target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${{upper}} "${{output}}")
+  endforeach()
+endif()
+if(BUILD_TESTING)
+  add_test(NAME {target}-self-test COMMAND {cmake_target} --self-test)
+endif()
+install(TARGETS {cmake_target} RUNTIME DESTINATION bin/processes/{target})
+'''
+    source = f'''#include <PocoDDS/Robotics/Types.h>
+
+#include <atomic>
+#include <chrono>
+#include <csignal>
+#include <iostream>
+#include <string_view>
+#include <thread>
+
+namespace {{ std::atomic_bool running{{true}}; void stop(int) {{ running = false; }} }}
+int main(int argc, char** argv)
+{{
+    if (argc == 2 && std::string_view(argv[1]) == "--self-test")
+    {{
+        PocoDDS::Robotics::RobotFrame frame;
+        std::cout << "{target.upper().replace('-', '_')}_SELF_TEST_PASS sensors="
+                  << frame.sensors.size() << '\\n';
+        return 0;
+    }}
+    std::signal(SIGINT, stop); std::signal(SIGTERM, stop);
+    std::cout << "{target.upper().replace('-', '_')}_READY" << std::endl;
+    while (running.load())
+    {{
+        std::cout << "{target.upper().replace('-', '_')}_HEARTBEAT" << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }}
+    std::cout << "{target.upper().replace('-', '_')}_STOPPED" << std::endl;
+}}
+'''
+    readme = f'''# {name} robot process
+
+Independent robotics process template. Use ROS 2 or another public protocol for
+communication. It must not access the OSP Service Registry or a robot core object
+owned by another process. Add readiness, bounded restart and resource policies
+before production deployment.
+'''
+    return {"CMakeLists.txt": cmake, "src/main.cpp": source, "README.md": readme}
+
+
+def ros2_node_templates(name: str) -> dict[str, str]:
+    package = f"pdr_{snake_name(name)}_ros2"
+    node = f"{snake_name(name)}_node"
+    cmake = f'''cmake_minimum_required(VERSION 3.16)
+project({package})
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_gtest REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(PDRRoboticsRuntime REQUIRED)
+
+add_library(${{PROJECT_NAME}}_component src/{name}Node.cpp)
+target_include_directories(${{PROJECT_NAME}}_component PUBLIC include)
+ament_target_dependencies(${{PROJECT_NAME}}_component rclcpp)
+target_link_libraries(${{PROJECT_NAME}}_component PocoDDS::RoboticsRuntime)
+add_executable({node} src/main.cpp)
+target_link_libraries({node} ${{PROJECT_NAME}}_component)
+ament_target_dependencies({node} rclcpp)
+
+ament_add_gtest(${{PROJECT_NAME}}_test test/{name}NodeTest.cpp)
+target_link_libraries(${{PROJECT_NAME}}_test ${{PROJECT_NAME}}_component)
+ament_target_dependencies(${{PROJECT_NAME}}_test rclcpp)
+
+install(TARGETS ${{PROJECT_NAME}}_component {node} DESTINATION lib/${{PROJECT_NAME}})
+install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY config launch DESTINATION share/${{PROJECT_NAME}})
+ament_package()
+'''
+    header = f'''#pragma once
+#include <rclcpp/rclcpp.hpp>
+namespace PocoDDS::Generated::{name}
+{{
+class {name}Node final : public rclcpp::Node
+{{
+public:
+    {name}Node();
+}};
+}}
+'''
+    source = f'''#include <{package}/{name}Node.h>
+namespace PocoDDS::Generated::{name}
+{{
+{name}Node::{name}Node() : rclcpp::Node("{node}")
+{{
+    declare_parameter("enabled", true);
+}}
+}}
+'''
+    main = f'''#include <{package}/{name}Node.h>
+#include <rclcpp/rclcpp.hpp>
+int main(int argc, char** argv)
+{{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<PocoDDS::Generated::{name}::{name}Node>());
+    rclcpp::shutdown();
+    return 0;
+}}
+'''
+    test = f'''#include <{package}/{name}Node.h>
+#include <gtest/gtest.h>
+#include <rclcpp/rclcpp.hpp>
+TEST({name}Node, StableName)
+{{
+    if (!rclcpp::ok()) rclcpp::init(0, nullptr);
+    auto node = std::make_shared<PocoDDS::Generated::{name}::{name}Node>();
+    EXPECT_EQ(node->get_name(), std::string("{node}"));
+    rclcpp::shutdown();
+}}
+'''
+    package_xml = f'''<?xml version="1.0"?>
+<package format="3">
+  <name>{package}</name><version>0.1.0</version>
+  <description>Generated PocoDDS robotics ROS 2 adapter.</description>
+  <maintainer email="maintainer@example.com">Maintainer</maintainer>
+  <license>Proprietary</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>
+'''
+    launch = f'''from pathlib import Path
+
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+
+def generate_launch_description():
+    config = str(Path(get_package_share_directory("{package}")) / "config" / "runtime.yaml")
+    return LaunchDescription([Node(package="{package}", executable="{node}",
+        name="{node}", parameters=[config])])
+'''
+    return {
+        "CMakeLists.txt": cmake, "package.xml": package_xml,
+        f"include/{package}/{name}Node.h": header, f"src/{name}Node.cpp": source,
+        "src/main.cpp": main, f"test/{name}NodeTest.cpp": test,
+        "config/runtime.yaml": f"{node}:\n  ros__parameters:\n    enabled: true\n",
+        f"launch/{snake_name(name)}.launch.py": launch,
+        "README.md": f"# {name} ROS 2 node\n\nBuild with `colcon build --packages-select {package}` after sourcing ROS 2 and the installed PDRRoboticsRuntime SDK.\n",
+    }
+
+
 def subprocess_templates(name: str) -> dict[str, str]:
     target = "pdr-" + re.sub(r"(?<!^)(?=[A-Z])", "-", name).lower()
+    cmake_target = "pdr_generated_subprocess_" + snake_name(name)
     cmake = f'''cmake_minimum_required(VERSION 3.24)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     project({name}Subprocess LANGUAGES CXX)
@@ -803,29 +1513,30 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     include(CTest)
 endif()
 
-add_executable({target} src/main.cpp)
-target_link_libraries({target} PRIVATE PocoDDS::SDK)
+add_executable({cmake_target} src/main.cpp)
+target_link_libraries({cmake_target} PRIVATE PocoDDS::SDK)
 if(DEFINED PDR_SUBPROCESS_OUTPUT_ROOT)
     set({name}_OUTPUT_ROOT "${{PDR_SUBPROCESS_OUTPUT_ROOT}}")
 else()
     set({name}_OUTPUT_ROOT "${{CMAKE_BINARY_DIR}}/processes")
 endif()
-set_target_properties({target} PROPERTIES
+set_target_properties({cmake_target} PROPERTIES
+    OUTPUT_NAME "{target}"
     RUNTIME_OUTPUT_DIRECTORY "${{{name}_OUTPUT_ROOT}}/{target}")
 if(CMAKE_CONFIGURATION_TYPES)
     foreach(configuration IN LISTS CMAKE_CONFIGURATION_TYPES)
         string(TOUPPER "${{configuration}}" configuration_upper)
-        set_target_properties({target} PROPERTIES
+        set_target_properties({cmake_target} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY_${{configuration_upper}}
                 "${{{name}_OUTPUT_ROOT}}/{target}")
     endforeach()
 endif()
 
 if(BUILD_TESTING)
-    add_test(NAME {target}-self-test COMMAND {target} --self-test)
+    add_test(NAME {target}-self-test COMMAND {cmake_target} --self-test)
 endif()
 
-install(TARGETS {target}
+install(TARGETS {cmake_target}
     RUNTIME DESTINATION "bin/processes/{target}")
 install(FILES config/pdr-subprocess-entry.properties
     DESTINATION "share/PocoDDSRuntime/subprocesses/{target}")
@@ -907,11 +1618,21 @@ slot, and validate start, heartbeat, graceful stop and crash recovery.
 
 
 def templates(kind: str, name: str) -> dict[str, str]:
+    """Render the frozen v1 component scaffold; evolve it in component_template.py."""
+    if kind == "robot-module":
+        return robot_module_templates(name)
+    if kind in ("robot-hardware-adapter", "robot-simulation-adapter"):
+        return robot_adapter_templates(name, kind)
+    if kind == "robot-process":
+        return robot_process_templates(name)
+    if kind == "ros2-node":
+        return ros2_node_templates(name)
     if kind in ("bundle", "plugin"):
         return plugin_templates(name, kind)
     if kind == "subprocess":
         return subprocess_templates(name)
     namespace = f"PocoDDS::Generated::{name}"
+    target_stem = f"pdr_generated_{kind.replace('-', '_')}_{snake_name(name)}"
     common_cmake = f'''cmake_minimum_required(VERSION 3.24)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     project({name} LANGUAGES CXX)
@@ -919,16 +1640,24 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     include(CTest)
 endif()
 
-add_library({name} src/{name}.cpp)
-target_include_directories({name} PUBLIC
+add_library({target_stem} src/{name}.cpp)
+set_target_properties({target_stem} PROPERTIES OUTPUT_NAME "{name}")
+target_include_directories({target_stem} PUBLIC
     $<BUILD_INTERFACE:${{CMAKE_CURRENT_SOURCE_DIR}}/include>
     $<INSTALL_INTERFACE:include>)
-target_link_libraries({name} PUBLIC PocoDDS::SDK)
+target_link_libraries({target_stem} PUBLIC PocoDDS::SDK)
+
+install(TARGETS {target_stem}
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin)
+install(DIRECTORY include/ DESTINATION include)
 
 if(BUILD_TESTING)
-    add_executable({name}Smoke tests/{name}Smoke.cpp)
-    target_link_libraries({name}Smoke PRIVATE {name})
-    add_test(NAME {name.lower()}-smoke COMMAND {name}Smoke)
+    add_executable({target_stem}_smoke tests/{name}Smoke.cpp)
+    set_target_properties({target_stem}_smoke PROPERTIES OUTPUT_NAME "{name}Smoke")
+    target_link_libraries({target_stem}_smoke PRIVATE {target_stem})
+    add_test(NAME {kind}-{name.lower()}-smoke COMMAND {target_stem}_smoke)
 endif()
 '''
     if kind == "workflow":
@@ -1205,19 +1934,61 @@ Add `--report verify-report.json` to retain configure, build and CTest evidence.
     }
 
 
+def locate_project_manifest(output: Path, explicit: str | None) -> Path | None:
+    if explicit:
+        supplied = Path(explicit).resolve()
+        manifest = supplied / "pdr-project.yaml" if supplied.is_dir() else supplied
+        if not manifest.is_file():
+            raise FileNotFoundError(f"project manifest not found: {manifest}")
+        return manifest
+    visited: set[Path] = set()
+    for start in (output.resolve(), Path.cwd().resolve()):
+        for directory in (start, *start.parents):
+            if directory in visited:
+                continue
+            visited.add(directory)
+            manifest = directory / "pdr-project.yaml"
+            if manifest.is_file():
+                return manifest
+    return None
+
+
 def create_module(args: argparse.Namespace) -> int:
     destination = Path(args.output).resolve() / args.name
+    project_manager = None
+    manifest = None
+    if not args.no_register:
+        manifest = locate_project_manifest(Path(args.output), args.project)
+        if manifest:
+            project_manager = load_project_manager()
+            project_manager.validate_manifest(manifest, check_paths=True)
+            project_manager.normalized_project_path(manifest, destination)
     if destination.exists() and any(destination.iterdir()) and not args.force:
         print(f"error: destination is not empty: {destination}", file=sys.stderr)
         return 2
     destination.mkdir(parents=True, exist_ok=True)
-    for relative, content in templates(args.kind, args.name).items():
+    component_template = load_component_template()
+    rendered = component_template.render_component_template(
+        args.kind,
+        args.name,
+        templates,
+        component_template.CURRENT_TEMPLATE_VERSION,
+    )
+    for relative, content in rendered.items():
         path = destination / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists() and not args.force:
             print(f"error: file already exists: {path}", file=sys.stderr)
             return 2
         path.write_text(content, encoding="utf-8", newline="\n")
+    component_template.write_initial_state(
+        destination, args.kind, args.name, rendered
+    )
+    if manifest and project_manager:
+        relative = project_manager.register_component_path(
+            manifest, args.kind, destination, allow_existing=args.force
+        )
+        print(f"registered {args.kind}: {relative} in {manifest}")
     print(f"created {args.kind} module: {destination}")
     return 0
 
@@ -1355,6 +2126,13 @@ def verify_module(args: argparse.Namespace) -> int:
     try:
         if not (module / "CMakeLists.txt").is_file():
             raise FileNotFoundError(f"module CMakeLists.txt not found: {module}")
+        component_state = load_component_template().require_current_clean(module, templates)
+        if component_state is not None:
+            report["componentTemplate"] = {
+                "kind": component_state["kind"],
+                "name": component_state["name"],
+                "version": component_state["appliedVersion"],
+            }
         cmake = executable(args.cmake, "cmake")
         ctest = executable(args.ctest, "ctest")
         prefixes = [str(Path(item).resolve()) for item in args.prefix]
@@ -1417,7 +2195,7 @@ def verify_module(args: argparse.Namespace) -> int:
                 report["passed"] = True
                 result = 0
                 print(f"verified module: {module}")
-    except (FileNotFoundError, OSError) as error:
+    except (FileNotFoundError, OSError, ValueError) as error:
         report["error"] = str(error)
         print(f"verify failed: {error}", file=sys.stderr)
         result = 2
@@ -2318,11 +3096,325 @@ def validate_restored_runtime(args: argparse.Namespace) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="pdr", description=__doc__)
     commands = result.add_subparsers(dest="command", required=True)
+    project = commands.add_parser(
+        "project", help="create, validate and resolve a deterministic product project"
+    )
+    project_commands = project.add_subparsers(dest="project_command", required=True)
+    project_create = project_commands.add_parser(
+        "create", help="create a standalone product project consuming the installed SDK"
+    )
+    project_create.add_argument("name", type=valid_name)
+    project_create.add_argument("--output", default=".")
+    project_create.add_argument("--profile", choices=("robotics", "embedded", "edge-test", "server"),
+                                default="robotics")
+    project_create.add_argument("--runtime-version", default="0.1.x")
+    project_create.add_argument("--version", default="0.1.0")
+    project_create.add_argument("--force", action="store_true")
+    project_create.set_defaults(handler=create_project)
+    project_validate = project_commands.add_parser(
+        "validate", help="validate project structure and every referenced path"
+    )
+    project_validate.add_argument("manifest")
+    project_validate.add_argument("--skip-path-checks", action="store_true")
+    project_validate.add_argument("--report")
+    project_validate.set_defaults(handler=validate_project)
+    project_resolve = project_commands.add_parser(
+        "resolve", help="validate and write a source-hash-bound project lock"
+    )
+    project_resolve.add_argument("manifest")
+    project_resolve.add_argument("--output", required=True)
+    project_resolve.set_defaults(handler=resolve_project)
+    project_version = project_commands.add_parser(
+        "version", help="set the concrete product version and refresh composition binding"
+    )
+    project_version.add_argument("manifest")
+    project_version.add_argument("version")
+    project_version.set_defaults(handler=set_project_version)
+    project_component_kinds = (*KINDS, "web-bundle")
+    project_add = project_commands.add_parser(
+        "add", help="register a generated component and refresh manifest-driven CMake"
+    )
+    project_add.add_argument("manifest")
+    project_add.add_argument("kind", choices=project_component_kinds)
+    project_add.add_argument("path")
+    project_add.set_defaults(handler=add_project_component)
+    project_remove = project_commands.add_parser(
+        "remove", help="unregister a component without deleting its source directory"
+    )
+    project_remove.add_argument("manifest")
+    project_remove.add_argument("kind", choices=project_component_kinds)
+    project_remove.add_argument("path")
+    project_remove.set_defaults(handler=remove_project_component)
+    project_list = project_commands.add_parser("list", help="list registered components")
+    project_list.add_argument("manifest")
+    project_list.add_argument("--skip-path-checks", action="store_true")
+    project_list.add_argument("--json", action="store_true")
+    project_list.set_defaults(handler=list_project_components)
+    project_sync = project_commands.add_parser(
+        "sync", help="validate the manifest and regenerate deterministic CMake composition"
+    )
+    project_sync.add_argument("manifest")
+    project_sync.add_argument("--output")
+    project_sync.set_defaults(handler=sync_project)
+    project_config = project_commands.add_parser(
+        "config", help="resolve layered, secret-safe and migration-aware product configuration"
+    )
+    project_config_commands = project_config.add_subparsers(
+        dest="project_config_command", required=True
+    )
+    project_config_resolve = project_config_commands.add_parser(
+        "resolve", help="merge configured layers and optionally migrate to a target version"
+    )
+    project_config_resolve.add_argument("manifest")
+    project_config_resolve.add_argument("--output", required=True)
+    project_config_resolve.add_argument("--target-version", type=int)
+    project_config_resolve.add_argument("--require-environment", action="store_true")
+    project_config_resolve.set_defaults(handler=resolve_project_config)
+    project_config_plan = project_config_commands.add_parser(
+        "plan", help="bind a candidate diff to component owners and update capabilities"
+    )
+    project_config_plan.add_argument("manifest")
+    project_config_plan.add_argument("--current", required=True)
+    project_config_plan.add_argument("--candidate", required=True)
+    project_config_plan.add_argument("--output", required=True)
+    project_config_plan.set_defaults(handler=plan_project_config)
+    project_config_apply = project_config_commands.add_parser(
+        "apply", help="preflight and transactionally commit a configuration plan"
+    )
+    project_config_apply.add_argument("manifest")
+    project_config_apply.add_argument("--plan", required=True)
+    project_config_apply.add_argument("--current", required=True)
+    project_config_apply.add_argument("--candidate", required=True)
+    project_config_apply.add_argument("--state-dir", default="build/config-transactions")
+    project_config_apply.add_argument("--allow-restart", action="store_true")
+    project_config_apply.set_defaults(handler=apply_project_config)
+    project_config_recover = project_config_commands.add_parser(
+        "recover", help="rollback an interrupted configuration transaction from its journal"
+    )
+    project_config_recover.add_argument("manifest")
+    project_config_recover.add_argument("--journal", required=True)
+    project_config_recover.add_argument("--retry-rollback", action="store_true")
+    project_config_recover.set_defaults(handler=recover_project_config)
+    project_template = project_commands.add_parser(
+        "template", help="inspect, adopt and transactionally upgrade project scaffolding"
+    )
+    project_template_commands = project_template.add_subparsers(
+        dest="project_template_command", required=True
+    )
+    project_template_status_parser = project_template_commands.add_parser(
+        "status", help="report template version, available updates and managed-file drift"
+    )
+    project_template_status_parser.add_argument("manifest")
+    project_template_status_parser.add_argument("--check", action="store_true")
+    project_template_status_parser.add_argument("--json", action="store_true")
+    project_template_status_parser.add_argument("--report")
+    project_template_status_parser.set_defaults(handler=project_template_status)
+    project_template_adopt = project_template_commands.add_parser(
+        "adopt", help="safely attach legacy projects to a known template baseline"
+    )
+    project_template_adopt.add_argument("manifest")
+    project_template_adopt.add_argument("--version", type=int, required=True)
+    project_template_adopt.add_argument("--report")
+    project_template_adopt.set_defaults(handler=adopt_project_template)
+    project_template_upgrade = project_template_commands.add_parser(
+        "upgrade", help="upgrade clean files and require explicit conflict resolution"
+    )
+    project_template_upgrade.add_argument("manifest")
+    project_template_upgrade.add_argument("--target-version", type=int)
+    project_template_upgrade.add_argument("--accept-template", action="append", default=[])
+    project_template_upgrade.add_argument("--keep-project", action="append", default=[])
+    project_template_upgrade.add_argument("--report")
+    project_template_upgrade.set_defaults(handler=upgrade_project_template)
+    project_template_recover = project_template_commands.add_parser(
+        "recover", help="restore all files from an interrupted template transaction"
+    )
+    project_template_recover.add_argument("manifest")
+    project_template_recover.add_argument("--journal", required=True)
+    project_template_recover.add_argument("--retry-rollback", action="store_true")
+    project_template_recover.set_defaults(handler=recover_project_template)
+    project_pipeline = project_commands.add_parser(
+        "pipeline", help="create and run a standard hash-bound project qualification pipeline"
+    )
+    project_pipeline_commands = project_pipeline.add_subparsers(
+        dest="project_pipeline_command", required=True
+    )
+    project_pipeline_create = project_pipeline_commands.add_parser(
+        "create", help="generate the portable automated plan and list external gates"
+    )
+    project_pipeline_create.add_argument("manifest")
+    project_pipeline_create.add_argument("--build-root", default="build/qualification")
+    project_pipeline_create.add_argument("--output", default="build/qualification/plan.json")
+    project_pipeline_create.add_argument(
+        "--sdk-prefix", default=str(default_install_prefix(tool_root()))
+    )
+    project_pipeline_create.add_argument("--python", default=sys.executable)
+    project_pipeline_create.add_argument("--cmake", default="cmake")
+    project_pipeline_create.add_argument("--ctest", default="ctest")
+    project_pipeline_create.add_argument("--colcon", default="colcon")
+    project_pipeline_create.add_argument("--config", default="Release")
+    project_pipeline_create.add_argument("--candidate-version")
+    project_pipeline_create.add_argument("--jobs", type=int, default=2)
+    project_pipeline_create.add_argument("--cmake-argument", action="append", default=[])
+    project_pipeline_create.add_argument("--require-environment", action="store_true")
+    project_pipeline_create.add_argument("--preflight-timeout", type=int, default=300)
+    project_pipeline_create.add_argument("--configure-timeout", type=int, default=900)
+    project_pipeline_create.add_argument("--build-timeout", type=int, default=3600)
+    project_pipeline_create.add_argument("--test-timeout", type=int, default=3600)
+    project_pipeline_create.set_defaults(
+        handler=create_project_pipeline, skip_ros2=False
+    )
+    for command_name, help_text, handler in (
+        ("run", "run a new generated project pipeline", run_project_pipeline),
+        ("resume", "resume a failed or interrupted project pipeline", resume_project_pipeline),
+    ):
+        project_pipeline_execute = project_pipeline_commands.add_parser(
+            command_name, help=help_text
+        )
+        project_pipeline_execute.add_argument("--plan", type=Path, required=True)
+        project_pipeline_execute.add_argument("--state", type=Path, required=True)
+        project_pipeline_execute.add_argument("--confirm-run", action="store_true")
+        project_pipeline_execute.set_defaults(handler=handler)
+    project_pipeline_state = project_pipeline_commands.add_parser(
+        "status", help="show automated results without conflating pending external gates"
+    )
+    project_pipeline_state.add_argument("--plan", type=Path, required=True)
+    project_pipeline_state.add_argument("--state", type=Path, required=True)
+    project_pipeline_state.add_argument(
+        "--external-evidence", action="append", type=named_qualification_path, default=[]
+    )
+    project_pipeline_state.add_argument(
+        "--external-signature", action="append", type=named_qualification_path, default=[]
+    )
+    project_pipeline_state.add_argument("--trust-policy", type=Path)
+    project_pipeline_state.add_argument("--expected-trust-policy-id")
+    project_pipeline_state.add_argument("--expected-trust-policy-sha256")
+    project_pipeline_state.add_argument("--signature-check-executable", type=Path)
+    project_pipeline_state.set_defaults(handler=project_pipeline_status)
+    project_dependency = project_commands.add_parser(
+        "dependency", help="manage project-owned third-party dependency declarations"
+    )
+    project_dependency_commands = project_dependency.add_subparsers(
+        dest="project_dependency_command", required=True
+    )
+    project_dependency_add = project_dependency_commands.add_parser(
+        "add", help="add one dependency to the project manifest and SBOM inventory"
+    )
+    project_dependency_add.add_argument("manifest")
+    project_dependency_add.add_argument("name")
+    project_dependency_add.add_argument("--version", required=True)
+    project_dependency_add.add_argument("--license", required=True)
+    project_dependency_add.add_argument("--download", required=True)
+    project_dependency_add.add_argument("--scope", choices=("runtime", "build", "test"),
+                                        default="runtime")
+    project_dependency_add.add_argument("--optional", action="store_true")
+    project_dependency_add.set_defaults(handler=add_project_dependency)
+    project_dependency_remove = project_dependency_commands.add_parser(
+        "remove", help="remove a dependency declaration without touching downloaded files"
+    )
+    project_dependency_remove.add_argument("manifest")
+    project_dependency_remove.add_argument("name")
+    project_dependency_remove.set_defaults(handler=remove_project_dependency)
+    project_dependency_list = project_dependency_commands.add_parser(
+        "list", help="list project dependency declarations"
+    )
+    project_dependency_list.add_argument("manifest")
+    project_dependency_list.add_argument("--skip-path-checks", action="store_true")
+    project_dependency_list.add_argument("--json", action="store_true")
+    project_dependency_list.set_defaults(handler=list_project_dependencies)
+    project_package = project_commands.add_parser(
+        "package", help="create and verify deterministic signed product packages"
+    )
+    project_package_commands = project_package.add_subparsers(
+        dest="project_package_command", required=True
+    )
+    project_package_create = project_package_commands.add_parser(
+        "create", help="bind payload, project lock, resolved config, SPDX SBOM and signature"
+    )
+    project_package_create.add_argument("manifest")
+    project_package_create.add_argument("--artifacts", required=True)
+    project_package_create.add_argument("--output", required=True)
+    project_package_create.add_argument("--version", required=True)
+    project_package_create.add_argument("--license", default="NOASSERTION")
+    project_package_create.add_argument("--lock")
+    project_package_create.add_argument("--refresh-lock", action="store_true")
+    project_package_create.add_argument("--target-config-version", type=int)
+    project_package_create.add_argument("--require-environment", action="store_true")
+    project_package_create.add_argument(
+        "--source-date-epoch", type=int,
+        default=os.environ.get("SOURCE_DATE_EPOCH", "0"),
+    )
+    project_package_create.add_argument("--maximum-files", type=int, default=10000)
+    project_package_create.add_argument(
+        "--maximum-expanded-bytes", type=int, default=4 * 1024 * 1024 * 1024
+    )
+    project_package_create.add_argument("--signing-key-environment")
+    project_package_create.add_argument("--ed25519-private-key-environment")
+    project_package_create.add_argument("--private-key-passphrase-environment")
+    project_package_create.add_argument("--signing-key-id")
+    project_package_create.add_argument("--force", action="store_true")
+    project_package_create.set_defaults(handler=create_project_package)
+    project_package_verify = project_package_commands.add_parser(
+        "verify", help="verify package structure, hashes, SBOM and optional signature in place"
+    )
+    project_package_verify.add_argument("package")
+    project_package_verify.add_argument("--require-signature", action="store_true")
+    project_package_verify.add_argument("--trusted-key-environment")
+    project_package_verify.add_argument("--expected-key-id")
+    project_package_verify.add_argument("--public-key")
+    project_package_verify.add_argument("--expected-public-key-sha256")
+    project_package_verify.add_argument("--maximum-files", type=int, default=10000)
+    project_package_verify.add_argument(
+        "--maximum-expanded-bytes", type=int, default=4 * 1024 * 1024 * 1024
+    )
+    project_package_verify.add_argument("--report")
+    project_package_verify.set_defaults(handler=verify_project_package)
+
+    component = commands.add_parser(
+        "component", help="inspect, adopt and transactionally upgrade component scaffolding"
+    )
+    component_commands = component.add_subparsers(dest="component_command", required=True)
+    component_status_parser = component_commands.add_parser(
+        "status", help="report component template version and managed-file drift"
+    )
+    component_status_parser.add_argument("component")
+    component_status_parser.add_argument("--check", action="store_true")
+    component_status_parser.add_argument("--json", action="store_true")
+    component_status_parser.add_argument("--report")
+    component_status_parser.set_defaults(handler=component_template_status)
+    component_adopt = component_commands.add_parser(
+        "adopt", help="attach a legacy generated component to a known template baseline"
+    )
+    component_adopt.add_argument("component")
+    component_adopt.add_argument("--kind", choices=KINDS, required=True)
+    component_adopt.add_argument("--name", type=valid_name, required=True)
+    component_adopt.add_argument("--version", type=int, required=True)
+    component_adopt.add_argument("--report")
+    component_adopt.set_defaults(handler=adopt_component_template)
+    component_upgrade = component_commands.add_parser(
+        "upgrade", help="upgrade structural files with explicit conflict decisions"
+    )
+    component_upgrade.add_argument("component")
+    component_upgrade.add_argument("--target-version", type=int)
+    component_upgrade.add_argument("--accept-template", action="append", default=[])
+    component_upgrade.add_argument("--keep-project", action="append", default=[])
+    component_upgrade.add_argument("--report")
+    component_upgrade.set_defaults(handler=upgrade_component_template)
+    component_recover = component_commands.add_parser(
+        "recover", help="restore an interrupted component template transaction"
+    )
+    component_recover.add_argument("component")
+    component_recover.add_argument("--journal", required=True)
+    component_recover.add_argument("--retry-rollback", action="store_true")
+    component_recover.set_defaults(handler=recover_component_template)
+
     new = commands.add_parser("new", help="create a framework module")
     new.add_argument("kind", choices=KINDS)
     new.add_argument("name", type=valid_name)
     new.add_argument("--output", default="generated")
     new.add_argument("--force", action="store_true")
+    new.add_argument("--project", help="project directory or pdr-project.yaml to register into")
+    new.add_argument("--no-register", action="store_true",
+                     help="do not auto-register even when a project manifest is found")
     new.set_defaults(handler=create_module)
     check = commands.add_parser("doctor", help="check the local development environment")
     check.add_argument("--root")
@@ -2568,8 +3660,7 @@ def parser() -> argparse.ArgumentParser:
     )
     add_release_qualification_arguments(release_qualify)
     release_qualify.set_defaults(handler=qualify_release)
-    acceptance_types = ("petalinux-target", "physical-protocols", "production-identity",
-                        "site-network", "soak-24h", "soak-72h")
+    acceptance_types = EXTERNAL_ACCEPTANCE_TYPES
     release_external_template = release_commands.add_parser(
         "external-template", help="create candidate-bound external acceptance checklist"
     )
@@ -2577,6 +3668,9 @@ def parser() -> argparse.ArgumentParser:
     release_external_template.add_argument("--version", required=True)
     release_external_template.add_argument("--git-commit", required=True)
     release_external_template.add_argument("--artifact-manifest", type=Path, required=True)
+    release_external_template.add_argument(
+        "--requirement", action="append", type=named_requirement, default=[]
+    )
     release_external_template.add_argument("--output", type=Path, required=True)
     release_external_template.set_defaults(handler=create_external_acceptance_template)
     release_external_approve = release_commands.add_parser(
@@ -2602,6 +3696,9 @@ def parser() -> argparse.ArgumentParser:
     release_external_verify.add_argument("--version")
     release_external_verify.add_argument("--git-commit")
     release_external_verify.add_argument("--artifact-manifest-sha256")
+    release_external_verify.add_argument(
+        "--requirement", action="append", type=named_requirement, default=[]
+    )
     release_external_verify.add_argument("--signature", type=Path)
     release_external_verify.add_argument("--trust-policy", type=Path)
     release_external_verify.add_argument("--expected-trust-policy-id")

@@ -171,7 +171,8 @@ const PermissionSet& managementPermissions()
 {
     static const PermissionSet permissions{
         "protocol.manage", "process.manage", "bundle.manage", "configuration.manage",
-        "identity.manage", "audit.read", "task.read", "task.cancel"};
+        "identity.manage", "audit.read", "task.read", "task.cancel",
+        "diagnostics.read", "diagnostics.execute"};
     return permissions;
 }
 

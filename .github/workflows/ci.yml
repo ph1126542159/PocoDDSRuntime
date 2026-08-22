@@ -26,6 +26,20 @@ jobs:
         run: python3 tools/check_release_matrix.py
       - name: Validate governance documentation
         run: cmake -DSOURCE_DIR=${{ github.workspace }} -P cmake/ValidateDocs.cmake
+      - name: Enforce portable robotics architecture boundary
+        run: python3 tools/check_architecture.py --root .
+      - name: Validate project composition and scaffolding tooling
+        run: >-
+          python3 -m unittest
+          tools.tests.test_project_manager
+          tools.tests.test_project_config
+          tools.tests.test_project_config_transaction
+          tools.tests.test_project_template
+          tools.tests.test_component_template
+          tools.tests.test_project_pipeline
+          tools.tests.test_project_package
+          tools.tests.test_architecture_policy
+          tools.tests.test_pdr
       - name: Validate CMake profiles
         run: cmake --list-presets
       - name: Validate profile feature declarations
@@ -50,6 +64,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: lukka/get-cmake@latest
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - name: Configure robotics core
         run: cmake --preset robotics -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Build robotics core
@@ -66,6 +83,12 @@ jobs:
         run: ctest --preset robotics -C Release --output-on-failure
       - name: Install robotics SDK
         run: cmake --install build/robotics --config Release
+      - name: Build generated product through installed project pipeline
+        run: >-
+          python tools/tests/project_pipeline_portable.py
+          --pdr build/install/bin/pdr.py
+          --sdk-prefix build/install
+          --workspace build/portable-product
 
   ros2-robotics:
     runs-on: ubuntu-latest
@@ -99,6 +122,15 @@ jobs:
           cd robotics/ros2_ws
           colcon test --merge-install --event-handlers console_direct+
           colcon test-result --verbose
+      - name: Build generated ROS 2 product through installed project pipeline
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          python3 tools/tests/project_pipeline_portable.py \
+            --pdr build/install/bin/pdr.py \
+            --sdk-prefix build/install \
+            --workspace build/generated-ros2-product \
+            --include-ros2
 
   gazebo-sil:
     runs-on: ubuntu-latest

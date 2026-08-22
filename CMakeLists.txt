@@ -112,6 +112,7 @@ set(PDR_PROFILE "custom" CACHE STRING "Deployment profile: embedded, edge-test, 
 set_property(CACHE PDR_PROFILE PROPERTY STRINGS embedded edge-test server custom)
 option(PDR_BUILD_WEBUI "Build and package administration WebUI page bundles" ON)
 option(PDR_BUILD_LAUNCHER "Build the independent runtime watchdog launcher" ON)
+option(PDR_BUILD_DIAGNOSTIC_AGENT "Build the independent runtime diagnostic agent" ON)
 option(PDR_BUILD_PLUGIN_HOST "Build the isolated OSP plugin host process" ON)
 option(PDR_BUILD_QT3D "Build the Qt3D demonstration subprocess" ON)
 option(PDR_BUILD_LEGACY_RUNTIME
@@ -250,7 +251,7 @@ set(CMAKE_FOLDER "Services")
 add_subdirectory(services)
 
 set(CMAKE_FOLDER "Applications")
-if(PDR_BUILD_LAUNCHER OR PDR_BUILD_QT3D)
+if(PDR_BUILD_LAUNCHER OR PDR_BUILD_DIAGNOSTIC_AGENT OR PDR_BUILD_QT3D)
     add_subdirectory(SubSystem)
 endif()
 if(PDR_BUILD_WEBUI)
@@ -320,6 +321,46 @@ if(BUILD_TESTING)
         add_test(NAME developer-cli
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_pdr.py")
+        add_test(NAME project-composition-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_project_manager.py")
+        set_tests_properties(project-composition-cli PROPERTIES
+            LABELS "sdk;project;robotics;architecture")
+        add_test(NAME project-configuration-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_project_config.py")
+        set_tests_properties(project-configuration-cli PROPERTIES
+            LABELS "sdk;project;configuration;security")
+        add_test(NAME project-config-transaction-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_project_config_transaction.py")
+        set_tests_properties(project-config-transaction-cli PROPERTIES
+            LABELS "sdk;project;configuration;transaction;recovery")
+        add_test(NAME project-template-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_project_template.py")
+        set_tests_properties(project-template-cli PROPERTIES
+            LABELS "sdk;project;template;migration;recovery")
+        add_test(NAME component-template-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_component_template.py")
+        set_tests_properties(component-template-cli PROPERTIES
+            LABELS "sdk;component;template;migration;recovery")
+        add_test(NAME project-pipeline-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_project_pipeline.py")
+        set_tests_properties(project-pipeline-cli PROPERTIES
+            LABELS "sdk;project;pipeline;qualification;recovery")
+        add_test(NAME project-package-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_project_package.py")
+        set_tests_properties(project-package-cli PROPERTIES
+            LABELS "sdk;project;release;security;sbom")
+        add_test(NAME robotics-architecture-policy-tests
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_architecture_policy.py")
+        set_tests_properties(robotics-architecture-policy-tests PROPERTIES
+            LABELS "robotics;architecture;policy")
         add_test(NAME plugin-transactions
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_plugin_manager.py")
@@ -908,6 +949,14 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/contracts/"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/contracts")
 install(PROGRAMS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_manager.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_config_transaction.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_template.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/component_template.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_pipeline.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_package.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_architecture.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/release_manifest.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/release_qualification.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/external_acceptance.py"
@@ -924,6 +973,10 @@ install(PROGRAMS
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.ps1"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
+if(NOT WIN32)
+    install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.py"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}" RENAME pdr)
+endif()
 # A fresh package must be directly startable. Poco's FileChannel does not
 # create the parent directory, and the OSP runtime also expects these writable
 # roots to exist before the first request or trace is persisted.

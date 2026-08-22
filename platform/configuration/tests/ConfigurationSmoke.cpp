@@ -339,7 +339,7 @@ int main()
     multi.setString("pdr.management.authentication.principals.0.tokenEnvironment",
                     "PDR_CONFIGURATION_TEST_OPERATOR_TOKEN");
     multi.setString("pdr.management.authentication.principals.0.permissions",
-                    "protocol.manage, process.manage, bundle.manage");
+                    "protocol.manage, process.manage, bundle.manage, diagnostics.read, diagnostics.execute");
     if (!validator.validate(multi).empty())
         return 43;
     multi.setString("pdr.management.authentication.principals.0.permissions",

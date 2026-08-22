@@ -24,7 +24,8 @@
           "acceptanceTypes": {
             "type": "array", "minItems": 1,
             "items": { "enum": ["petalinux-target", "physical-protocols",
-                                  "production-identity", "site-network", "soak-24h", "soak-72h"] }
+                                  "production-identity", "site-network", "soak-24h", "soak-72h",
+                                  "project-sil", "project-hil", "project-soak"] }
           },
           "notBefore": { "type": "string", "format": "date-time" },
           "notAfter": { "type": "string", "format": "date-time" }

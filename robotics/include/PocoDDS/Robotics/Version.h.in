@@ -1,0 +1,12 @@
+#pragma once
+
+#define PDR_ROBOTICS_RUNTIME_VERSION "@PROJECT_VERSION@"
+#define PDR_ROBOTICS_PLUGIN_ABI_VERSION @PDR_ROBOTICS_PLUGIN_ABI_VERSION@
+#define PDR_ROBOTICS_ABI_FINGERPRINT "@PDR_ROBOTICS_ABI_FINGERPRINT@"
+
+namespace PocoDDS::Robotics
+{
+inline constexpr const char* runtimeVersion = PDR_ROBOTICS_RUNTIME_VERSION;
+inline constexpr unsigned int pluginAbiVersion = PDR_ROBOTICS_PLUGIN_ABI_VERSION;
+inline constexpr const char* pluginAbiFingerprint = PDR_ROBOTICS_ABI_FINGERPRINT;
+}

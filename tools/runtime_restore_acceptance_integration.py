@@ -120,6 +120,8 @@ def main() -> int:
             (target / "pdr-runtime.properties").read_text(encoding="utf-8") + "\n" +
             "\n".join([
                 "osp.web.server.host = 127.0.0.1", f"osp.web.server.port = {port}",
+                f"osp.codeCache = {(workspace / 'runtime-codeCache').as_posix()}",
+                f"logging.channels.file.path = {(workspace / 'runtime-file.log').as_posix()}",
                 "pdr.management.authentication.required = false",
                 f"pdr.management.tasks.persistence.path = {(target / 'management-tasks.json').as_posix()}",
                 f"pdr.management.idempotency.persistence.path = {(target / 'management-idempotency.json').as_posix()}",

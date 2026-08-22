@@ -28,6 +28,12 @@ ACCEPTANCE_CHECKS = {
                      "time-synchronization"),
     "soak-24h": ("duration", "health", "resource-growth", "error-budget", "fault-recovery"),
     "soak-72h": ("duration", "health", "resource-growth", "error-budget", "fault-recovery"),
+    "project-sil": ("simulator-identity", "scenario-set", "deterministic-replay",
+                    "pass-threshold", "logs"),
+    "project-hil": ("hardware-topology", "firmware-identity", "bidirectional-closed-loop",
+                    "fault-injection", "safety-boundary", "logs"),
+    "project-soak": ("duration", "health", "resource-growth", "error-budget",
+                     "fault-recovery"),
 }
 
 
@@ -65,8 +71,24 @@ def named_path(value: str) -> tuple[str, Path]:
     return name, Path(raw_path)
 
 
+def named_requirement(value: str) -> tuple[str, str]:
+    name, separator, requirement = value.partition("=")
+    if (not separator or not re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]*", name)
+            or not requirement or "\x00" in requirement):
+        raise argparse.ArgumentTypeError("expected REQUIREMENT=VALUE")
+    return name, requirement
+
+
+def requirement_map(values: list[tuple[str, str]]) -> dict[str, str]:
+    result = dict(values)
+    if len(result) != len(values):
+        raise ValueError("external acceptance requirements are duplicated")
+    return result
+
+
 def create_template(args: argparse.Namespace) -> int:
     manifest = args.artifact_manifest.resolve()
+    requirements = requirement_map(args.requirement)
     document = {
         "schemaVersion": 1, "operation": "external-acceptance-template",
         "acceptanceType": args.type, "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -74,6 +96,8 @@ def create_template(args: argparse.Namespace) -> int:
                       "artifactManifestSha256": digest(manifest)},
         "checks": [{"id": check, "status": "PENDING"} for check in ACCEPTANCE_CHECKS[args.type]],
     }
+    if requirements:
+        document["requirements"] = requirements
     atomic_json(args.output.resolve(), document)
     print(f"EXTERNAL_ACCEPTANCE_TEMPLATE_PASS type={args.type} output={args.output.resolve()}")
     return 0
@@ -89,6 +113,11 @@ def approve(args: argparse.Namespace) -> int:
     if (template.get("operation") != "external-acceptance-template" or
             acceptance_type not in ACCEPTANCE_CHECKS):
         raise ValueError("invalid external acceptance template")
+    requirements = template.get("requirements", {})
+    if (not isinstance(requirements, dict) or
+            any(not isinstance(key, str) or not isinstance(value, str)
+                for key, value in requirements.items())):
+        raise ValueError("invalid external acceptance requirements")
     evidence_by_check: dict[str, list[Path]] = {}
     for check, path in args.evidence:
         evidence_by_check.setdefault(check, []).append(path.resolve())
@@ -131,6 +160,8 @@ def approve(args: argparse.Namespace) -> int:
         "candidate": template.get("candidate"), "checks": checks,
         "approval": {"approverId": args.approver_id, "record": args.approval_record},
     }
+    if requirements:
+        document["requirements"] = requirements
     document["contentSha256"] = content_digest(document)
     try:
         atomic_json(output, document)
@@ -170,7 +201,8 @@ def approve(args: argparse.Namespace) -> int:
 
 def verify_report(path: Path, expected_type: str | None = None,
                   expected_version: str | None = None, expected_commit: str | None = None,
-                  expected_manifest_sha256: str | None = None) -> dict[str, Any]:
+                  expected_manifest_sha256: str | None = None,
+                  expected_requirements: dict[str, str] | None = None) -> dict[str, Any]:
     document = json.loads(path.resolve().read_text(encoding="utf-8"))
     acceptance_type = document.get("acceptanceType")
     if (document.get("schemaVersion") != 1 or document.get("operation") != "external-acceptance" or
@@ -181,6 +213,13 @@ def verify_report(path: Path, expected_type: str | None = None,
         raise ValueError("external acceptance type mismatch")
     if document.get("contentSha256") != content_digest(document):
         raise ValueError("external acceptance content digest mismatch")
+    requirements = document.get("requirements", {})
+    if (not isinstance(requirements, dict) or
+            any(not isinstance(key, str) or not isinstance(value, str)
+                for key, value in requirements.items())):
+        raise ValueError("external acceptance requirements are malformed")
+    if expected_requirements is not None and requirements != expected_requirements:
+        raise ValueError("external acceptance requirements mismatch")
     candidate = document.get("candidate", {})
     for label, actual, expected in (
         ("version", candidate.get("version"), expected_version),
@@ -232,9 +271,10 @@ def verify_signed_report(report_path: Path, signature_path: Path, trust_policy_p
                          expected_policy_id: str, expected_policy_sha256: str,
                          signature_check_executable: Path, expected_type: str,
                          expected_version: str, expected_commit: str | None,
-                         expected_manifest_sha256: str | None) -> dict[str, Any]:
+                         expected_manifest_sha256: str | None,
+                         expected_requirements: dict[str, str] | None = None) -> dict[str, Any]:
     evidence = verify_report(report_path, expected_type, expected_version, expected_commit,
-                             expected_manifest_sha256)
+                             expected_manifest_sha256, expected_requirements)
     policy_path = trust_policy_path.resolve()
     policy_sha = digest(policy_path)
     if policy_sha != expected_policy_sha256.lower():
@@ -306,6 +346,7 @@ def verify_signed_report(report_path: Path, signature_path: Path, trust_policy_p
 
 
 def verify_command(args: argparse.Namespace) -> int:
+    requirements = requirement_map(args.requirement)
     if args.signature:
         required = (args.trust_policy, args.expected_trust_policy_id,
                     args.expected_trust_policy_sha256, args.signature_check_executable,
@@ -315,10 +356,11 @@ def verify_command(args: argparse.Namespace) -> int:
         result = verify_signed_report(
             args.report, args.signature, args.trust_policy, args.expected_trust_policy_id,
             args.expected_trust_policy_sha256, args.signature_check_executable,
-            args.type, args.version, args.git_commit, args.artifact_manifest_sha256)
+            args.type, args.version, args.git_commit, args.artifact_manifest_sha256,
+            requirements)
     else:
         result = verify_report(args.report, args.type, args.version, args.git_commit,
-                               args.artifact_manifest_sha256)
+                               args.artifact_manifest_sha256, requirements)
     print(f"EXTERNAL_ACCEPTANCE_VERIFY_PASS type={result['acceptanceType']} attachments={result['attachmentCount']}")
     return 0
 
@@ -331,6 +373,7 @@ def parser() -> argparse.ArgumentParser:
     template.add_argument("--version", required=True)
     template.add_argument("--git-commit", required=True)
     template.add_argument("--artifact-manifest", type=Path, required=True)
+    template.add_argument("--requirement", action="append", type=named_requirement, default=[])
     template.add_argument("--output", type=Path, required=True)
     template.set_defaults(handler=create_template)
     approval = commands.add_parser("approve")
@@ -351,6 +394,7 @@ def parser() -> argparse.ArgumentParser:
     verify.add_argument("--version")
     verify.add_argument("--git-commit")
     verify.add_argument("--artifact-manifest-sha256")
+    verify.add_argument("--requirement", action="append", type=named_requirement, default=[])
     verify.add_argument("--signature", type=Path)
     verify.add_argument("--trust-policy", type=Path)
     verify.add_argument("--expected-trust-policy-id")

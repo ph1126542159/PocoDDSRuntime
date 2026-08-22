@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-template-state.schema.json",
+  "title": "PocoDDSRuntime product template state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "template", "appliedVersion", "project", "context",
+    "managedFiles", "unmanagedFiles"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "template": {"const": "pdr-product"},
+    "appliedVersion": {"type": "integer", "minimum": 1},
+    "project": {"type": "string", "minLength": 1},
+    "context": {
+      "type": "object", "additionalProperties": false,
+      "required": ["displayName", "profile", "runtimeVersion"],
+      "properties": {
+        "displayName": {"type": "string", "minLength": 1},
+        "profile": {"enum": ["robotics", "embedded", "edge-test", "server"]},
+        "runtimeVersion": {"type": "string", "minLength": 1}
+      }
+    },
+    "managedFiles": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "baselineSha256"],
+        "properties": {
+          "path": {"$ref": "#/$defs/path"},
+          "baselineSha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "unmanagedFiles": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "reason"],
+        "properties": {
+          "path": {"$ref": "#/$defs/path"},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

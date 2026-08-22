@@ -59,6 +59,15 @@ string(REPLACE
     "  <bundle><symbolicName>pdr.missing.dependency</symbolicName><version>[1.0.0,2.0.0)</version></bundle>\n    </requiredBundles>"
     broken_spec_content "${broken_spec_content}")
 file(WRITE "${broken_spec}" "${broken_spec_content}")
+execute_process(
+    COMMAND "${PDR_PYTHON}" "${PDR_SOURCE_DIR}/tools/pdr.py"
+            component upgrade "${broken_module}"
+            --keep-project BrokenPlugin.bndlspec
+    RESULT_VARIABLE broken_template_result)
+if(NOT broken_template_result EQUAL 0)
+    message(FATAL_ERROR
+        "Broken plugin template customization was not recorded: ${broken_template_result}")
+endif()
 
 execute_process(
     COMMAND "${PDR_CMAKE}" --install "${PDR_BINARY_DIR}"

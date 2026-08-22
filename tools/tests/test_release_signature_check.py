@@ -37,6 +37,13 @@ PLUGIN_SIGNATURE = {
 class ReleaseSignatureCheckTests(unittest.TestCase):
     executable: Path
 
+    @classmethod
+    def setUpClass(cls):
+        if not hasattr(cls, "executable"):
+            raise unittest.SkipTest(
+                "native pdr-signature-check path is required; run this test through CTest"
+            )
+
     def test_valid_signature_and_fail_closed_tamper_cases(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

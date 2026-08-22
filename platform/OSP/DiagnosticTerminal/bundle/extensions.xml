@@ -1,0 +1,14 @@
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/diagnostic-log-stream"
+             class="PocoDDS::DiagnosticTerminal::DiagnosticStreamHandlerFactory"
+             library="pdr.platform.diagnosticTerminal"
+             allowSpecialization="none"
+             hidden="true"/>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/diagnostic-terminal"
+             class="PocoDDS::DiagnosticTerminal::TerminalHandlerFactory"
+             library="pdr.platform.diagnosticTerminal"
+             allowSpecialization="none"
+             hidden="true"/>
+</extensions>

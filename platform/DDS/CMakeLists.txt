@@ -39,6 +39,15 @@ add_executable(pdr-fastdds-device-smoke
 target_link_libraries(pdr-fastdds-device-smoke PRIVATE PocoDDS::FastDDS)
 pdr_set_warnings(pdr-fastdds-device-smoke)
 if(BUILD_TESTING)
+    add_executable(pdr-fastdds-runtime-snapshot-smoke tests/RuntimeSnapshotSmoke.cpp)
+    target_link_libraries(pdr-fastdds-runtime-snapshot-smoke PRIVATE PocoDDS::FastDDS)
+    pdr_set_warnings(pdr-fastdds-runtime-snapshot-smoke)
+    add_test(NAME fastdds-runtime-snapshot-smoke COMMAND pdr-fastdds-runtime-snapshot-smoke)
+    if(WIN32)
+        set_tests_properties(fastdds-runtime-snapshot-smoke PROPERTIES
+            ENVIRONMENT_MODIFICATION
+                "PATH=path_list_prepend:${PDR_INSTALL_PREFIX}/bin;PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
+    endif()
     add_test(NAME fastdds-device-smoke COMMAND pdr-fastdds-device-smoke)
     if(WIN32)
         set_tests_properties(fastdds-device-smoke PROPERTIES

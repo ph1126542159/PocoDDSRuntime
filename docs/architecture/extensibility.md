@@ -46,11 +46,16 @@ PocoDDSRuntime/
 ## 快速新增
 
 ```powershell
+./tools/pdr.ps1 project create WarehouseRobot --output E:/Products --profile robotics
 ./tools/pdr.ps1 new module TemperatureModel --output product/modules
 ./tools/pdr.ps1 new service TemperatureService --output product/services
 ./tools/pdr.ps1 new bundle TemperatureApi --output product/bundles
 ./tools/pdr.ps1 new subprocess VisionWorker --output product/subprocesses
+./tools/pdr.ps1 new robot-module ChargingModule --output product/modules
+./tools/pdr.ps1 new robot-hardware-adapter CanDrive --output product/adapters/hardware
 ```
+
+项目创建、清单校验和源码摘要锁定的完整流程见[产品项目工作区](../development/project-workspaces.md)。
 
 `bundle` 是受治理的外部 OSP Plugin Bundle 别名，仍使用 `pdr.plugin.*` 命名并经过 API/ABI、签名、隔离和回退门禁。生成器默认拒绝覆盖非空目录。
 

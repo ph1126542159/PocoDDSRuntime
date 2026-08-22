@@ -146,6 +146,28 @@ session 身份通过 dispatcher 后才能进入 WebSocket 握手，handler 本�
 
 ## 其他 OSP 运行项
 
+### DiagnosticTerminal
+
+`pdr.platform.diagnosticTerminal` 是可独立加载和治理的 OSP Bundle。它在进程内注册
+`pdr.diagnostics.terminal` Service，并通过 `/api/v1/diagnostic-terminal` 暴露受控命令协议。
+选择 Bundle 而不是独立子进程，是因为诊断对象位于同一个 OSP Registry；选择 Bundle 内 Service
+而不是把命令直接写进 WebUI，是为了让 CLI、自动化工具和其他 Bundle 能复用同一命令引擎。
+
+该终端不是操作系统 Shell。命令覆盖 Host/Runtime、进程、Bundle、Service、配置、日志流、
+健康树、指标异常、业务 Trace、协议、设备、Fast DDS、独立进程 Agent、崩溃转储和脱敏支持包。
+模块可注册 `pdr.diagnostics.provider` Service 扩展统一 `Finding`（稳定错误码、严重度、证据、
+修复建议和 Trace ID），而不需要修改 WebUI。
+
+`GET /api/v1/diagnostic-log-stream` 提供受控 SSE 日志流：目标只能是 Runtime 或已托管
+子进程，最多 4 条并发流、单段最长 60 秒、最多 2000 行，浏览器负责无重复续接和 Ctrl+C
+取消。普通命令限制为每个 Principal 每 10 秒 30 次，单次最多 2000 行、200 个 Finding 和
+500 个事实字段。配置和日志中的凭据行会脱敏。
+
+生命周期写操作不由命令引擎直接操作对象。Web 终端的 `repair ... --confirm`、`jobs`、
+`job show` 和 `cancel` 复用 SystemMonitoring 的治理 API，因此仍执行细粒度权限、请求幂等、
+资源互斥、执行超时、任务持久化和管理审计。`dump process ... --confirm` 是唯一由诊断 Bundle
+调用独立 Agent 的受控采集操作，需要 `diagnostics.execute`，目标仍只能是 Runtime 或托管进程。
+
 | 配置项 | 说明 |
 | --- | --- |
 | `osp.language` | OSP 资源/本地化语言 |

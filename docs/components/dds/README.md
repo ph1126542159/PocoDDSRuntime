@@ -56,6 +56,12 @@ runtime.stop();
 
 `start()` 后才能发布或订阅；析构前应调用 `stop()`。同一 `Runtime` 可管理多个 Topic，Writer/Reader 会按需创建。
 
+`Runtime::snapshots()` 返回当前进程内的只读诊断快照：Domain ID、Participant 名、启动状态、
+Topic/Writer/Reader 数量、Topic 名称、传输和 QoS 摘要。诊断终端的 `dds participants`、
+`dds discovery`、`dds qos` 和 `dds check` 使用该接口，并结合 `pdr.dds.*` 指标与失败 Trace。
+该接口不跨进程读取对象；DDS 位于托管子进程时，终端会明确要求组合 `agent`、`trace` 和
+`logs --follow`，避免把“无法观测”误判为“没有 Participant”。
+
 ## ServiceEndpoint 用法
 
 ```cpp

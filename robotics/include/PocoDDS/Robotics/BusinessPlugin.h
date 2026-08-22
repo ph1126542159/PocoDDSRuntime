@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PocoDDS/Robotics/Business.h"
+#include "PocoDDS/Robotics/Version.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -9,7 +10,7 @@
 
 namespace PocoDDS::Robotics
 {
-inline constexpr std::uint32_t businessPluginAbiVersion = 1;
+inline constexpr std::uint32_t businessPluginAbiVersion = pluginAbiVersion;
 inline constexpr const char* businessPluginEntryPoint = "pdrBusinessPluginV1";
 
 struct BusinessPluginDescriptor
@@ -19,6 +20,8 @@ struct BusinessPluginDescriptor
     const char* name{nullptr};
     RobotBusinessModule* (*create)(){nullptr};
     void (*destroy)(RobotBusinessModule*) noexcept {nullptr};
+    const char* requiredRuntimeVersion{runtimeVersion};
+    const char* requiredAbiFingerprint{pluginAbiFingerprint};
 };
 
 using BusinessPluginEntry = const BusinessPluginDescriptor* (*)();

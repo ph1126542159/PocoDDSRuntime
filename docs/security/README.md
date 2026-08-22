@@ -43,12 +43,18 @@ Builtin Users 和 Guests 的有效权限；在 Unix 上要求 group/other 权限
 需要最小权限时，使用 `pdr.management.authentication.principals.count` 和索引 Principal
 配置。每个 Principal 包含非敏感 `id`、二选一的 `tokenEnvironment`/`tokenFile`，以及由
 `protocol.manage`、`process.manage`、`bundle.manage`、`configuration.manage` 组成的
-权限列表，并可用 `identity.manage`、`audit.read`、`task.read`、`task.cancel` 分别授予身份轮换、审计查询、任务
-查询和排队取消能力；`*` 表示全部八项权限。旧
+权限列表，并可用 `identity.manage`、`audit.read`、`task.read`、`task.cancel`、`diagnostics.read`
+分别授予身份轮换、审计查询、任务查询、排队取消和受控诊断终端读取能力；`*` 表示全部九项权限。旧
 `tokenEnvironment` 继续映射为 `legacy-admin` 全权限
 身份，便于兼容已有部署，但新生产部署应优先使用职责分离的 Principal。认证成功但权限
 不足返回 403，认证失败仍返回 401。Principal ID 会进入配置事务审计，令牌不会进入响应、
 日志或报告。
+
+诊断终端的 `GET/POST /api/v1/diagnostic-terminal` 使用独立的 `diagnostics.read` 权限。
+它只执行编译进 Runtime 的白名单只读命令，不启动 PowerShell、cmd、bash，不接受任意文件路径、
+网络目标或脚本。Bundle、Service、进程和日志输出可能包含内部部署信息，因此生产环境不能把
+`diagnostics.read` 默认授予普通业务用户；终端命令只记录 Principal、命令名和退出码，不记录
+Bearer Token，也不把完整命令参数写入 Runtime 日志。
 
 异步任务查询和取消分别使用 `task.read`、`task.cancel`。取消只对尚未执行的 `queued`
 任务生效；运行中的设备、协议、进程或 Bundle 操作不会被强行终止，因为中途杀死底层

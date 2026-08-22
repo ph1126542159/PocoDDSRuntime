@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-plan.schema.json",
+  "title": "PocoDDSRuntime project configuration transaction plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "transactionId", "createdAt", "project",
+    "manifestSha256", "capabilities", "current", "candidate", "changes",
+    "participants", "requiresRestart", "applicable", "rejectionReasons"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "project-config-plan"},
+    "transactionId": {"type": "string", "format": "uuid"},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "project": {"type": "string", "minLength": 1},
+    "manifestSha256": {"$ref": "#/$defs/sha256"},
+    "capabilities": {"$ref": "#/$defs/fileBinding"},
+    "current": {"$ref": "#/$defs/configBinding"},
+    "candidate": {"$ref": "#/$defs/configBinding"},
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "participant", "mode"],
+        "properties": {
+          "path": {"type": "string", "pattern": "^/"},
+          "kind": {"enum": ["added", "removed", "changed"]},
+          "participant": {"type": "string"},
+          "mode": {"enum": ["hot-reload", "restart", "immutable", "unowned"]}
+        }
+      }
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "mode", "order"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "mode": {"enum": ["hot-reload", "restart", "immutable"]},
+          "order": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "requiresRestart": {"type": "boolean"},
+    "applicable": {"type": "boolean"},
+    "rejectionReasons": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "fileBinding": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
+      "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "configBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "documentSha256", "valuesSha256", "configVersion"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "documentSha256": {"$ref": "#/$defs/sha256"},
+        "valuesSha256": {"$ref": "#/$defs/sha256"},
+        "configVersion": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

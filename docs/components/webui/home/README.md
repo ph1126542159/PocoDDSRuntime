@@ -30,6 +30,10 @@ npm run build
 | `POST /api/v1/process-lifecycle` | 本机子进程生命周期操作 |
 | `POST /api/v1/bundle-lifecycle` | 可管理 Bundle 的启动、停止或重启 |
 | `GET /api/v1/process-logs?id=...&name=...&limit=...` | 当前选中进程的日志查询 |
+| `GET /api/v1/diagnostic-terminal` | 读取受控终端模式、命令目录、Prompt 和当前 Principal |
+| `POST /api/v1/diagnostic-terminal` | 执行白名单只读诊断命令；生产环境要求 `diagnostics.read` |
+| `GET /api/v1/diagnostic-log-stream` | SSE 跟踪 Runtime/托管子进程日志；支持 tail、grep、duration |
+| `GET /api/v1/diagnostic-terminal?artifact=...` | 下载 `support collect` 生成的脱敏 JSON 诊断包 |
 | `GET /api/v1/diagnostic-events` | 最近结构化故障检测与恢复事件 |
 | `GET /api/v1/alerts` | 告警状态及生效的去抖、升级和静默策略 |
 | `GET /api/v1/alert-history?limit=20` | 最近持久化告警转换，当前进程无告警时用于跨重启展示 |
@@ -74,6 +78,17 @@ Web 成功提示会明确显示“已校验、持久化并应用”或“已校�
 
 主页只保留内部链路摘要，不再重复实现流程图、节点参数、日志、历史查询或诊断报告。
 点击摘要记录后进入 `/tracing/?traceId=...`；完整追踪能力统一由业务追踪组件提供。
+
+侧边栏“终端调试”提供 Linux 风格的受控交互：命令历史、方向键、Tab 补全、`Ctrl+L`、
+`Ctrl+C`、`watch -n <秒> <命令>` 和 `logs runtime --follow`。它不执行浏览器或主机 Shell；
+`clear`、`history`、`watch`、实时流续接以及治理任务展示由页面管理，Runtime 诊断命令由
+`pdr.diagnostics.terminal` Service 执行。结构化 Finding 会按严重度显示证据和建议，
+`--format json` 可输出稳定 schema，`support collect` 结果可用当前 Bearer 身份直接下载。
+
+受控写命令必须显式带 `--confirm`。页面将 `repair bundle/process/protocol` 转交已有治理 API，
+将 `jobs`、`job show`、`cancel` 转交管理任务 API；最终权限始终由服务端判断。诊断终端不会
+用 `diagnostics.execute` 绕过 `bundle.manage`、`process.manage`、`protocol.manage` 或
+`task.cancel`。
 
 运行总览的告警区同时展示已注册 AlertSink、逐 Sink 健康状态和成功/失败次数，以及 `pdr.alert.delivery` 的全局成功、失败、丢弃计数；连续失败的 Sink 标为 degraded，悬停可查看最近错误。
 Sink API 或指标暂时不可用时该区域降级为空清单和零计数，不阻断首页其余运行状态刷新。

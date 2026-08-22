@@ -1,3 +1,12 @@
+set(PDR_ROBOTICS_PLUGIN_ABI_VERSION 2)
+string(REGEX MATCH "^[0-9]+" PDR_ROBOTICS_COMPILER_MAJOR "${CMAKE_CXX_COMPILER_VERSION}")
+set(PDR_ROBOTICS_ABI_FINGERPRINT
+    "${CMAKE_CXX_COMPILER_ID}-${PDR_ROBOTICS_COMPILER_MAJOR}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/PocoDDS/Robotics/Version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/include/PocoDDS/Robotics/Version.h"
+    @ONLY)
+
 add_library(PDRRoboticsRuntime
     src/Action.cpp
     src/Behavior.cpp
@@ -16,6 +25,7 @@ set_target_properties(PDRRoboticsRuntime PROPERTIES EXPORT_NAME RoboticsRuntime)
 
 target_include_directories(PDRRoboticsRuntime
     PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>)
 target_compile_features(PDRRoboticsRuntime PUBLIC cxx_std_17)
@@ -36,11 +46,46 @@ install(TARGETS PDRRoboticsRuntime EXPORT PDRRoboticsRuntimeTargets
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(TARGETS pdr-robot-sim RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(TARGETS pdr-business-sim RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    PATTERN "*.in" EXCLUDE)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/PocoDDS/Robotics/Version.h"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/PocoDDS/Robotics")
 install(PROGRAMS tools/robotics_web_server.py
     DESTINATION "${CMAKE_INSTALL_DATADIR}/PDRRoboticsRuntime/tools")
+install(PROGRAMS
+    "${CMAKE_SOURCE_DIR}/tools/pdr.py"
+    "${CMAKE_SOURCE_DIR}/tools/project_manager.py"
+    "${CMAKE_SOURCE_DIR}/tools/project_config.py"
+    "${CMAKE_SOURCE_DIR}/tools/project_config_transaction.py"
+    "${CMAKE_SOURCE_DIR}/tools/project_template.py"
+    "${CMAKE_SOURCE_DIR}/tools/component_template.py"
+    "${CMAKE_SOURCE_DIR}/tools/project_pipeline.py"
+    "${CMAKE_SOURCE_DIR}/tools/project_package.py"
+    "${CMAKE_SOURCE_DIR}/tools/check_architecture.py"
+    "${CMAKE_SOURCE_DIR}/tools/release_manifest.py"
+    "${CMAKE_SOURCE_DIR}/tools/release_qualification.py"
+    "${CMAKE_SOURCE_DIR}/tools/external_acceptance.py"
+    "${CMAKE_SOURCE_DIR}/tools/evidence_bundle.py"
+    "${CMAKE_SOURCE_DIR}/tools/release_pipeline.py"
+    "${CMAKE_SOURCE_DIR}/tools/upgrade_manager.py"
+    "${CMAKE_SOURCE_DIR}/tools/plugin_manager.py"
+    "${CMAKE_SOURCE_DIR}/tools/upgrade_transaction_integration.py"
+    "${CMAKE_SOURCE_DIR}/tools/runtime_smoke.py"
+    "${CMAKE_SOURCE_DIR}/tools/soak_runner.py"
+    "${CMAKE_SOURCE_DIR}/tools/device_acceptance.py"
+    "${CMAKE_SOURCE_DIR}/tools/protocol_acceptance.py"
+    "${CMAKE_SOURCE_DIR}/tools/security_gate.py"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(FILES "${CMAKE_SOURCE_DIR}/tools/pdr.ps1"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}")
+if(NOT WIN32)
+    install(PROGRAMS "${CMAKE_SOURCE_DIR}/tools/pdr.py"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}" RENAME pdr)
+endif()
 install(DIRECTORY webui/
     DESTINATION "${CMAKE_INSTALL_DATADIR}/PDRRoboticsRuntime/webui")
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/contracts/"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PDRRoboticsRuntime/contracts")
 install(EXPORT PDRRoboticsRuntimeTargets
     FILE PDRRoboticsRuntimeTargets.cmake
     NAMESPACE PocoDDS::
@@ -60,6 +105,33 @@ install(FILES
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/PDRRoboticsRuntime")
 
 if(BUILD_TESTING)
+    set(PDR_ROBOTICS_STEP_AVERAGE_BUDGET_US "500.0" CACHE STRING
+        "Maximum average RobotRuntime step latency in microseconds")
+    set(PDR_ROBOTICS_STEP_P99_BUDGET_US "2000.0" CACHE STRING
+        "Maximum p99 RobotRuntime step latency in microseconds")
+    add_executable(pdr-robotics-performance benchmarks/RoboticsPerformance.cpp)
+    target_link_libraries(pdr-robotics-performance PRIVATE PocoDDS::RoboticsRuntime)
+    target_compile_definitions(pdr-robotics-performance PRIVATE
+        PDR_ROBOTICS_STEP_AVERAGE_BUDGET_US=${PDR_ROBOTICS_STEP_AVERAGE_BUDGET_US}
+        PDR_ROBOTICS_STEP_P99_BUDGET_US=${PDR_ROBOTICS_STEP_P99_BUDGET_US})
+    pdr_set_warnings(pdr-robotics-performance)
+
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME robotics-architecture-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tools/check_architecture.py"
+                --root "${CMAKE_SOURCE_DIR}")
+        set_tests_properties(robotics-architecture-policy PROPERTIES
+            LABELS "robotics;architecture;policy")
+    endif()
+
+    add_test(NAME robotics-performance-budget COMMAND pdr-robotics-performance)
+    set_tests_properties(robotics-performance-budget PROPERTIES
+        LABELS "robotics;performance;regression"
+        PASS_REGULAR_EXPRESSION "PDR_ROBOTICS_PERFORMANCE_PASS"
+        TIMEOUT 30)
+
     add_library(pdr-sample-business-plugin MODULE examples/SampleBusinessPlugin.cpp)
     target_link_libraries(pdr-sample-business-plugin PRIVATE PocoDDS::RoboticsRuntime)
     pdr_set_warnings(pdr-sample-business-plugin)
@@ -92,7 +164,6 @@ if(BUILD_TESTING)
         PASS_REGULAR_EXPRESSION "PDR_BUSINESS_SIM_PASS module=custom_cleaning"
         TIMEOUT 30)
 
-    find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_test(NAME robotics-business-webui
             COMMAND "${Python3_EXECUTABLE}"

@@ -211,6 +211,8 @@ curl -fsS http://127.0.0.1:9080/health/detail
 真实 PetaLinux 镜像、板卡电源循环、物理协议设备、生产证书/OIDC、现场网络和 24/72 小时持续时间均需要外部环境。仓库中的自动测试只提供统一入口和判定格式，不构成这些项目已经通过的声明。
 这些结果统一使用 `pdr release external-template/external-approve/external-verify` 生成候选绑定证据；
 固定类型为 `petalinux-target`、`physical-protocols`、`production-identity`、`site-network`、
-`soak-24h` 和 `soak-72h`。每份批准报告必须连同工具归档的附件目录进入 release qualification。
+`soak-24h`、`soak-72h`，以及产品项目使用的 `project-sil`、`project-hil`、`project-soak`。
+`project-soak` 必须用签名 requirements 绑定 Manifest 的 `minimumHours`。每份批准报告必须连同
+工具归档的附件目录进入 release qualification 或项目资格状态汇聚。
 正式资格还必须携带 Ed25519 分离签名，并通过固定 SHA-256 的批准者信任策略完成身份、授权范围、
 有效期和吊销检查；内容摘要只能证明完整性，不能替代签名身份验证。

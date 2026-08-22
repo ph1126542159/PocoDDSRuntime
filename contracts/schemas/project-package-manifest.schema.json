@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-package-manifest.schema.json",
+  "title": "PocoDDSRuntime project package manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "name", "displayName", "version", "runtime",
+    "sourceDateEpoch", "projectManifestSha256", "projectLockSha256",
+    "sourceTreeSha256", "resolvedConfigSha256", "sbomSha256", "files"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeProjectPackage"},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+    "displayName": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "minLength": 1},
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile", "version"],
+      "properties": {
+        "profile": {"enum": ["robotics", "embedded", "edge-test", "server"]},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "template": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "sourceDateEpoch": {"type": "integer", "minimum": 0},
+    "projectManifestSha256": {"$ref": "#/$defs/sha256"},
+    "projectLockSha256": {"$ref": "#/$defs/sha256"},
+    "sourceTreeSha256": {"$ref": "#/$defs/sha256"},
+    "resolvedConfigSha256": {"$ref": "#/$defs/sha256"},
+    "sbomSha256": {"$ref": "#/$defs/sha256"},
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+          "size": {"type": "integer", "minimum": 0},
+          "sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

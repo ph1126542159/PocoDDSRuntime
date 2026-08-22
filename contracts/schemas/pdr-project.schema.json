@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/pdr-project.schema.json",
+  "title": "PocoDDSRuntime product project",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "displayName", "runtime", "components", "config", "acceptance", "dependencies"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+    "displayName": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$"},
+    "template": {
+      "type": "object", "additionalProperties": false, "required": ["id", "version"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+        "version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "runtime": {
+      "type": "object", "additionalProperties": false, "required": ["profile", "version"],
+      "properties": {
+        "profile": {"enum": ["robotics", "embedded", "edge-test", "server"]},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.([0-9]+|x)([-+][0-9A-Za-z.-]+)?$"}
+      }
+    },
+    "robot": {
+      "type": "object", "additionalProperties": false, "required": ["model", "backend", "controlPeriodMs"],
+      "properties": {
+        "model": {"type": "string", "minLength": 1},
+        "backend": {"enum": ["in_memory", "mock_hardware", "topic_simulation", "topic_hardware"]},
+        "controlPeriodMs": {"type": "integer", "minimum": 1, "maximum": 1000}
+      }
+    },
+    "components": {
+      "type": "object", "additionalProperties": false,
+      "required": ["robotModules", "robotProcesses", "modules", "services", "devices", "workflows", "bundles", "subprocesses", "webBundles", "adapters"],
+      "properties": {
+        "robotModules": {"$ref": "#/$defs/paths"},
+        "robotProcesses": {"$ref": "#/$defs/paths"},
+        "modules": {"$ref": "#/$defs/paths"}, "services": {"$ref": "#/$defs/paths"},
+        "devices": {"$ref": "#/$defs/paths"}, "workflows": {"$ref": "#/$defs/paths"},
+        "bundles": {"$ref": "#/$defs/paths"}, "subprocesses": {"$ref": "#/$defs/paths"},
+        "webBundles": {"$ref": "#/$defs/paths"},
+        "adapters": {
+          "type": "object", "additionalProperties": false,
+          "required": ["hardware", "simulation", "ros2"],
+          "properties": {
+            "hardware": {"$ref": "#/$defs/paths"}, "simulation": {"$ref": "#/$defs/paths"},
+            "ros2": {"$ref": "#/$defs/paths"}
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "layers", "migrations"],
+      "properties": {
+        "version": {"type": "integer", "minimum": 1},
+        "layers": {"$ref": "#/$defs/paths"},
+        "migrations": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+        "capabilities": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"}
+      }
+    },
+    "acceptance": {
+      "type": "object", "additionalProperties": false, "required": ["unit", "sil", "hil", "soakHours"],
+      "properties": {
+        "unit": {"type": "boolean"}, "sil": {"type": "boolean"},
+        "hil": {"type": "boolean"}, "soakHours": {"type": "integer", "minimum": 0}
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "version", "license", "download", "scope", "optional"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "version": {"type": "string", "minLength": 1},
+          "license": {"type": "string", "minLength": 1},
+          "download": {"type": "string", "minLength": 1},
+          "scope": {"enum": ["runtime", "build", "test"]},
+          "optional": {"type": "boolean"}
+        }
+      }
+    }
+  },
+  "allOf": [{
+    "if": {
+      "properties": {
+        "runtime": {"properties": {"profile": {"const": "robotics"}}}
+      }
+    },
+    "then": {"required": ["robot"]}
+  }],
+  "$defs": {
+    "paths": {
+      "type": "array", "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"}
+    }
+  }
+}

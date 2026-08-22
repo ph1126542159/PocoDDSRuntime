@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/component-template-state.schema.json",
+  "title": "PocoDDSRuntime generated component template state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "template", "kind", "name", "appliedVersion",
+    "managedFiles", "projectFiles", "unmanagedFiles"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "template": {"const": "pdr-component"},
+    "kind": {
+      "enum": [
+        "module", "service", "device", "workflow", "bundle", "plugin", "subprocess",
+        "robot-module", "robot-hardware-adapter", "robot-simulation-adapter",
+        "robot-process", "ros2-node"
+      ]
+    },
+    "name": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"},
+    "appliedVersion": {"type": "integer", "minimum": 1},
+    "managedFiles": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/managedFile"}
+    },
+    "projectFiles": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/projectFile"}
+    },
+    "unmanagedFiles": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/unmanagedFile"}
+    }
+  },
+  "$defs": {
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "managedFile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "baselineSha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "baselineSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "projectFile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "templateSha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "templateSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "unmanagedFile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "reason"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

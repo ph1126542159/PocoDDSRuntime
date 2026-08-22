@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Diagnostic Terminal</name>
+    <symbolicName>pdr.platform.diagnosticTerminal</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::DiagnosticTerminal::BundleActivator</class>
+      <library>pdr.platform.diagnosticTerminal</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>185</runLevel>
+    <requiredBundles>
+      <bundle>
+        <symbolicName>osp.core</symbolicName>
+        <version>[1.0.0,2.0.0)</version>
+      </bundle>
+      <bundle>
+        <symbolicName>osp.web</symbolicName>
+        <version>[1.0.0,2.0.0)</version>
+      </bundle>
+      <bundle>
+        <symbolicName>pdr.platform.managementAuth</symbolicName>
+        <version>[1.0.0,2.0.0)</version>
+      </bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+  <files>bundle/*</files>
+</bundlespec>

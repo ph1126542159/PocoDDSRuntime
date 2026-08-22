@@ -79,6 +79,7 @@ Windows PowerShell：
   --report build/reports/config-validation.json
 ./tools/pdr.ps1 identity check config/pdr-runtime.properties config/site.properties `
   --prefix build/install --report build/reports/identity-check.json
+./tools/pdr.ps1 project create WarehouseRobot --output E:/Products --profile robotics
 ./tools/pdr.ps1 new module TemperatureModel --output modules
 ./tools/pdr.ps1 new service TemperatureService --output services
 ./tools/pdr.ps1 new device CanTemperatureSensor --output platform/devices
@@ -86,6 +87,11 @@ Windows PowerShell：
 ./tools/pdr.ps1 new bundle AcmeDiagnostics --output bundles
 ./tools/pdr.ps1 new plugin AcmeDiagnostics --output plugins
 ./tools/pdr.ps1 new subprocess VisionWorker --output subprocesses
+./tools/pdr.ps1 new robot-module ChargingModule --output modules
+./tools/pdr.ps1 new robot-hardware-adapter CanDrive --output adapters/hardware
+./tools/pdr.ps1 new robot-simulation-adapter WarehouseWorld --output adapters/simulation
+./tools/pdr.ps1 new robot-process VisionWorker --output processes
+./tools/pdr.ps1 new ros2-node MissionGateway --output adapters/ros2
 ./tools/pdr.ps1 verify platform/devices/CanTemperatureSensor `
   --prefix build/install `
   --config Release --report build/reports/can-temperature-sensor-verify.json
@@ -107,6 +113,7 @@ python3 tools/pdr.py identity check config/pdr-runtime.properties config/site.pr
 python3 tools/pdr.py persistence inspect build/bin/management-tasks.json \
   --kind tasks --report build/reports/tasks-inspect.json
 python3 tools/pdr.py new service TemperatureService --output services
+python3 tools/pdr.py component status services/TemperatureService --check
 python3 tools/pdr.py verify services/TemperatureService \
   --prefix build/install --config Release \
   --report build/reports/temperature-verify.json
@@ -116,6 +123,10 @@ python3 tools/pdr.py verify services/TemperatureService \
 CMake Target、冒烟测试和集成说明；`subprocess` 生成独立可执行文件、自检、安装规则和
 `pdr-subprocesses.properties` 合并片段。目标目录已有内容时命令默认拒绝覆盖；只有明确传入
 `--force` 才会覆盖。
+
+所有生成类型都写入 `.pdr-component.json`，并把 CMake、README、`package.xml` 和
+`.bndlspec` 作为版本化结构文件；业务源码仍由产品维护。模板状态、旧组件采用、冲突升级和
+中断恢复的完整规则见[组件模板升级](component-templates.md)。
 
 `new bundle` 是 `new plugin` 的用户侧别名，两者都生成 BundleActivator、Service、
 `.bndlspec` 和打包规则，并使用受治理的 `pdr.plugin.*` 命名。`verify` 会要求

@@ -160,7 +160,8 @@ std::vector<ValidationIssue> ConfigurationValidator::validate(
     }
     const std::unordered_set<std::string> allowedManagementPermissions{
         "protocol.manage", "process.manage", "bundle.manage", "configuration.manage",
-        "identity.manage", "audit.read", "task.read", "task.cancel"};
+        "identity.manage", "audit.read", "task.read", "task.cancel",
+        "diagnostics.read", "diagnostics.execute"};
     std::unordered_set<std::string> principalIds;
     std::unordered_set<std::string> principalTokenEnvironments;
     std::unordered_set<std::string> principalTokenValues;

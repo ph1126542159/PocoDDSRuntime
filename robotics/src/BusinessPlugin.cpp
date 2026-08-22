@@ -76,7 +76,11 @@ std::shared_ptr<RobotBusinessModule> BusinessPluginLoader::load(const std::strin
     const auto descriptor = library->entry()();
     if (!descriptor || descriptor->structureSize < sizeof(BusinessPluginDescriptor) ||
         descriptor->abiVersion != businessPluginAbiVersion || !descriptor->name ||
-        std::string(descriptor->name).empty() || !descriptor->create || !descriptor->destroy)
+        std::string(descriptor->name).empty() || !descriptor->create || !descriptor->destroy ||
+        !descriptor->requiredRuntimeVersion ||
+        std::string(descriptor->requiredRuntimeVersion) != runtimeVersion ||
+        !descriptor->requiredAbiFingerprint ||
+        std::string(descriptor->requiredAbiFingerprint) != pluginAbiFingerprint)
         throw std::runtime_error("business plugin descriptor is invalid: " + path);
     auto* instance = descriptor->create();
     if (!instance)

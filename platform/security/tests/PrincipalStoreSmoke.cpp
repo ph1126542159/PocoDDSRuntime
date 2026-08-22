@@ -37,7 +37,7 @@ int main()
             "PDR_IDENTITY_TEST_OPERATOR");
         configuration->setString(
             "pdr.management.authentication.principals.0.permissions",
-            " protocol.manage, task.read ");
+            " protocol.manage, task.read, diagnostics.read ");
 
         auto store = PocoDDS::Security::PrincipalStore::fromManagementConfiguration(
             *configuration);
@@ -47,6 +47,8 @@ int main()
         require(legacy && legacy->id() == "legacy-admin", "legacy principal did not authenticate");
         require(legacy->permissions() == PocoDDS::Security::managementPermissions(),
                 "legacy principal did not receive all management permissions");
+        require(legacy->authorized("diagnostics.execute"),
+                "legacy administrator did not receive diagnostic execute permission");
         const auto* operatorPrincipal = store.authenticateBearerToken("operator-secret");
         require(operatorPrincipal && operatorPrincipal->id() == "operator",
                 "indexed principal did not authenticate");
@@ -56,6 +58,10 @@ int main()
                 "missing principal lookup succeeded");
         require(operatorPrincipal->authorized("protocol.manage"),
                 "configured permission missing");
+        require(operatorPrincipal->authorized("diagnostics.read"),
+                "diagnostic terminal permission missing");
+        require(!operatorPrincipal->authorized("diagnostics.execute"),
+                "read-only operator received diagnostic execute permission");
         require(!operatorPrincipal->authorized("bundle.manage"),
                 "unconfigured permission was granted");
         require(store.authenticateBearerToken("wrong-secret") == nullptr,

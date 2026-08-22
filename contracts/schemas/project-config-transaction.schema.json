@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-transaction.schema.json",
+  "title": "PocoDDSRuntime project configuration transaction journal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "transactionId", "project", "status", "startedAt",
+    "manifest", "manifestSha256", "plan", "planSha256", "capabilities",
+    "capabilitiesSha256", "currentConfig", "candidateConfig", "previousConfig",
+    "previousConfigSha256", "preflightCompleted", "commitAttempted", "commitCompleted",
+    "rollbackCompleted", "events", "errors"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "project-config-transaction"},
+    "transactionId": {"type": "string", "format": "uuid"},
+    "project": {"type": "string", "minLength": 1},
+    "status": {
+      "enum": [
+        "preflighting", "preflight-failed", "committing", "activating",
+        "rolling-back", "rolled-back", "rollback-failed", "committed"
+      ]
+    },
+    "startedAt": {"type": "string", "format": "date-time"},
+    "finishedAt": {"type": "string", "format": "date-time"},
+    "recoveredAt": {"type": "string", "format": "date-time"},
+    "manifest": {"type": "string", "minLength": 1},
+    "manifestSha256": {"$ref": "#/$defs/sha256"},
+    "plan": {"type": "string", "minLength": 1},
+    "planSha256": {"$ref": "#/$defs/sha256"},
+    "capabilities": {"type": "string", "minLength": 1},
+    "capabilitiesSha256": {"$ref": "#/$defs/sha256"},
+    "currentConfig": {"type": "string", "minLength": 1},
+    "candidateConfig": {"type": "string", "minLength": 1},
+    "previousConfig": {"type": "string", "minLength": 1},
+    "previousConfigSha256": {"$ref": "#/$defs/sha256"},
+    "activeConfigSha256": {"$ref": "#/$defs/sha256"},
+    "preflightCompleted": {"$ref": "#/$defs/participantIds"},
+    "commitAttempted": {"$ref": "#/$defs/participantIds"},
+    "commitCompleted": {"$ref": "#/$defs/participantIds"},
+    "rollbackCompleted": {"$ref": "#/$defs/participantIds"},
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["participant", "phase", "status", "responseSha256", "finishedAt"],
+        "properties": {
+          "participant": {"type": "string", "minLength": 1},
+          "phase": {"enum": ["preflight", "commit", "rollback"]},
+          "status": {"enum": ["ready", "committed", "rolled-back"]},
+          "responseSha256": {"$ref": "#/$defs/sha256"},
+          "finishedAt": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "errors": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "participantIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

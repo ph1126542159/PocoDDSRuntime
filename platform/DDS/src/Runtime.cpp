@@ -24,6 +24,7 @@
 #include <map>
 #include <chrono>
 #include <mutex>
+#include <set>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -81,11 +82,40 @@ public:
         : domainId(domainId), participantName(std::move(participantName)),
           envelopeType(new EnvelopeTopicDataType)
     {
+        std::lock_guard<std::mutex> lock(registryMutex);
+        registry.insert(this);
     }
 
     ~Impl()
     {
+        {
+            std::lock_guard<std::mutex> lock(registryMutex);
+            registry.erase(this);
+        }
         stop();
+    }
+
+    RuntimeSnapshot snapshot() const
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        RuntimeSnapshot result;
+        result.domainId = domainId;
+        result.participantName = participantName;
+        result.started = participant != nullptr;
+        result.topicCount = topics.size();
+        result.writerCount = writers.size();
+        result.readerCount = readers.size();
+        for (const auto& item : topics) result.topics.push_back(item.first);
+        return result;
+    }
+
+    static std::vector<RuntimeSnapshot> snapshots()
+    {
+        std::lock_guard<std::mutex> lock(registryMutex);
+        std::vector<RuntimeSnapshot> result;
+        result.reserve(registry.size());
+        for (const auto* runtime : registry) result.push_back(runtime->snapshot());
+        return result;
     }
 
     void start()
@@ -244,7 +274,12 @@ public:
     std::map<std::string, DataWriter*> writers;
     std::vector<DataReader*> readers;
     std::vector<std::unique_ptr<ReaderListener>> listeners;
+    static std::mutex registryMutex;
+    static std::set<Impl*> registry;
 };
+
+std::mutex Runtime::Impl::registryMutex;
+std::set<Runtime::Impl*> Runtime::Impl::registry;
 
 Runtime::Runtime(std::uint32_t domainId, std::string participantName)
     : _impl(std::make_unique<Impl>(domainId, std::move(participantName)))
@@ -266,6 +301,11 @@ void Runtime::stop() noexcept
 bool Runtime::started() const noexcept
 {
     return _impl->started();
+}
+
+std::vector<RuntimeSnapshot> Runtime::snapshots()
+{
+    return Impl::snapshots();
 }
 
 void Runtime::preparePublisher(const std::string& topic)

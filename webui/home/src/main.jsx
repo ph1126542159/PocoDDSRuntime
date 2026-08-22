@@ -20,12 +20,14 @@ const pageMeta = {
   plugins: ["插件治理", "外部插件兼容性、依赖与生命周期"],
   metrics: ["指标中心", "按运行域查看 OpenTelemetry Counter 与 Histogram"],
   governance: ["Runtime 治理", "身份、权限、配置事务、审计与管理任务"],
+  terminal: ["终端调试", "使用受控命令诊断 Bundle、Service 与子进程"],
   tracing: ["业务追踪", "机器人仿真与 OpenTelemetry 业务流程"]
 };
 
 const navItems = [
   ["overview", Activity], ["processes", AppWindow], ["devices", Cpu],
   ["plugins", Boxes], ["metrics", Activity], ["governance", ShieldCheck],
+  ["terminal", Terminal],
   ["tracing", GitBranch, "/tracing/"]
 ];
 
@@ -1384,6 +1386,375 @@ function Logs() {
   </section>;
 }
 
+const defaultTerminalCommands = [
+  "help", "status", "ps", "bundle list", "bundle show", "service list", "service show",
+  "logs runtime --tail 80", "logs runtime --follow", "diagnose all --deep", "health tree",
+  "protocol list", "protocol check", "device list", "device check", "metrics top",
+  "metrics anomalies", "trace list", "trace show", "config effective", "config diff",
+  "config validate", "provider list", "agent status", "agent threads", "agent net",
+  "support collect", "jobs", "job show", "cancel", "repair bundle", "repair process",
+  "repair protocol", "crash list", "crash show", "dump process", "dds participants",
+  "dds discovery", "dds qos", "version", "uptime", "whoami", "clear", "history", "watch -n 2"
+];
+
+function DiagnosticTerminalPage({ host }) {
+  const [entries, setEntries] = useState([{ id: "welcome", kind: "system", lines: [
+    "PocoDDS Runtime Diagnostic Terminal",
+    "输入 help 查看命令；按 Tab 补全，↑/↓ 浏览历史，Ctrl+L 清屏。",
+    "这是受控诊断终端，不会执行 PowerShell、cmd、bash 或任意脚本。"
+  ] }]);
+  const [input, setInput] = useState("");
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [catalog, setCatalog] = useState(defaultTerminalCommands);
+  const [prompt, setPrompt] = useState(`pdr@${host || "runtime"}:runtime$`);
+  const [principal, setPrincipal] = useState("connecting");
+  const [mayExecute, setMayExecute] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [watching, setWatching] = useState(false);
+  const [completion, setCompletion] = useState([]);
+  const inputRef = useRef(null);
+  const endRef = useRef(null);
+  const watchRef = useRef(null);
+  const streamRef = useRef(null);
+  const sequenceRef = useRef(0);
+
+  const append = useCallback(entry => {
+    sequenceRef.current += 1;
+    setEntries(current => [...current, { id: `${Date.now()}-${sequenceRef.current}`, ...entry }].slice(-1500));
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    request("/api/v1/diagnostic-terminal").then(data => {
+      if (!active) return;
+      setCatalog([...new Set([...(data.commands || []), ...defaultTerminalCommands])]);
+      setPrompt(data.prompt || `pdr@${host || "runtime"}:runtime$`);
+      setPrincipal(data.principal || "unknown");
+      setMayExecute(Boolean(data.mayExecute));
+    }).catch(error => {
+      if (active) append({ kind: "error", lines: [`终端服务连接失败: ${error.message}`] });
+    });
+    return () => {
+      active = false;
+      if (watchRef.current) clearInterval(watchRef.current);
+      streamRef.current?.abort();
+    };
+  }, [append, host]);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [entries, busy]);
+
+  const executeBackend = useCallback(async (command, watch = false) => {
+    setBusy(true);
+    try {
+      const result = await request("/api/v1/diagnostic-terminal", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command })
+      });
+      const jsonFormat = /(?:^|\s)--format(?:=|\s+)json(?:\s|$)/i.test(command);
+      const lines = jsonFormat ? [JSON.stringify({ schemaVersion: result.schemaVersion,
+        exitCode: result.exitCode, facts: result.facts || {}, findings: result.findings || [] }, null, 2)] :
+        (result.lines || []);
+      append({ kind: watch ? "watch" : "command", command, lines,
+        findings: result.findings || [], facts: result.facts || {},
+        artifactUrl: result.facts?.["artifact.url"] || "",
+        exitCode: Number(result.exitCode || 0), duration: Number(result.durationMilliseconds || 0) });
+    } catch (error) {
+      append({ kind: "error", command, lines: [error.message], exitCode: 1 });
+    } finally { setBusy(false); }
+  }, [append]);
+
+  const stopWatch = useCallback(() => {
+    let stopped = false;
+    if (watchRef.current) {
+      clearInterval(watchRef.current);
+      watchRef.current = null;
+      stopped = true;
+    }
+    if (streamRef.current) {
+      streamRef.current.active = false;
+      streamRef.current.controller?.abort();
+      streamRef.current = null;
+      stopped = true;
+    }
+    if (!stopped) return false;
+    setWatching(false);
+    setBusy(false);
+    append({ kind: "system", lines: ["^C", "持续诊断任务已停止。"] });
+    return true;
+  }, [append]);
+
+  const streamLogs = useCallback(async command => {
+    stopWatch();
+    const processMatch = command.match(/^logs(?:\s+([^\s-][^\s]*))?/i);
+    const tailMatch = command.match(/--tail\s+(\d+)/i);
+    const grepMatch = command.match(/--grep\s+(?:"([^"]*)"|'([^']*)'|([^\s]+))/i);
+    const process = processMatch?.[1] || "runtime";
+    const tail = Math.max(0, Math.min(Number(tailMatch?.[1] || 40), 500));
+    const grep = grepMatch?.[1] ?? grepMatch?.[2] ?? grepMatch?.[3] ?? "";
+    const state = { active: true, controller: null };
+    streamRef.current = state;
+    setWatching(true);
+    setBusy(true);
+    append({ kind: "command", command, lines: [
+      `正在跟踪 ${process} 日志（初始 ${tail} 行）；按 Ctrl+C 停止。`
+    ], exitCode: 0 });
+    let reconnectTail = tail;
+    try {
+      while (state.active) {
+        state.controller = new AbortController();
+        const query = new URLSearchParams({ process, tail: String(reconnectTail), duration: "60" });
+        if (grep) query.set("grep", grep);
+        const token = sessionStorage.getItem("pdr.webui.token") || "";
+        const response = await fetch(`/api/v1/diagnostic-log-stream?${query}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: state.controller.signal
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || body.message || `日志流连接失败 (${response.status})`);
+        }
+        setBusy(false);
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("浏览器不支持流式响应读取");
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (state.active) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+          let boundary;
+          while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+            const frame = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            const eventName = frame.split("\n").find(line => line.startsWith("event:"))?.slice(6).trim();
+            const data = frame.split("\n").filter(line => line.startsWith("data:"))
+              .map(line => line.slice(5).trimStart()).join("\n");
+            if (!data) continue;
+            const event = JSON.parse(data);
+            if (eventName === "log") append({ kind: "stream", lines: [event.line || " "] });
+            else if (eventName === "end" && event.line === "output-limit")
+              append({ kind: "error", lines: ["实时日志达到单段 2000 行上限，正在从当前位置续接。"] });
+          }
+        }
+        reconnectTail = 0;
+      }
+    } catch (error) {
+      if (state.active && error.name !== "AbortError")
+        append({ kind: "error", command, lines: [`实时日志中断: ${error.message}`], exitCode: 1 });
+    } finally {
+      if (streamRef.current === state) streamRef.current = null;
+      setWatching(false);
+      setBusy(false);
+    }
+  }, [append, stopWatch]);
+
+  const downloadArtifact = useCallback(async (url, suggestedName) => {
+    try {
+      const token = sessionStorage.getItem("pdr.webui.token") || "";
+      const response = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!response.ok) throw new Error(`下载失败 (${response.status})`);
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = suggestedName || "pdr-support.json";
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (error) {
+      append({ kind: "error", lines: [`诊断包下载失败: ${error.message}`], exitCode: 1 });
+    }
+  }, [append]);
+
+  const executeGoverned = useCallback(async command => {
+    const tokens = command.match(/"[^"]*"|'[^']*'|\S+/g)?.map(token =>
+      token.replace(/^(?:"|')|(?:"|')$/g, "")) || [];
+    const verb = tokens[0]?.toLowerCase();
+    try {
+      if (verb === "jobs") {
+        const stateToken = tokens.find(token => token.startsWith("--state="));
+        const query = new URLSearchParams({ limit: "50" });
+        if (stateToken) query.set("state", stateToken.slice(8));
+        const result = await request(`/api/v1/management-tasks?${query}`);
+        const lines = ["STATE       OPERATION             TARGET                 TASK ID"];
+        for (const task of result.tasks || []) lines.push(
+          `${String(task.state || "-").padEnd(11)} ${String(task.operation || "-").padEnd(21)} ` +
+          `${String(task.target || task.id || "-").padEnd(22)} ${task.id || "-"}`);
+        if (lines.length === 1) lines.push("暂无管理任务。");
+        append({ kind: "command", command, lines, exitCode: 0,
+          facts: { "scheduler.state": result.scheduler?.state || "unknown" } });
+        return;
+      }
+      if (verb === "job") {
+        if (tokens[1]?.toLowerCase() !== "show" || !tokens[2])
+          throw new Error("用法: job show <task-id>");
+        const task = await request(`/api/v1/management-tasks/${encodeURIComponent(tokens[2])}`);
+        append({ kind: "command", command, lines: [JSON.stringify(task, null, 2)], exitCode: 0 });
+        return;
+      }
+      if (verb === "cancel") {
+        if (!tokens[1] || !tokens.includes("--confirm"))
+          throw new Error("用法: cancel <task-id> --confirm");
+        const result = await request("/api/v1/management-tasks", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: tokens[1], action: "cancel" })
+        });
+        append({ kind: "command", command, lines: [result.message || "取消请求已提交",
+          JSON.stringify(result.task || {}, null, 2)], exitCode: 0 });
+        return;
+      }
+      if (verb !== "repair") return;
+      const kind = tokens[1]?.toLowerCase();
+      const id = tokens[2];
+      let action = tokens[3]?.toLowerCase();
+      if (!kind || !id || !action || !tokens.includes("--confirm"))
+        throw new Error("用法: repair <bundle|process|protocol> <id> <动作> --confirm");
+      const routes = { bundle: "/api/v1/bundle-lifecycle", process: "/api/v1/process-lifecycle",
+        protocol: "/api/v1/protocols" };
+      if (!routes[kind]) throw new Error("修复类型仅支持 bundle、process、protocol。");
+      if (kind === "protocol" && action === "reconnect") action = "restart";
+      const allowed = kind === "protocol" ? ["open", "close", "restart"] :
+        kind === "bundle" ? ["start", "stop", "restart", "reset-quarantine"] :
+          ["start", "stop", "restart"];
+      if (!allowed.includes(action)) throw new Error(`${kind} 不支持动作 ${action}`);
+      const payload = { id, action, async: action !== "reset-quarantine",
+        startTimeoutMilliseconds: 30000, executionTimeoutMilliseconds: 30000,
+        ...(kind === "protocol" ? { stabilityWindowMilliseconds: 1000 } : {}),
+        ...(tokens.includes("--recover-persistence") ? { confirmPersistenceRecovery: true } : {}) };
+      const result = await request(routes[kind], { method: "POST",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const task = result.task || {};
+      append({ kind: "command", command, lines: [
+        result.message || "受控修复已提交", task.id ? `task: ${task.id} · state: ${task.state}` : "操作已完成",
+        "所有修复均通过 Runtime 治理接口执行，包含权限、幂等、超时和审计控制。"
+      ], exitCode: 0, facts: task.id ? { "task.id": task.id } : {} });
+    } catch (error) {
+      append({ kind: "error", command, lines: [error.message], exitCode: 1 });
+    }
+  }, [append]);
+
+  useEffect(() => {
+    const interrupt = event => {
+      if (!event.ctrlKey || event.key.toLowerCase() !== "c") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!stopWatch()) append({ kind: "system", lines: ["^C"] });
+      setInput("");
+    };
+    window.addEventListener("keydown", interrupt, true);
+    return () => window.removeEventListener("keydown", interrupt, true);
+  }, [append, stopWatch]);
+
+  const run = useCallback(async raw => {
+    const command = raw.trim();
+    if (!command) return;
+    setHistory(current => [command, ...current.filter(item => item !== command)].slice(0, 100));
+    setHistoryIndex(-1);
+    setCompletion([]);
+    if (command === "clear") { setEntries([]); return; }
+    if (command === "history") {
+      append({ kind: "command", command, lines: history.length ?
+        history.slice().reverse().map((item, index) => `${String(index + 1).padStart(3, " ")}  ${item}`) :
+        ["history is empty"] });
+      return;
+    }
+    const watchMatch = command.match(/^watch(?:\s+-n)?\s+(\d+(?:\.\d+)?)\s+(.+)$/i);
+    if (watchMatch) {
+      stopWatch();
+      const seconds = Math.max(0.5, Math.min(Number(watchMatch[1]), 60));
+      const watchedCommand = watchMatch[2].trim();
+      append({ kind: "system", lines: [`watch: 每 ${seconds}s 执行 ${watchedCommand}；按 Ctrl+C 停止。`] });
+      await executeBackend(watchedCommand, true);
+      watchRef.current = setInterval(() => executeBackend(watchedCommand, true), seconds * 1000);
+      setWatching(true);
+      return;
+    }
+    if (/^watch\b/i.test(command)) {
+      append({ kind: "error", command, lines: ["用法: watch -n <秒> <命令>，例如 watch -n 2 status"], exitCode: 2 });
+      return;
+    }
+    if (/^logs\b.*(?:^|\s)(?:-f|--follow)(?:\s|$)/i.test(command)) {
+      await streamLogs(command);
+      return;
+    }
+    if (/^(?:jobs|job\s+show|cancel|repair)\b/i.test(command)) {
+      await executeGoverned(command);
+      return;
+    }
+    await executeBackend(command);
+  }, [append, executeBackend, executeGoverned, history, stopWatch, streamLogs]);
+
+  const handleKeyDown = event => {
+    if (event.ctrlKey && event.key.toLowerCase() === "l") {
+      event.preventDefault(); setEntries([]); return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!history.length) return;
+      const next = Math.min(historyIndex + 1, history.length - 1);
+      setHistoryIndex(next); setInput(history[next]); return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      const next = historyIndex - 1;
+      setHistoryIndex(next);
+      setInput(next >= 0 ? history[next] : ""); return;
+    }
+    if (event.key === "Tab") {
+      event.preventDefault();
+      const needle = input.trimStart().toLowerCase();
+      const matches = catalog.filter(command => command.toLowerCase().startsWith(needle));
+      setCompletion(matches);
+      if (matches.length === 1) setInput(`${matches[0]} `);
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const command = input; setInput(""); run(command);
+    }
+  };
+
+  return <section className="diagnostic-terminal-page">
+    <header className="diagnostic-terminal-head">
+      <div><span><Terminal size={24} /></span><div><h2>Runtime 诊断终端</h2>
+        <p>Linux 风格交互 · 受控只读命令 · Bundle 内诊断 Service</p></div></div>
+      <div className="terminal-session-meta"><span><i />已连接</span><small>身份：{principal} · {mayExecute ? "可执行受控修复" : "只读诊断"}</small></div>
+    </header>
+    <div className="terminal-safety"><ShieldCheck size={17} /><b>安全模式</b>
+      <span>仅允许 Runtime 诊断命令，不提供操作系统 Shell；生命周期操作继续使用治理页面。</span></div>
+    <div className="diagnostic-command-chips">
+      {["status", "health tree", "diagnose all --deep", "protocol check", "metrics anomalies", "logs runtime --follow", "support collect"].map(command =>
+        <button key={command} onClick={() => run(command)}>{command}</button>)}
+    </div>
+    <div className="diagnostic-console" onClick={() => inputRef.current?.focus()} role="application"
+      aria-label="Runtime 诊断终端">
+      {entries.map(entry => <div key={entry.id} className={`diagnostic-entry ${entry.kind || ""}`}>
+        {entry.command && <div className="diagnostic-command"><span>{prompt}</span><b>{entry.command}</b></div>}
+        {(entry.lines || []).map((line, index) => <pre key={`${entry.id}-${index}`}>{line || " "}</pre>)}
+        {!!entry.findings?.length && <div className="diagnostic-findings">{entry.findings.map((finding, index) =>
+          <article key={`${entry.id}-finding-${index}`} className={finding.severity || "info"}>
+            <b>{finding.code} · {finding.target || finding.scope}</b><span>{finding.summary}</span>
+            {finding.detail && <small>证据：{finding.detail}</small>}
+            {finding.remediation && <small>建议：{finding.remediation}</small>}
+          </article>)}</div>}
+        {entry.artifactUrl && <button className="diagnostic-artifact" onClick={event => {
+          event.stopPropagation();
+          downloadArtifact(entry.artifactUrl, entry.facts?.["artifact.id"]);
+        }}><FileText size={15} />下载脱敏诊断包</button>}
+        {entry.command && <small className={entry.exitCode ? "failed" : ""}>
+          exit {entry.exitCode || 0}{entry.duration != null ? ` · ${entry.duration.toFixed(1)} ms` : ""}</small>}
+      </div>)}
+      {completion.length > 1 && <div className="terminal-completions">{completion.join("    ")}</div>}
+      <div className="diagnostic-prompt"><span>{prompt}</span><input ref={inputRef} value={input}
+        onChange={event => { setInput(event.target.value); setCompletion([]); }} onKeyDown={handleKeyDown}
+        autoCapitalize="off" autoComplete="off" autoCorrect="off" spellCheck="false"
+        aria-label="输入诊断命令" autoFocus /><i className={busy ? "busy" : ""} /></div>
+      <div ref={endRef} />
+    </div>
+    <footer className="diagnostic-terminal-footer"><span>Tab 补全 · ↑↓ 历史 · Ctrl+L 清屏 · Ctrl+C 停止 watch/日志流</span>
+      {watching ? <button onClick={stopWatch}>停止持续任务</button> : <span>ready</span>}</footer>
+  </section>;
+}
+
 function App() {
   const initialPage = new URLSearchParams(window.location.search).get("page");
   const [page, setPage] = useState(pageMeta[initialPage] && initialPage !== "tracing" ? initialPage : "overview");
@@ -1534,6 +1905,7 @@ function App() {
         {page === "metrics" && <MetricsCenter data={businessMetrics} />}
         {page === "governance" && <ProcessWorkbench mainProcess={topology.mainProcess}
           activeSection="configuration" onSectionChange={() => {}} onNotify={notify} governanceOnly />}
+        {page === "terminal" && <DiagnosticTerminalPage host={topology.host} />}
       </div>
     </main>
     {menuOpen && <button className="mobile-overlay" onClick={() => setMenuOpen(false)} />}

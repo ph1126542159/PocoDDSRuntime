@@ -26,4 +26,6 @@ To create a product module:
 
 Plugins are native code with process privileges. Do not auto-discover or load
 untrusted files. The ABI version catches descriptor mismatches, but it does not
-make different compilers or C++ runtimes binary-compatible.
+make different compilers or C++ runtimes binary-compatible. The descriptor also
+binds the exact Robotics Runtime version and compiler/platform ABI fingerprint;
+rebuild plugins whenever either contract changes.

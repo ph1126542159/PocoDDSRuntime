@@ -164,6 +164,46 @@ class PdrToolTests(unittest.TestCase):
                     self.assertIn("RUNTIME_OUTPUT_DIRECTORY", cmake)
                     self.assertIn("subprocess.N.name", entry)
 
+    def test_generates_robotics_specific_extensions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            expectations = {
+                "robot-module": ("src/Plugin.cpp", "RobotBusinessModule"),
+                "robot-hardware-adapter": (
+                    "include/PocoDDS/Generated/DriveHardware/DriveHardware.h", "HardwareInterface"
+                ),
+                "robot-simulation-adapter": (
+                    "include/PocoDDS/Generated/WorldSimulation/WorldSimulation.h",
+                    "SimulationAdapter",
+                ),
+                "robot-process": ("src/main.cpp", "PDR_ROBOT_VISION_WORKER_READY"),
+                "ros2-node": ("package.xml", "ament_cmake"),
+            }
+            names = {
+                "robot-module": "ChargingModule",
+                "robot-hardware-adapter": "DriveHardware",
+                "robot-simulation-adapter": "WorldSimulation",
+                "robot-process": "VisionWorker",
+                "ros2-node": "MissionGateway",
+            }
+            for kind, (relative, marker) in expectations.items():
+                name = names[kind]
+                result = subprocess.run(
+                    [sys.executable, str(TOOL), "new", kind, name, "--output", str(root)],
+                    check=False, capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                content = (root / name / relative).read_text(encoding="utf-8")
+                self.assertIn(marker, content)
+                if kind == "ros2-node":
+                    package_xml = (root / name / "package.xml").read_text(encoding="utf-8")
+                    launch = next((root / name / "launch").glob("*.launch.py")).read_text(
+                        encoding="utf-8"
+                    )
+                    self.assertIn("ament_index_python", package_xml)
+                    self.assertIn("get_package_share_directory", launch)
+                    self.assertNotIn('parameters=["config/runtime.yaml"]', launch)
+
     def test_rejects_invalid_name(self):
         result = subprocess.run(
             [sys.executable, str(TOOL), "new", "service", "bad-name"],

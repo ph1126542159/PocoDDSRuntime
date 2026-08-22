@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/component-template-transaction.schema.json",
+  "title": "PocoDDSRuntime component template transaction journal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "transactionId", "status", "startedAt",
+    "entries", "attempted"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"enum": ["component-template-adopt", "component-template-upgrade"]},
+    "transactionId": {"type": "string", "format": "uuid"},
+    "status": {"enum": ["applying", "completed", "rolled-back", "rollback-failed"]},
+    "startedAt": {"type": "string", "format": "date-time"},
+    "finishedAt": {"type": "string", "format": "date-time"},
+    "recoveredAt": {"type": "string", "format": "date-time"},
+    "error": {"type": "string"},
+    "rollbackError": {"type": "string"},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "existed"],
+        "properties": {
+          "path": {"$ref": "#/$defs/path"},
+          "existed": {"type": "boolean"},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "backup": {"$ref": "#/$defs/path"}
+        },
+        "allOf": [{
+          "if": {"properties": {"existed": {"const": true}}, "required": ["existed"]},
+          "then": {"required": ["sha256", "backup"]},
+          "else": {"not": {"anyOf": [{"required": ["sha256"]}, {"required": ["backup"]}]}}
+        }]
+      }
+    },
+    "attempted": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/path"}}
+  },
+  "$defs": {
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

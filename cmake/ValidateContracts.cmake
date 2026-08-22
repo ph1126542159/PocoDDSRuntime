@@ -1,5 +1,14 @@
 set(required_files
+    "${SOURCE_DIR}/contracts/schemas/component-template-state.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/component-template-transaction.schema.json"
     "${SOURCE_DIR}/contracts/schemas/runtime-config.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/pdr-project.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/project-config-capabilities.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/project-config-plan.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/project-config-transaction.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/project-template-state.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/project-template-transaction.schema.json"
+    "${SOURCE_DIR}/contracts/schemas/project-package-manifest.schema.json"
     "${SOURCE_DIR}/contracts/schemas/runtime-resource.schema.json"
     "${SOURCE_DIR}/contracts/schemas/release-trust-policy.schema.json"
     "${SOURCE_DIR}/contracts/schemas/plugin-trust-policy.schema.json"
@@ -9,6 +18,7 @@ set(required_files
     "${SOURCE_DIR}/contracts/schemas/external-approver-trust-policy.schema.json"
     "${SOURCE_DIR}/contracts/schemas/evidence-bundle.schema.json"
     "${SOURCE_DIR}/contracts/schemas/release-pipeline.schema.json"
+    "${SOURCE_DIR}/contracts/component-templates/v1.json"
     "${SOURCE_DIR}/contracts/openapi/runtime.yaml"
     "${SOURCE_DIR}/contracts/asyncapi/runtime.yaml")
 foreach(path IN LISTS required_files)

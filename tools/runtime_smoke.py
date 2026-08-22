@@ -47,6 +47,8 @@ def write_overlay(
         "osp.web.server.host": host,
         "osp.web.server.port": str(port),
         "osp.web.server.securePort": "0",
+        "osp.codeCache":
+            (destination.parent / f"runtime-smoke-{port}-codeCache").as_posix(),
         "logging.channels.file.path":
             (destination.parent / f"runtime-smoke-{port}-runtime.log").as_posix(),
     }
@@ -302,7 +304,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--forbid-body", action="append", default=[], metavar="REGEX",
                         help="regular expression that must not appear in endpoint responses")
     parser.add_argument("--clear-code-cache", action="store_true",
-                        help="remove WORKING_DIRECTORY/codeCache before launch")
+                        help="remove the isolated per-run code cache before launch")
     parser.add_argument("--follow-html-assets", action="store_true",
                         help="fetch same-origin script and stylesheet assets referenced by HTML")
     parser.add_argument("--validate-runtime-scope-contract", action="store_true",
@@ -446,6 +448,8 @@ def main() -> int:
     report_path = args.report.resolve() if args.report else None
     log_path = args.log.resolve() if args.log else (report_path.with_suffix(".log") if report_path else None)
     overlay = (report_path.parent if report_path else work) / f"runtime-smoke-{port}.properties"
+    code_cache = (overlay.parent / f"runtime-smoke-{port}-codeCache").resolve()
+    configuration_overrides = parse_overrides(args.set)
     result: dict[str, object] = {
         "schemaVersion": 1,
         "executable": str(executable),
@@ -510,13 +514,13 @@ def main() -> int:
         if not config.is_file():
             raise FileNotFoundError(f"runtime configuration not found: {config}")
         if args.clear_code_cache:
-            code_cache = (work / "codeCache").resolve()
-            if code_cache.parent != work or code_cache.name != "codeCache":
+            if (code_cache.parent != overlay.parent.resolve() or
+                    code_cache.name != f"runtime-smoke-{port}-codeCache"):
                 raise RuntimeError(f"refusing to clear unexpected code cache path: {code_cache}")
             shutil.rmtree(code_cache, ignore_errors=True)
             result["codeCacheCleared"] = True
         overlay.parent.mkdir(parents=True, exist_ok=True)
-        write_overlay(config, overlay, args.host, port, parse_overrides(args.set))
+        write_overlay(config, overlay, args.host, port, configuration_overrides)
         option = f"/config-file={overlay}" if os.name == "nt" else f"--config-file={overlay}"
         environment = os.environ.copy()
         if args.path:
@@ -835,6 +839,8 @@ def main() -> int:
             overlay.unlink(missing_ok=True)
         except OSError:
             pass
+        if args.clear_code_cache:
+            shutil.rmtree(code_cache, ignore_errors=True)
         if report_path:
             report_path.parent.mkdir(parents=True, exist_ok=True)
             report_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")

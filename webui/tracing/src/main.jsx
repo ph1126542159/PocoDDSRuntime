@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Activity, AlertCircle, AppWindow, Bot, Box, Boxes, CheckCircle2, ChevronRight, Clock3, Cpu, Download, FileJson, GitBranch, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PauseCircle, Play, RefreshCw, Search, Server, ShieldCheck, Wifi, WifiOff } from "lucide-react";
+import { Activity, AlertCircle, AppWindow, Bot, Box, Boxes, CheckCircle2, ChevronRight, Clock3, Cpu, Download, FileJson, GitBranch, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PauseCircle, Play, RefreshCw, Search, Server, ShieldCheck, Terminal, Wifi, WifiOff } from "lucide-react";
 import "./styles.css";
 import "./workspace.css";
 import "./typography.css";
@@ -255,7 +255,8 @@ function App() {
     ["设备与协议", Cpu, "/home/?page=devices"],
     ["插件治理", Boxes, "/home/?page=plugins"],
     ["指标中心", Activity, "/home/?page=metrics"],
-    ["Runtime 治理", ShieldCheck, "/home/?page=governance"]
+    ["Runtime 治理", ShieldCheck, "/home/?page=governance"],
+    ["终端调试", Terminal, "/home/?page=terminal"]
   ];
   return <div className="tracing-shell precision-shell">
     <header className="command-bar">

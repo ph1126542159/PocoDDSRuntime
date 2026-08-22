@@ -1,6 +1,7 @@
 set(required_docs
     "docs/architecture/layering-rules.md"
     "docs/architecture/extensibility.md"
+    "docs/architecture/performance-budgets.md"
     "docs/architecture/deployment-profiles.md"
     "docs/adr/README.md"
     "docs/operations/runbook.md"
@@ -11,6 +12,12 @@ set(required_docs
     "docs/development/new-protocol.md"
     "docs/development/new-subprocess.md"
     "docs/development/sdk-and-scaffolding.md"
+    "docs/development/project-workspaces.md"
+    "docs/development/project-configuration.md"
+    "docs/development/project-templates.md"
+    "docs/development/component-templates.md"
+    "docs/development/project-pipelines.md"
+    "docs/development/project-delivery.md"
     "docs/security/README.md"
     "docs/compatibility/README.md")
 foreach(relative_path IN LISTS required_docs)
@@ -22,6 +29,13 @@ file(READ "${SOURCE_DIR}/docs/README.md" index)
 foreach(link
         "architecture/layering-rules.md"
         "architecture/extensibility.md"
+        "architecture/performance-budgets.md"
+        "development/project-workspaces.md"
+        "development/project-configuration.md"
+        "development/project-templates.md"
+        "development/component-templates.md"
+        "development/project-pipelines.md"
+        "development/project-delivery.md"
         "operations/runbook.md"
         "operations/troubleshooting.md"
         "operations/recovery.md")

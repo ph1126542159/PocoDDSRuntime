@@ -185,6 +185,13 @@ Use the developer command to check the environment or create a standard module:
   --report build/reports/developer-doctor.json
 ./tools/pdr.ps1 validate-config config/pdr-runtime.properties `
   --prefix build/install --report build/reports/config-validation.json
+./tools/pdr.ps1 project create WarehouseRobot --output E:/Products --profile robotics
+./tools/pdr.ps1 project template status E:/Products/WarehouseRobot/pdr-project.yaml --check
+./tools/pdr.ps1 component status E:/Products/WarehouseRobot/services/Diagnostics --check
+./tools/pdr.ps1 project config plan E:/Products/WarehouseRobot/pdr-project.yaml `
+  --current E:/Products/WarehouseRobot/build/active-config.json `
+  --candidate E:/Products/WarehouseRobot/build/candidate-config.json `
+  --output E:/Products/WarehouseRobot/build/config-plan.json
 ./tools/pdr.ps1 new module TemperatureModel --output modules
 ./tools/pdr.ps1 new service TemperatureService --output services
 ./tools/pdr.ps1 new device CanTemperatureSensor --output platform/devices
@@ -192,6 +199,8 @@ Use the developer command to check the environment or create a standard module:
 ./tools/pdr.ps1 new bundle AcmeDiagnostics --output bundles
 ./tools/pdr.ps1 new plugin AcmeDiagnostics --output plugins
 ./tools/pdr.ps1 new subprocess VisionWorker --output SubSystem
+./tools/pdr.ps1 new robot-module ChargingModule --output modules
+./tools/pdr.ps1 new robot-hardware-adapter CanDrive --output adapters/hardware
 ./tools/pdr.ps1 verify platform/devices/CanTemperatureSensor `
   --prefix build/install --config Release `
   --report build/reports/can-temperature-sensor-verify.json
