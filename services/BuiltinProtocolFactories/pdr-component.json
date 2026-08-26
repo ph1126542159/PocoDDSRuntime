@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin-protocol-factories",
+  "name": "BuiltinProtocolFactories",
+  "kind": "bundle",
+  "plane": "management",
+  "target": "PDR_BuiltinProtocolFactories_Bundle",
+  "owner": "protocol-team",
+  "isolation": "bundle",
+  "requires": ["gateway-api", "protocol-core"]
+}

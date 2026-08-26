@@ -93,6 +93,7 @@ std::string instanceId(const FastDdsTransportOptions& options)
            std::to_string(sequence.fetch_add(1, std::memory_order_relaxed)) + "-" +
            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
 }
+
 } // namespace
 
 struct FastDdsTransport::State : public std::enable_shared_from_this<State>

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-runner-attestation-verification.schema.json",
+  "title": "Verification evidence for a scoped CI Runner team contract attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "operation", "passed", "attestationSha256", "policyId",
+    "policySha256", "runnerId", "repository", "sourceRevision", "workflow", "jobId",
+    "runId", "keyId", "publicKeySha256", "issuedAt", "expiresAt"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRunnerAttestationVerification"},
+    "operation": {"const": "team-contract-runner-verify"},
+    "passed": {"const": true},
+    "attestationSha256": {"$ref": "#/$defs/sha256"},
+    "policyId": {"$ref": "#/$defs/id"},
+    "policySha256": {"$ref": "#/$defs/sha256"},
+    "runnerId": {"$ref": "#/$defs/id"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"},
+    "sourceRevision": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "workflow": {"$ref": "#/$defs/id"},
+    "jobId": {"$ref": "#/$defs/id"},
+    "runId": {"$ref": "#/$defs/id"},
+    "keyId": {"$ref": "#/$defs/id"},
+    "publicKeySha256": {"$ref": "#/$defs/sha256"},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

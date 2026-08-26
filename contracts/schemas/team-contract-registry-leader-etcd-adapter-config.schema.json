@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-etcd-adapter-config.schema.json",
+  "title": "Registry leader etcdctl adapter configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "adapterId", "etcdctl", "etcdctlSha256", "etcdctlVersion", "etcdctlArguments", "etcdctlArtifactPins", "etcdctlEnvironmentVariables", "endpoints", "keyPrefix", "caCertificate", "caCertificateSha256", "clientCertificate", "clientCertificateSha256", "clientKey", "clientKeySha256", "dialTimeoutSeconds", "commandTimeoutSeconds", "maxResponseBytes"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderEtcdAdapterConfig"},
+    "adapterId": {"$ref": "#/$defs/id"},
+    "etcdctl": {"type": "string", "minLength": 1},
+    "etcdctlSha256": {"$ref": "#/$defs/sha256"},
+    "etcdctlVersion": {"type": "string", "pattern": "^3\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$"},
+    "etcdctlArguments": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": 1024}},
+    "etcdctlArtifactPins": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/pin"}},
+    "etcdctlEnvironmentVariables": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"}},
+    "endpoints": {"type": "array", "minItems": 3, "maxItems": 9, "uniqueItems": true, "items": {"type": "string", "pattern": "^https://[^/?#]+:[0-9]+$"}},
+    "keyPrefix": {"type": "string", "pattern": "^/[A-Za-z0-9._/-]{1,255}$"},
+    "caCertificate": {"type": "string", "minLength": 1},
+    "caCertificateSha256": {"$ref": "#/$defs/sha256"},
+    "clientCertificate": {"type": "string", "minLength": 1},
+    "clientCertificateSha256": {"$ref": "#/$defs/sha256"},
+    "clientKey": {"type": "string", "minLength": 1},
+    "clientKeySha256": {"$ref": "#/$defs/sha256"},
+    "dialTimeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 10},
+    "commandTimeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 20},
+    "maxResponseBytes": {"type": "integer", "minimum": 4096, "maximum": 4194304}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "pin": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}}}
+  }
+}

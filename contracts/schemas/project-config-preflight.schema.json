@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-preflight.schema.json",
+  "title": "PocoDDSRuntime project configuration preflight evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "transactionId", "project", "status",
+    "createdAt", "manifestSha256", "planSha256", "capabilitiesSha256",
+    "currentDocumentSha256", "candidateDocumentSha256", "requiresRestart",
+    "participants", "events", "errors", "evidenceSha256"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "project-config-preflight"},
+    "transactionId": {"type": "string", "format": "uuid"},
+    "project": {"type": "string", "minLength": 1},
+    "status": {"enum": ["running", "passed", "failed"]},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "finishedAt": {"type": "string", "format": "date-time"},
+    "manifestSha256": {"$ref": "#/$defs/sha256"},
+    "planSha256": {"$ref": "#/$defs/sha256"},
+    "capabilitiesSha256": {"$ref": "#/$defs/sha256"},
+    "currentDocumentSha256": {"$ref": "#/$defs/sha256"},
+    "candidateDocumentSha256": {"$ref": "#/$defs/sha256"},
+    "requiresRestart": {"type": "boolean"},
+    "participants": {"$ref": "#/$defs/participantIds"},
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["participant", "phase", "status", "responseSha256", "finishedAt"],
+        "properties": {
+          "participant": {"type": "string", "minLength": 1},
+          "phase": {"const": "preflight"},
+          "status": {"const": "ready"},
+          "responseSha256": {"$ref": "#/$defs/sha256"},
+          "finishedAt": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "errors": {"type": "array", "items": {"type": "string"}},
+    "evidenceSha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "participantIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

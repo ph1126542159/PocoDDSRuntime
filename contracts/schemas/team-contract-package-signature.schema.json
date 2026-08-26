@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-package-signature.schema.json",
+  "title": "Ed25519 team contract package signature envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "algorithm", "keyId", "packageId", "version",
+    "owner", "manifestSha256", "artifactSetSha256", "signature"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractPackageSignature"},
+    "algorithm": {"const": "Ed25519"},
+    "keyId": {"$ref": "#/$defs/identifier"},
+    "packageId": {"$ref": "#/$defs/packageId"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$"},
+    "owner": {"$ref": "#/$defs/identifier"},
+    "manifestSha256": {"$ref": "#/$defs/sha256"},
+    "artifactSetSha256": {"$ref": "#/$defs/sha256"},
+    "signature": {"type": "string", "minLength": 88, "maxLength": 88}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "packageId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

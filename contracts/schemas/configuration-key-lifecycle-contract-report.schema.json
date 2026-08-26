@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/configuration-key-lifecycle-contract-report.schema.json",
+  "title": "Configuration key lifecycle and migration conformance evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "passed", "compatible", "runtimeVersion",
+    "participantDeclarationCount", "lifecycleDeclarationCount", "entryCount",
+    "migrationDocumentCount", "inputSetSha256", "inputs", "entries",
+    "migrationOperations", "baseline", "violations", "errors"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "operation": { "const": "configuration-key-lifecycle-contract" },
+    "passed": { "type": "boolean" },
+    "compatible": { "type": "boolean" },
+    "runtimeVersion": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        { "type": "null" }
+      ]
+    },
+    "participantDeclarationCount": { "type": "integer", "minimum": 0 },
+    "lifecycleDeclarationCount": { "type": "integer", "minimum": 0 },
+    "entryCount": { "type": "integer", "minimum": 0, "maximum": 1024 },
+    "migrationDocumentCount": { "type": "integer", "minimum": 0 },
+    "inputSetSha256": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "owner", "path", "sha256"],
+        "properties": {
+          "kind": { "enum": ["participant", "lifecycle", "migration"] },
+          "owner": { "type": "string" },
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "owner", "id", "participantId", "operation", "sourceKey",
+          "replacementKey", "deprecatedSince", "removalAllowedFrom"
+        ],
+        "properties": {
+          "owner": { "type": "string", "minLength": 1, "maxLength": 192 },
+          "id": { "type": "string", "pattern": "^PDR-CFG-[0-9]{4,}$" },
+          "participantId": {
+            "$ref": "configuration-participants.schema.json#/$defs/participantId"
+          },
+          "operation": { "enum": ["rename", "remove"] },
+          "sourceKey": {
+            "$ref": "configuration-participants.schema.json#/$defs/prefix"
+          },
+          "replacementKey": {
+            "oneOf": [
+              { "$ref": "configuration-participants.schema.json#/$defs/prefix" },
+              { "type": "null" }
+            ]
+          },
+          "deprecatedSince": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          },
+          "removalAllowedFrom": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          }
+        }
+      }
+    },
+    "migrationOperations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "op", "sourceKey", "replacementKey"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "op": { "enum": ["rename", "remove"] },
+          "sourceKey": { "type": "string", "minLength": 1, "maxLength": 192 },
+          "replacementKey": {
+            "oneOf": [
+              { "type": "string", "minLength": 1, "maxLength": 192 },
+              { "type": "null" }
+            ]
+          }
+        }
+      }
+    },
+    "baseline": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "runtimeVersion", "entryCount"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "runtimeVersion": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "entryCount": { "type": "integer", "minimum": 0, "maximum": 1024 }
+          }
+        }
+      ]
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "path", "sourceKey", "detail"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "path": { "type": "string" },
+          "sourceKey": { "type": "string", "maxLength": 192 },
+          "detail": { "type": "string", "minLength": 1, "maxLength": 512 }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "path", "detail"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "path": { "type": "string" },
+          "detail": { "type": "string", "minLength": 1, "maxLength": 512 }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "passed": { "const": true } }, "required": ["passed"] },
+      "then": {
+        "properties": {
+          "compatible": { "const": true },
+          "runtimeVersion": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          },
+          "inputSetSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "violations": { "maxItems": 0 },
+          "errors": { "maxItems": 0 }
+        }
+      },
+      "else": {
+        "anyOf": [
+          { "properties": { "violations": { "minItems": 1 } } },
+          { "properties": { "errors": { "minItems": 1 } } }
+        ]
+      }
+    }
+  ]
+}

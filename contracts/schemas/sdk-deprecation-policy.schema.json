@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.dev/contracts/sdk-deprecation-policy.schema.json",
+  "title": "PocoDDSRuntime SDK deprecation lifecycle policy report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "passed", "baselineVersion", "currentVersion",
+    "baselineSurfaceSha256", "currentSurfaceSha256", "inputs", "inputSetSha256",
+    "publishedSnapshotCount", "entryCount", "activeEntryCount", "removedEntryCount",
+    "markerCount", "breakingSurfaces", "violations"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "operation": { "const": "sdk-deprecation-policy" },
+    "passed": { "type": "boolean" },
+    "baselineVersion": { "$ref": "#/$defs/semver" },
+    "currentVersion": { "$ref": "#/$defs/semver" },
+    "baselineSurfaceSha256": { "$ref": "#/$defs/sha256" },
+    "currentSurfaceSha256": { "$ref": "#/$defs/sha256" },
+    "inputs": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "path", "sha256"],
+        "properties": {
+          "role": {
+            "enum": [
+              "catalog", "baseline-snapshot", "current-snapshot", "published-snapshot"
+            ]
+          },
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "inputSetSha256": { "$ref": "#/$defs/sha256" },
+    "publishedSnapshotCount": { "type": "integer", "minimum": 1 },
+    "entryCount": { "type": "integer", "minimum": 0 },
+    "activeEntryCount": { "type": "integer", "minimum": 0 },
+    "removedEntryCount": { "type": "integer", "minimum": 0 },
+    "markerCount": { "type": "integer", "minimum": 0 },
+    "breakingSurfaces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/breakingSurface" }
+    },
+    "violations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/violation" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "passed": { "const": true } } },
+      "then": { "properties": { "violations": { "maxItems": 0 } } },
+      "else": { "properties": { "violations": { "minItems": 1 } } }
+    }
+  ],
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "breakingSurface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "surface", "change"],
+      "properties": {
+        "kind": { "enum": ["header", "cmake-target", "abi-artifact"] },
+        "surface": { "type": "string", "minLength": 1 },
+        "change": { "enum": ["removed", "changed"] }
+      }
+    },
+    "violation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "id", "kind", "surface", "detail"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "surface": { "type": "string" },
+        "detail": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

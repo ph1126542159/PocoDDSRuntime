@@ -107,14 +107,14 @@ def main() -> int:
                 before.get("environmentBackedPrincipalCount") != 0):
             raise RuntimeError("identity snapshot secret-source diagnostics are incorrect")
 
-        def concurrent_probe(token: str, expected_generation: int):
+        def concurrent_probe(token: str, accepted_generations: set[int]):
             observations = []
             for _ in range(40):
                 status, body = request("/api/v1/identity", token)
                 generation = json.loads(body).get("generation") if status == 200 else None
                 if status not in {200, 401}:
                     raise RuntimeError(f"concurrent identity probe returned HTTP {status}")
-                if status == 200 and generation != expected_generation:
+                if status == 200 and generation not in accepted_generations:
                     raise RuntimeError("token authenticated against a mismatched identity generation")
                 observations.append(status)
                 time.sleep(0.005)
@@ -122,8 +122,15 @@ def main() -> int:
 
         replace_token(new_token + "\n")
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            old_futures = [executor.submit(concurrent_probe, old_token, 1) for _ in range(4)]
-            new_futures = [executor.submit(concurrent_probe, new_token, 2) for _ in range(4)]
+            # Authentication and the diagnostic snapshot read are separate
+            # linearization points. An old-token request authenticated before
+            # the swap may therefore return the generation-2 snapshot while it
+            # drains; the post-reload probes below prove it cannot authenticate
+            # after the transition has completed.
+            old_futures = [executor.submit(concurrent_probe, old_token, {1, 2})
+                           for _ in range(4)]
+            new_futures = [executor.submit(concurrent_probe, new_token, {2})
+                           for _ in range(4)]
             time.sleep(0.05)
             reload_status, reload_body = request(
                 "/api/v1/identity", old_token, "POST", "identity-rotation-success")

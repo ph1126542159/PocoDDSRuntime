@@ -71,11 +71,71 @@ class ComponentTemplateTests(unittest.TestCase):
                     encoding="utf-8"
                 ))
                 self.assertEqual(state["kind"], kind)
-                self.assertEqual(state["appliedVersion"], 3)
+                self.assertEqual(state["appliedVersion"], 9)
                 self.assertTrue(state["managedFiles"])
                 cmake = component / "CMakeLists.txt"
-                self.assertIn("PDR_COMPONENT_TEMPLATE_VERSION 3",
+                self.assertIn("PDR_COMPONENT_TEMPLATE_VERSION 9",
                               cmake.read_text(encoding="utf-8"))
+                contract = json.loads((component / "pdr-component.json").read_text(
+                    encoding="utf-8"
+                ))
+                self.assertEqual(contract["kind"], kind)
+                self.assertEqual(contract["owner"], "project")
+                self.assertEqual(contract["requires"], [])
+                if kind == "device":
+                    self.assertTrue((component / "src/FactoryBundleActivator.cpp").is_file())
+                    specification = component / f"{name}Factory.bndlspec"
+                    self.assertTrue(specification.is_file())
+                    self.assertIn("<runLevel>090</runLevel>",
+                                  specification.read_text(encoding="utf-8"))
+                    self.assertIn("PocoDDS::GatewayAPI",
+                                  cmake.read_text(encoding="utf-8"))
+                if kind == "workflow":
+                    self.assertTrue((component / "src/WorkflowBundleActivator.cpp").is_file())
+                    specification = component / f"{name}Workflow.bndlspec"
+                    self.assertTrue(specification.is_file())
+                    self.assertIn("<runLevel>110</runLevel>",
+                                  specification.read_text(encoding="utf-8"))
+                    self.assertIn("PocoDDS::WorkflowAPI",
+                                  cmake.read_text(encoding="utf-8"))
+                if kind in {"bundle", "plugin"}:
+                    service_contract = component / "bundle/service-contracts.json"
+                    self.assertTrue(service_contract.is_file())
+                    service_document = json.loads(service_contract.read_text(encoding="utf-8"))
+                    self.assertEqual(len(service_document["provides"]), 1)
+                    self.assertIn("pdr_add_component_contract_test",
+                                  cmake.read_text(encoding="utf-8"))
+                    self.assertIn("<files>bundle/*</files>",
+                                  (component / f"{name}.bndlspec").read_text(
+                                      encoding="utf-8"))
+                    self.assertIn('properties.set("pdr.bundle"',
+                                  (component / "src/BundleActivator.cpp").read_text(
+                                      encoding="utf-8"))
+                    declaration = json.loads(
+                        (component / "bundle/configuration-participants.json").read_text(
+                            encoding="utf-8")
+                    )
+                    self.assertEqual(len(declaration["participants"]), 1)
+                    self.assertEqual(
+                        declaration["participants"][0]["ownedPrefixes"],
+                        [f"pdr.plugin.{name.lower()}"],
+                    )
+                    self.assertIn("pdr_add_configuration_participant_contract_test",
+                                  cmake.read_text(encoding="utf-8"))
+                    lifecycle = json.loads(
+                        (component / "bundle/configuration-key-lifecycle.json").read_text(
+                            encoding="utf-8")
+                    )
+                    self.assertEqual(lifecycle["entries"], [])
+                    self.assertIn(
+                        "pdr_add_configuration_key_lifecycle_contract_test",
+                        cmake.read_text(encoding="utf-8"),
+                    )
+                    activator = (component / "src/BundleActivator.cpp").read_text(
+                        encoding="utf-8"
+                    )
+                    self.assertIn("PARTICIPANT_KIND", activator)
+                    self.assertIn("_participantRef", activator)
 
                 project_file = state["projectFiles"][0]["path"]
                 project_path = component / project_file
@@ -118,6 +178,27 @@ class ComponentTemplateTests(unittest.TestCase):
             self.assertNotEqual(verified.returncode, 0)
             self.assertIn("untracked=README.md", verified.stderr)
 
+    def test_component_dependency_cli_updates_product_owned_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            component = self.create(Path(directory), "service", "DependencyService")
+            added = self.run_tool(
+                "component", "dependency", "add", str(component), "shared-model"
+            )
+            self.assertEqual(added.returncode, 0, added.stdout + added.stderr)
+            listed = self.run_tool(
+                "component", "dependency", "list", str(component), "--json"
+            )
+            self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
+            self.assertEqual(json.loads(listed.stdout), ["shared-model"])
+            removed = self.run_tool(
+                "component", "dependency", "remove", str(component), "shared-model"
+            )
+            self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+            contract = json.loads((component / "pdr-component.json").read_text(
+                encoding="utf-8"
+            ))
+            self.assertEqual(contract["requires"], [])
+
     def test_legacy_adopt_and_upgrade_never_touch_business_source(self):
         with tempfile.TemporaryDirectory() as directory:
             component = self.make_legacy_v1(Path(directory), "service", "LegacyService")
@@ -138,8 +219,9 @@ class ComponentTemplateTests(unittest.TestCase):
             upgraded = self.run_tool("component", "upgrade", str(component))
             self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
             self.assertEqual(source.read_bytes(), custom_source)
-            self.assertIn("PDR_COMPONENT_TEMPLATE_VERSION 3",
+            self.assertIn("PDR_COMPONENT_TEMPLATE_VERSION 9",
                           (component / "CMakeLists.txt").read_text(encoding="utf-8"))
+            self.assertTrue((component / "pdr-component.json").is_file())
             after = self.run_tool(
                 "component", "status", str(component), "--check", "--json"
             )
@@ -164,6 +246,20 @@ class ComponentTemplateTests(unittest.TestCase):
             )
             self.assertEqual(kept.returncode, 0, kept.stdout + kept.stderr)
             self.assertEqual(readme.read_bytes(), custom)
+            service_contract = json.loads(
+                (component / "bundle/service-contracts.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(service_contract["provides"], [])
+            self.assertEqual(service_contract["requires"], [])
+            participant_contract = json.loads(
+                (component / "bundle/configuration-participants.json").read_text(
+                    encoding="utf-8")
+            )
+            self.assertEqual(participant_contract["participants"], [])
+            self.assertNotIn(
+                'properties.set("pdr.bundle"',
+                (component / "src/BundleActivator.cpp").read_text(encoding="utf-8"),
+            )
             state = json.loads((component / ".pdr-component.json").read_text(
                 encoding="utf-8"
             ))

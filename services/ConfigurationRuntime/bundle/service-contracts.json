@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "provides": [
+    {
+      "contract": "pdr.configuration-runtime",
+      "version": "1.0.0",
+      "serviceName": "pdr.service.configurationRuntime"
+    },
+    {
+      "contract": "pdr.configuration-preflight",
+      "version": "1.0.0",
+      "serviceName": "pdr.service.configurationPreflightRuntime"
+    },
+    {
+      "contract": "pdr.configuration-participant-catalog",
+      "version": "1.0.0",
+      "serviceName": "pdr.service.configurationParticipantCatalogRuntime"
+    }
+  ],
+  "requires": [
+    {
+      "contract": "pdr.capability-runtime",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": true,
+      "minimumProviders": 1
+    }
+  ]
+}

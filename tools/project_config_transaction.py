@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan, apply and recover project configuration transactions."""
+"""Plan, preflight, apply and recover project configuration transactions."""
 
 from __future__ import annotations
 
@@ -17,13 +17,15 @@ from typing import Any, Iterator
 
 
 PROTOCOL = "pdr-config-transaction/1"
+JOURNAL_SCHEMA_VERSION = 3
 CAPABILITY_MODES = {"hot-reload", "restart", "immutable"}
 TERMINAL_STATUSES = {"committed", "rolled-back", "preflight-failed"}
 TRANSACTION_STATUSES = {
-    "preflighting", "preflight-failed", "committing", "activating",
+    "preparing", "preflighting", "preflight-failed", "committing", "activating",
     "rolling-back", "rolled-back", "rollback-failed", "committed",
 }
 PARTICIPANT_ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$")
+ACTOR_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._@-]{0,127}$")
 POINTER_TOKEN = re.compile(r"(?:[^~/]|~[01])+")
 MISSING = object()
 
@@ -42,6 +44,36 @@ def digest(document: Any) -> str:
     return hashlib.sha256(canonical_json(document)).hexdigest()
 
 
+def sync_directory(path: Path) -> None:
+    if os.name == "nt":
+        return
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def durable_replace(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(
+        f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    )
+    try:
+        descriptor = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        sync_directory(path.parent)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def load_json(path: Path, description: str) -> dict[str, Any]:
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
@@ -53,12 +85,31 @@ def load_json(path: Path, description: str) -> dict[str, Any]:
 
 
 def atomic_json(path: Path, document: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(
-        json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    durable_replace(
+        path,
+        (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
     )
-    temporary.replace(path)
+
+
+def self_digest(document: dict[str, Any], field: str) -> str:
+    return digest({key: value for key, value in document.items() if key != field})
+
+
+def write_journal(path: Path, journal: dict[str, Any]) -> None:
+    journal["journalSha256"] = self_digest(journal, "journalSha256")
+    atomic_json(path, journal)
+
+
+def write_preflight_evidence(path: Path, evidence: dict[str, Any]) -> None:
+    evidence["evidenceSha256"] = self_digest(evidence, "evidenceSha256")
+    atomic_json(path, evidence)
+
+
+def validate_self_digest(document: dict[str, Any], field: str, description: str) -> None:
+    value = document.get(field)
+    if (not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+            or value != self_digest(document, field)):
+        raise ValueError(f"{description} hash mismatch")
 
 
 def confined_path(root: Path, value: str | Path, field: str,
@@ -279,6 +330,7 @@ def bind_change(change: dict[str, str], participants: dict[str, dict[str, Any]])
 
 def create_plan(manifest: Path, current_path: Path, candidate_path: Path) -> dict[str, Any]:
     import project_manager
+    from project_config_approval import plan_requirements
 
     manifest = manifest.resolve()
     project = project_manager.validate_manifest(manifest, check_paths=True)
@@ -299,6 +351,7 @@ def create_plan(manifest: Path, current_path: Path, candidate_path: Path) -> dic
             change["mode"] == "immutable" for change in changes) else set())
     )
     requires_restart = any(change["mode"] == "restart" for change in changes)
+    approval = plan_requirements(root, project, changes)
     return {
         "schemaVersion": 1,
         "operation": "project-config-plan",
@@ -328,6 +381,7 @@ def create_plan(manifest: Path, current_path: Path, candidate_path: Path) -> dic
             for index, name in enumerate(ordered)
         ],
         "requiresRestart": requires_restart,
+        "approval": approval,
         "applicable": not reasons,
         "rejectionReasons": reasons,
     }
@@ -372,33 +426,51 @@ def validate_plan(plan: dict[str, Any], manifest: Path, capabilities: dict[str, 
         )
 
 
-def validate_plan_semantics(plan: dict[str, Any], expected: dict[str, Any]) -> None:
+def validate_plan_semantics(plan: dict[str, Any], expected: dict[str, Any],
+                            require_paths: bool = True) -> None:
     for field in (
-            "project", "manifestSha256", "capabilities", "candidate", "changes",
-            "participants", "requiresRestart", "applicable", "rejectionReasons"):
+            "project", "manifestSha256", "capabilities", "changes",
+            "participants", "requiresRestart", "approval", "applicable",
+            "rejectionReasons"):
         if plan.get(field) != expected.get(field):
             raise ValueError(f"configuration transaction plan semantics mismatch: {field}")
-    current = plan.get("current")
-    expected_current = expected.get("current")
-    if not isinstance(current, dict) or not isinstance(expected_current, dict):
-        raise ValueError("configuration transaction plan has an invalid current binding")
-    for field in ("documentSha256", "valuesSha256", "configVersion"):
-        if current.get(field) != expected_current.get(field):
+    for binding in ("current", "candidate"):
+        actual = plan.get(binding)
+        expected_binding = expected.get(binding)
+        if not isinstance(actual, dict) or not isinstance(expected_binding, dict):
             raise ValueError(
-                f"configuration transaction plan semantics mismatch: current.{field}"
+                f"configuration transaction plan has an invalid {binding} binding"
             )
+        fields = ["documentSha256", "valuesSha256", "configVersion"]
+        if require_paths:
+            fields.append("path")
+        for field in fields:
+            if actual.get(field) != expected_binding.get(field):
+                raise ValueError(
+                    f"configuration transaction plan semantics mismatch: {binding}.{field}"
+                )
 
 
 def validate_journal(journal: dict[str, Any], participants: dict[str, dict[str, Any]]) -> None:
-    if (journal.get("schemaVersion") != 1
+    version = journal.get("schemaVersion")
+    if (version not in (1, 2, JOURNAL_SCHEMA_VERSION)
             or journal.get("operation") != "project-config-transaction"):
         raise ValueError("unsupported configuration transaction journal")
+    if isinstance(version, int) and version >= 2:
+        validate_self_digest(
+            journal, "journalSha256", "configuration transaction journal"
+        )
     try:
         uuid.UUID(journal.get("transactionId", ""))
     except (ValueError, TypeError) as error:
         raise ValueError("configuration transaction journal has an invalid transactionId") from error
     if journal.get("status") not in TRANSACTION_STATUSES:
         raise ValueError("configuration transaction journal has an invalid status")
+    initiated_by = journal.get("initiatedBy")
+    if initiated_by is not None and (
+            not isinstance(initiated_by, str)
+            or ACTOR_ID.fullmatch(initiated_by) is None):
+        raise ValueError("configuration transaction journal has an invalid initiator")
     for field in (
             "preflightCompleted", "commitAttempted", "commitCompleted", "rollbackCompleted"):
         values = journal.get(field)
@@ -411,6 +483,50 @@ def validate_journal(journal: dict[str, Any], participants: dict[str, dict[str, 
         raise ValueError("configuration transaction journal rolled back a commit never attempted")
     if not isinstance(journal.get("events"), list) or not isinstance(journal.get("errors"), list):
         raise ValueError("configuration transaction journal events and errors must be arrays")
+    if ("preflightEvidence" in journal) != ("preflightEvidenceSha256" in journal):
+        raise ValueError("configuration transaction journal has incomplete preflight binding")
+    if "approval" in journal and not isinstance(journal["approval"], dict):
+        raise ValueError("configuration transaction journal approval evidence is malformed")
+    audit_fields = {"auditSequence", "auditRecordSha256", "auditEvent"}
+    present_audit_fields = audit_fields.intersection(journal)
+    if present_audit_fields and present_audit_fields != audit_fields:
+        raise ValueError("configuration transaction journal audit binding is incomplete")
+
+
+def validate_preflight_evidence(evidence: dict[str, Any], plan: dict[str, Any],
+                                manifest: Path, capabilities: dict[str, Any],
+                                current: dict[str, Any], candidate: dict[str, Any]) -> None:
+    if (evidence.get("schemaVersion") != 1
+            or evidence.get("operation") != "project-config-preflight"):
+        raise ValueError("unsupported configuration preflight evidence")
+    validate_self_digest(
+        evidence, "evidenceSha256", "configuration preflight evidence"
+    )
+    if evidence.get("status") != "passed":
+        raise ValueError("configuration preflight evidence did not pass")
+    expected = {
+        "transactionId": plan["transactionId"],
+        "project": plan["project"],
+        "manifestSha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        "planSha256": digest(plan),
+        "capabilitiesSha256": digest(capabilities),
+        "currentDocumentSha256": digest(current),
+        "candidateDocumentSha256": digest(candidate),
+        "requiresRestart": plan["requiresRestart"],
+        "participants": [item["id"] for item in plan["participants"]],
+    }
+    for field, value in expected.items():
+        if evidence.get(field) != value:
+            raise ValueError(f"configuration preflight evidence has stale {field}")
+    events = evidence.get("events")
+    if (not isinstance(events, list) or
+            [item.get("participant") for item in events
+             if isinstance(item, dict)] != expected["participants"] or
+            any(not isinstance(item, dict) or item.get("phase") != "preflight"
+                or item.get("status") != "ready" for item in events)):
+        raise ValueError("configuration preflight evidence participant results mismatch")
+    if evidence.get("errors") != []:
+        raise ValueError("configuration preflight evidence contains errors")
 
 
 def invoke(participant: dict[str, Any], phase: str, plan: dict[str, Any], root: Path,
@@ -480,6 +596,36 @@ def invoke(participant: dict[str, Any], phase: str, plan: dict[str, Any], root: 
 def process_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+
+        process_query_limited_information = 0x1000
+        still_active = 259
+        error_invalid_parameter = 87
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, wintypes.LPDWORD]
+        kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        handle = kernel32.OpenProcess(
+            process_query_limited_information, False, pid
+        )
+        if not handle:
+            error = ctypes.get_last_error()
+            if error == error_invalid_parameter:
+                return False
+            # Access denied proves existence; any other unknown error also fails safe.
+            return True
+        try:
+            exit_code = wintypes.DWORD()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                return True
+            return exit_code.value == still_active
+        finally:
+            kernel32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -489,16 +635,75 @@ def process_alive(pid: int) -> bool:
     return True
 
 
+def process_identity(pid: int) -> str | None:
+    """Return a PID-reuse-resistant process creation identity when available."""
+    if pid <= 0:
+        return None
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+
+        class FileTime(ctypes.Structure):
+            _fields_ = [
+                ("low", wintypes.DWORD),
+                ("high", wintypes.DWORD),
+            ]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.GetProcessTimes.argtypes = [
+            wintypes.HANDLE, ctypes.POINTER(FileTime), ctypes.POINTER(FileTime),
+            ctypes.POINTER(FileTime), ctypes.POINTER(FileTime),
+        ]
+        kernel32.GetProcessTimes.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return None
+        try:
+            creation = FileTime()
+            exit_time = FileTime()
+            kernel_time = FileTime()
+            user_time = FileTime()
+            if not kernel32.GetProcessTimes(
+                    handle, ctypes.byref(creation), ctypes.byref(exit_time),
+                    ctypes.byref(kernel_time), ctypes.byref(user_time)):
+                return None
+            value = (creation.high << 32) | creation.low
+            return f"win-filetime:{value}"
+        finally:
+            kernel32.CloseHandle(handle)
+    stat = Path(f"/proc/{pid}/stat")
+    try:
+        content = stat.read_text(encoding="ascii")
+        fields = content[content.rindex(")") + 2:].split()
+        return f"proc-startticks:{int(fields[19])}"
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 @contextlib.contextmanager
-def transaction_lock(state: Path, transaction_id: str) -> Iterator[None]:
+def transaction_lock(state: Path, transaction_id: str,
+                     actor: str | None = None) -> Iterator[None]:
     state.mkdir(parents=True, exist_ok=True)
     lock = state / "config-transaction.lock"
-    payload = json.dumps({"pid": os.getpid(), "transactionId": transaction_id})
+    owner = {"pid": os.getpid(), "transactionId": transaction_id}
+    identity = process_identity(os.getpid())
+    if identity is not None:
+        owner["processIdentity"] = identity
+    if actor is not None:
+        owner["actor"] = actor
+    payload = json.dumps(owner)
     while True:
         try:
             descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
                 stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            sync_directory(state)
             break
         except FileExistsError:
             try:
@@ -506,7 +711,12 @@ def transaction_lock(state: Path, transaction_id: str) -> Iterator[None]:
                 owner_pid = int(owner.get("pid", 0))
             except (OSError, ValueError, json.JSONDecodeError, AttributeError) as error:
                 raise RuntimeError(f"configuration transaction lock is invalid: {lock}") from error
-            if process_alive(owner_pid):
+            owner_identity = owner.get("processIdentity")
+            identity_matches = (
+                not isinstance(owner_identity, str)
+                or process_identity(owner_pid) in (None, owner_identity)
+            )
+            if process_alive(owner_pid) and identity_matches:
                 raise RuntimeError(
                     f"configuration transaction is already running with pid {owner_pid}"
                 )
@@ -525,11 +735,36 @@ def transaction_lock(state: Path, transaction_id: str) -> Iterator[None]:
             pass
 
 
+def unfinished_transactions(state: Path, project: str,
+                            participants: dict[str, dict[str, Any]]) -> list[Path]:
+    pending: list[Path] = []
+    if not state.is_dir():
+        return pending
+    for path in sorted(state.glob("*.journal.json")):
+        journal = load_json(path, "configuration transaction journal")
+        if journal.get("operation") != "project-config-transaction":
+            raise ValueError(f"unexpected configuration transaction journal: {path}")
+        if journal.get("project") != project:
+            raise ValueError(f"configuration transaction journal belongs to another project: {path}")
+        status = journal.get("status")
+        if status not in TRANSACTION_STATUSES:
+            raise ValueError(f"configuration transaction journal has an invalid status: {path}")
+        version = journal.get("schemaVersion")
+        if isinstance(version, int) and version >= 2:
+            validate_self_digest(
+                journal, "journalSha256", "configuration transaction journal"
+            )
+        missing_terminal_audit = version == JOURNAL_SCHEMA_VERSION \
+            and status in TERMINAL_STATUSES \
+            and not {"auditSequence", "auditRecordSha256", "auditEvent"}.issubset(journal)
+        if status not in TERMINAL_STATUSES or missing_terminal_audit:
+            validate_journal(journal, participants)
+            pending.append(path)
+    return pending
+
+
 def activate(source: Path, destination: Path) -> None:
-    data = source.read_bytes()
-    temporary = destination.with_name(destination.name + ".activate.tmp")
-    temporary.write_bytes(data)
-    temporary.replace(destination)
+    durable_replace(destination, source.read_bytes())
 
 
 def changed_paths(plan: dict[str, Any], participant_id: str) -> list[str]:
@@ -542,7 +777,7 @@ def rollback_attempted(journal: dict[str, Any], plan: dict[str, Any],
                        current: Path, candidate: Path, journal_path: Path) -> list[str]:
     errors: list[str] = []
     journal["status"] = "rolling-back"
-    atomic_json(journal_path, journal)
+    write_journal(journal_path, journal)
     for identifier in reversed(journal["commitAttempted"]):
         if identifier in journal["rollbackCompleted"]:
             continue
@@ -555,12 +790,100 @@ def rollback_attempted(journal: dict[str, Any], plan: dict[str, Any],
             journal["events"].append(evidence)
         except Exception as error:
             errors.append(f"{identifier}: {error}")
-        atomic_json(journal_path, journal)
+        write_journal(journal_path, journal)
     return errors
+
+
+def finalize_terminal_journal(state: Path, journal_path: Path,
+                              journal: dict[str, Any], actor: str,
+                              event: str) -> None:
+    from project_config_audit import append_terminal_record
+
+    record = append_terminal_record(state, journal_path, journal, actor, event)
+    journal["auditSequence"] = record["sequence"]
+    journal["auditRecordSha256"] = record["recordSha256"]
+    journal["auditEvent"] = record["event"]
+    write_journal(journal_path, journal)
+
+
+def preflight_command(args: Any) -> int:
+    import project_manager
+
+    manifest = Path(args.manifest).resolve()
+    project = project_manager.validate_manifest(manifest, check_paths=True)
+    root = manifest.parent
+    plan_path = confined_path(root, args.plan, "transaction plan", must_exist=True)
+    plan = load_json(plan_path, "configuration transaction plan")
+    current_path = confined_path(root, args.current, "current configuration", must_exist=True)
+    candidate_path = confined_path(root, args.candidate, "candidate configuration", must_exist=True)
+    output = confined_path(root, args.output, "configuration preflight evidence")
+    if output.exists():
+        raise FileExistsError(f"configuration preflight evidence already exists: {output}")
+    capabilities, participants, _ = load_capabilities(manifest)
+    current = load_resolved(current_path, project["name"])
+    candidate = load_resolved(candidate_path, project["name"])
+    validate_plan(plan, manifest, capabilities, current, candidate)
+    validate_plan_semantics(plan, create_plan(manifest, current_path, candidate_path))
+    ordered = [item["id"] for item in plan["participants"]]
+    for identifier in ordered:
+        if identifier not in participants or not participants[identifier]["command"]:
+            raise ValueError(
+                f"configuration participant has no transaction command: {identifier}"
+            )
+
+    evidence: dict[str, Any] = {
+        "schemaVersion": 1,
+        "operation": "project-config-preflight",
+        "transactionId": plan["transactionId"],
+        "project": project["name"],
+        "status": "running",
+        "createdAt": now(),
+        "manifestSha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        "planSha256": digest(plan),
+        "capabilitiesSha256": digest(capabilities),
+        "currentDocumentSha256": digest(current),
+        "candidateDocumentSha256": digest(candidate),
+        "requiresRestart": plan["requiresRestart"],
+        "participants": ordered,
+        "events": [],
+        "errors": [],
+    }
+    write_preflight_evidence(output, evidence)
+    try:
+        for identifier in ordered:
+            evidence["events"].append(invoke(
+                participants[identifier], "preflight", plan, root, current_path,
+                candidate_path, output, changed_paths(plan, identifier),
+            ))
+            write_preflight_evidence(output, evidence)
+        latest_current = load_resolved(current_path, project["name"])
+        latest_candidate = load_resolved(candidate_path, project["name"])
+        validate_plan(plan, manifest, capabilities, latest_current, latest_candidate)
+        validate_plan_semantics(
+            plan, create_plan(manifest, current_path, candidate_path)
+        )
+    except Exception as error:
+        evidence["status"] = "failed"
+        evidence["errors"].append(str(error))
+        evidence["finishedAt"] = now()
+        write_preflight_evidence(output, evidence)
+        raise
+    evidence["status"] = "passed"
+    evidence["finishedAt"] = now()
+    write_preflight_evidence(output, evidence)
+    print(
+        f"PDR_PROJECT_CONFIG_PREFLIGHT_PASS transaction={plan['transactionId']} "
+        f"participants={len(ordered)} evidence={output}"
+    )
+    return 0
 
 
 def apply_command(args: Any) -> int:
     import project_manager
+    from project_config_approval import verify_apply_approval
+    from project_config_audit import validate_actor, validate_audit
+
+    actor = validate_actor(args.actor)
 
     manifest = Path(args.manifest).resolve()
     project = project_manager.validate_manifest(manifest, check_paths=True)
@@ -574,6 +897,26 @@ def apply_command(args: Any) -> int:
     candidate = load_resolved(candidate_path, project["name"])
     validate_plan(plan, manifest, capabilities, current, candidate)
     validate_plan_semantics(plan, create_plan(manifest, current_path, candidate_path))
+    approval_evidence = verify_apply_approval(args, root, project, plan)
+    preflight_path: Path | None = None
+    preflight: dict[str, Any] | None = None
+    if args.preflight_evidence:
+        preflight_path = confined_path(
+            root, args.preflight_evidence, "configuration preflight evidence",
+            must_exist=True,
+        )
+        preflight = load_json(preflight_path, "configuration preflight evidence")
+        validate_preflight_evidence(
+            preflight, plan, manifest, capabilities, current, candidate
+        )
+    invocation_bindings = {
+        "manifest": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        "plan": digest(plan),
+        "capabilities": digest(capabilities),
+        "current configuration": digest(current),
+        "candidate configuration": digest(candidate),
+        "preflight evidence": digest(preflight) if preflight is not None else "",
+    }
     if plan.get("requiresRestart") and not args.allow_restart:
         raise ValueError("configuration transaction requires --allow-restart")
     ordered = [item["id"] for item in plan["participants"]]
@@ -587,27 +930,69 @@ def apply_command(args: Any) -> int:
     transaction_id = plan["transactionId"]
     journal_path = state / f"{transaction_id}.journal.json"
     previous_path = state / f"{transaction_id}.previous-config.json"
-    if journal_path.exists() or previous_path.exists():
-        raise FileExistsError(f"configuration transaction state already exists: {transaction_id}")
-
-    with transaction_lock(state, transaction_id):
+    plan_snapshot_path = state / f"{transaction_id}.plan.json"
+    candidate_snapshot_path = state / f"{transaction_id}.candidate-config.json"
+    with transaction_lock(state, transaction_id, actor):
+        plan = load_json(plan_path, "configuration transaction plan")
+        capabilities, participants, capability_path = load_capabilities(manifest)
+        current = load_resolved(current_path, project["name"])
+        candidate = load_resolved(candidate_path, project["name"])
+        locked_bindings = {
+            "manifest": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+            "plan": digest(plan),
+            "capabilities": digest(capabilities),
+            "current configuration": digest(current),
+            "candidate configuration": digest(candidate),
+        }
+        for label, value in locked_bindings.items():
+            if invocation_bindings[label] != value:
+                raise ValueError(
+                    f"configuration transaction {label} changed while acquiring the lock"
+                )
+        validate_plan(plan, manifest, capabilities, current, candidate)
+        validate_plan_semantics(plan, create_plan(manifest, current_path, candidate_path))
+        approval_evidence = verify_apply_approval(args, root, project, plan)
+        if preflight_path is not None:
+            preflight = load_json(preflight_path, "configuration preflight evidence")
+            if invocation_bindings["preflight evidence"] != digest(preflight):
+                raise ValueError(
+                    "configuration preflight evidence changed while acquiring the lock"
+                )
+            validate_preflight_evidence(
+                preflight, plan, manifest, capabilities, current, candidate
+            )
+        pending = unfinished_transactions(state, project["name"], participants)
+        if pending:
+            raise RuntimeError(
+                f"unfinished configuration transaction requires recovery: {pending[0]}"
+            )
+        validate_audit(state, verify_journals=True)
+        transaction_files = (
+            journal_path, previous_path, plan_snapshot_path, candidate_snapshot_path,
+        )
+        if any(path.exists() for path in transaction_files):
+            raise FileExistsError(
+                f"configuration transaction state already exists: {transaction_id}"
+            )
         state.mkdir(parents=True, exist_ok=True)
-        previous_path.write_bytes(current_path.read_bytes())
         journal: dict[str, Any] = {
-            "schemaVersion": 1,
+            "schemaVersion": JOURNAL_SCHEMA_VERSION,
             "operation": "project-config-transaction",
             "transactionId": transaction_id,
             "project": project["name"],
-            "status": "preflighting",
+            "initiatedBy": actor,
+            "status": "preparing",
             "startedAt": now(),
             "manifest": relative(root, manifest),
             "manifestSha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
-            "plan": relative(root, plan_path),
+            "plan": relative(root, plan_snapshot_path),
+            "planSource": relative(root, plan_path),
             "planSha256": digest(plan),
             "capabilities": relative(root, capability_path),
             "capabilitiesSha256": digest(capabilities),
             "currentConfig": relative(root, current_path),
-            "candidateConfig": relative(root, candidate_path),
+            "candidateConfig": relative(root, candidate_snapshot_path),
+            "candidateSource": relative(root, candidate_path),
             "previousConfig": relative(root, previous_path),
             "previousConfigSha256": digest(current),
             "preflightCompleted": [],
@@ -617,56 +1002,77 @@ def apply_command(args: Any) -> int:
             "events": [],
             "errors": [],
         }
-        atomic_json(journal_path, journal)
+        if preflight_path is not None and preflight is not None:
+            journal["preflightEvidence"] = relative(root, preflight_path)
+            journal["preflightEvidenceSha256"] = preflight["evidenceSha256"]
+        if approval_evidence is not None:
+            journal["approval"] = approval_evidence
+        write_journal(journal_path, journal)
+        durable_replace(plan_snapshot_path, plan_path.read_bytes())
+        durable_replace(candidate_snapshot_path, candidate_path.read_bytes())
+        durable_replace(previous_path, current_path.read_bytes())
+        journal["status"] = "preflighting"
+        write_journal(journal_path, journal)
         try:
             for identifier in ordered:
                 evidence = invoke(
                     participants[identifier], "preflight", plan, root, current_path,
-                    candidate_path, journal_path, changed_paths(plan, identifier),
+                    candidate_snapshot_path, journal_path, changed_paths(plan, identifier),
                 )
                 journal["preflightCompleted"].append(identifier)
                 journal["events"].append(evidence)
-                atomic_json(journal_path, journal)
+                write_journal(journal_path, journal)
         except Exception as error:
             journal["status"] = "preflight-failed"
             journal["errors"].append(str(error))
             journal["finishedAt"] = now()
-            atomic_json(journal_path, journal)
+            write_journal(journal_path, journal)
+            finalize_terminal_journal(
+                state, journal_path, journal, actor,
+                "CONFIG_TRANSACTION_PREFLIGHT_FAILED",
+            )
             raise
 
         journal["status"] = "committing"
-        atomic_json(journal_path, journal)
+        write_journal(journal_path, journal)
         failure: Exception | None = None
         try:
             for identifier in ordered:
                 journal["commitAttempted"].append(identifier)
-                atomic_json(journal_path, journal)
+                write_journal(journal_path, journal)
                 evidence = invoke(
                     participants[identifier], "commit", plan, root, current_path,
-                    candidate_path, journal_path, changed_paths(plan, identifier),
+                    candidate_snapshot_path, journal_path, changed_paths(plan, identifier),
                 )
                 journal["commitCompleted"].append(identifier)
                 journal["events"].append(evidence)
-                atomic_json(journal_path, journal)
+                write_journal(journal_path, journal)
             journal["status"] = "activating"
-            atomic_json(journal_path, journal)
+            write_journal(journal_path, journal)
             validate_plan(
                 plan, manifest, capabilities,
                 load_resolved(current_path, project["name"]),
-                load_resolved(candidate_path, project["name"]),
+                load_resolved(candidate_snapshot_path, project["name"]),
             )
-            activate(candidate_path, current_path)
+            if digest(load_resolved(candidate_path, project["name"])) != digest(candidate):
+                raise ValueError("candidate configuration changed during transaction execution")
+            activate(candidate_snapshot_path, current_path)
             journal["status"] = "committed"
             journal["activeConfigSha256"] = digest(candidate)
             journal["finishedAt"] = now()
-            atomic_json(journal_path, journal)
+            write_journal(journal_path, journal)
+            finalize_terminal_journal(
+                state, journal_path, journal, actor,
+                "CONFIG_TRANSACTION_COMMITTED",
+            )
         except Exception as error:
             failure = error
 
         if failure is not None:
             journal["errors"].append(str(failure))
             rollback_errors = rollback_attempted(
-                journal, plan, participants, root, current_path, candidate_path, journal_path
+                journal, plan, participants, root, current_path,
+                candidate_snapshot_path, journal_path
             )
             if rollback_errors:
                 journal["status"] = "rollback-failed"
@@ -675,7 +1081,12 @@ def apply_command(args: Any) -> int:
                 activate(previous_path, current_path)
                 journal["status"] = "rolled-back"
             journal["finishedAt"] = now()
-            atomic_json(journal_path, journal)
+            write_journal(journal_path, journal)
+            finalize_terminal_journal(
+                state, journal_path, journal, actor,
+                "CONFIG_TRANSACTION_ROLLBACK_FAILED" if rollback_errors
+                else "CONFIG_TRANSACTION_ROLLED_BACK",
+            )
             raise RuntimeError(
                 f"configuration transaction failed with status {journal['status']}: {failure}"
             ) from failure
@@ -689,51 +1100,104 @@ def apply_command(args: Any) -> int:
 
 def recover_command(args: Any) -> int:
     import project_manager
+    from project_config_audit import validate_actor, validate_audit
+
+    actor = validate_actor(args.actor)
 
     manifest = Path(args.manifest).resolve()
     project = project_manager.validate_manifest(manifest, check_paths=True)
     root = manifest.parent
     journal_path = confined_path(root, args.journal, "transaction journal", must_exist=True)
-    journal = load_json(journal_path, "configuration transaction journal")
-    if journal.get("project") != project["name"]:
-        raise ValueError("configuration transaction journal belongs to another project")
     capabilities, participants, _ = load_capabilities(manifest)
-    validate_journal(journal, participants)
-    if journal.get("status") in TERMINAL_STATUSES:
-        print(
-            f"PDR_PROJECT_CONFIG_RECOVER_NOOP transaction={journal['transactionId']} "
-            f"status={journal['status']}"
-        )
-        return 0
-    if journal.get("status") == "rollback-failed" and not args.retry_rollback:
-        raise ValueError("rollback-failed recovery requires --retry-rollback")
-
-    plan_path = confined_path(root, journal["plan"], "journal plan", must_exist=True)
-    current_path = confined_path(root, journal["currentConfig"], "journal current config",
-                                   must_exist=True)
-    candidate_path = confined_path(root, journal["candidateConfig"],
-                                     "journal candidate config", must_exist=True)
-    previous_path = confined_path(root, journal["previousConfig"],
-                                    "journal previous config", must_exist=True)
-    plan = load_json(plan_path, "configuration transaction plan")
-    previous = load_resolved(previous_path, project["name"])
-    candidate = load_resolved(candidate_path, project["name"])
-    if digest(previous) != journal.get("previousConfigSha256"):
-        raise ValueError("configuration transaction previous snapshot digest mismatch")
-    bindings = (
-        (hashlib.sha256(manifest.read_bytes()).hexdigest(), journal.get("manifestSha256"), "manifest"),
-        (digest(plan), journal.get("planSha256"), "plan"),
-        (digest(capabilities), journal.get("capabilitiesSha256"), "capabilities"),
-    )
-    for actual, expected, label in bindings:
-        if actual != expected:
-            raise ValueError(f"configuration transaction journal has stale {label}")
-    validate_plan(plan, manifest, capabilities, previous, candidate)
-    validate_plan_semantics(plan, create_plan(manifest, previous_path, candidate_path))
-
-    transaction_id = journal["transactionId"]
     state = journal_path.parent
-    with transaction_lock(state, transaction_id):
+    initial = load_json(journal_path, "configuration transaction journal")
+    transaction_id = initial.get("transactionId")
+    try:
+        uuid.UUID(transaction_id)
+    except (ValueError, TypeError, AttributeError) as error:
+        raise ValueError("configuration transaction journal has an invalid transactionId") from error
+
+    with transaction_lock(state, transaction_id, actor):
+        capabilities, participants, _ = load_capabilities(manifest)
+        journal = load_json(journal_path, "configuration transaction journal")
+        if journal.get("project") != project["name"]:
+            raise ValueError("configuration transaction journal belongs to another project")
+        validate_journal(journal, participants)
+        if journal["transactionId"] != transaction_id:
+            raise ValueError("configuration transaction journal changed while acquiring the lock")
+        pending = unfinished_transactions(state, project["name"], participants)
+        others = [path for path in pending if path != journal_path]
+        if others:
+            raise RuntimeError(
+                f"another unfinished configuration transaction also requires recovery: {others[0]}"
+            )
+        has_audit_pointer = {
+            "auditSequence", "auditRecordSha256", "auditEvent"
+        }.issubset(journal)
+        if journal.get("status") not in TERMINAL_STATUSES or has_audit_pointer:
+            validate_audit(state, verify_journals=True)
+        if journal.get("status") in TERMINAL_STATUSES:
+            event = {
+                "committed": "CONFIG_TRANSACTION_COMMITTED",
+                "preflight-failed": "CONFIG_TRANSACTION_PREFLIGHT_FAILED",
+                "rollback-failed": "CONFIG_TRANSACTION_ROLLBACK_FAILED",
+                "rolled-back": (
+                    "CONFIG_TRANSACTION_RECOVERED_ROLLBACK"
+                    if "recoveredAt" in journal
+                    else "CONFIG_TRANSACTION_ROLLED_BACK"
+                ),
+            }[journal["status"]]
+            finalize_terminal_journal(state, journal_path, journal, actor, event)
+            print(
+                f"PDR_PROJECT_CONFIG_RECOVER_NOOP transaction={transaction_id} "
+                f"status={journal['status']}"
+            )
+            return 0
+        if journal.get("status") == "rollback-failed" and not args.retry_rollback:
+            raise ValueError("rollback-failed recovery requires --retry-rollback")
+        if journal.get("status") == "preparing":
+            journal["status"] = "rolled-back"
+            journal["errors"].append("configuration transaction preparation was interrupted")
+            journal["recoveredAt"] = now()
+            journal["finishedAt"] = now()
+            write_journal(journal_path, journal)
+            finalize_terminal_journal(
+                state, journal_path, journal, actor,
+                "CONFIG_TRANSACTION_RECOVERED_ROLLBACK",
+            )
+            print(
+                f"PDR_PROJECT_CONFIG_RECOVER_PASS transaction={transaction_id} "
+                f"journal={journal_path}"
+            )
+            return 0
+
+        plan_path = confined_path(root, journal["plan"], "journal plan", must_exist=True)
+        current_path = confined_path(root, journal["currentConfig"], "journal current config",
+                                       must_exist=True)
+        candidate_path = confined_path(root, journal["candidateConfig"],
+                                         "journal candidate config", must_exist=True)
+        previous_path = confined_path(root, journal["previousConfig"],
+                                        "journal previous config", must_exist=True)
+        plan = load_json(plan_path, "configuration transaction plan")
+        previous = load_resolved(previous_path, project["name"])
+        candidate = load_resolved(candidate_path, project["name"])
+        if digest(previous) != journal.get("previousConfigSha256"):
+            raise ValueError("configuration transaction previous snapshot digest mismatch")
+        bindings = (
+            (hashlib.sha256(manifest.read_bytes()).hexdigest(),
+             journal.get("manifestSha256"), "manifest"),
+            (digest(plan), journal.get("planSha256"), "plan"),
+            (digest(capabilities), journal.get("capabilitiesSha256"), "capabilities"),
+        )
+        for actual, expected, label in bindings:
+            if actual != expected:
+                raise ValueError(f"configuration transaction journal has stale {label}")
+        validate_plan(plan, manifest, capabilities, previous, candidate)
+        validate_plan_semantics(
+            plan, create_plan(manifest, previous_path, candidate_path),
+            require_paths=False,
+        )
+
         errors = rollback_attempted(
             journal, plan, participants, root, current_path, candidate_path, journal_path
         )
@@ -741,13 +1205,21 @@ def recover_command(args: Any) -> int:
             journal["status"] = "rollback-failed"
             journal["errors"].extend(errors)
             journal["finishedAt"] = now()
-            atomic_json(journal_path, journal)
+            write_journal(journal_path, journal)
+            finalize_terminal_journal(
+                state, journal_path, journal, actor,
+                "CONFIG_TRANSACTION_ROLLBACK_FAILED",
+            )
             raise RuntimeError("configuration transaction recovery rollback failed")
         activate(previous_path, current_path)
         journal["status"] = "rolled-back"
         journal["recoveredAt"] = now()
         journal["finishedAt"] = now()
-        atomic_json(journal_path, journal)
+        write_journal(journal_path, journal)
+        finalize_terminal_journal(
+            state, journal_path, journal, actor,
+            "CONFIG_TRANSACTION_RECOVERED_ROLLBACK",
+        )
     print(
         f"PDR_PROJECT_CONFIG_RECOVER_PASS transaction={transaction_id} journal={journal_path}"
     )

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "provides": [
+    {
+      "contract": "example.orders",
+      "version": "1.0.0",
+      "serviceName": "example.service.orders"
+    }
+  ],
+  "requires": [
+    {
+      "contract": "pdr.scheduling",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": true,
+      "minimumProviders": 1
+    },
+    {
+      "contract": "example.telemetry",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": false,
+      "minimumProviders": 1
+    }
+  ]
+}

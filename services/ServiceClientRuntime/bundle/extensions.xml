@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/service-client"
+             class="PocoDDS::ServiceClient::ServiceClientHandlerFactory"
+             library="pdr.service.serviceClientRuntime"
+             allowSpecialization="all"
+             hidden="true"/>
+</extensions>

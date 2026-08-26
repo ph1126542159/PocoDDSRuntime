@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "provides": [
+    {
+      "contract": "pdr.scheduling",
+      "version": "1.4.0",
+      "serviceName": "pdr.service.scheduler"
+    }
+  ],
+  "requires": []
+}

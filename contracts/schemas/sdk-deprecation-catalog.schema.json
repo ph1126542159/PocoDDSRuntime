@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.dev/contracts/sdk-deprecation-catalog.schema.json",
+  "title": "PocoDDSRuntime SDK surface deprecation lifecycle catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entries"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "kind", "surface", "symbol", "state", "deprecatedSince",
+        "removalAllowedFrom", "replacement", "owner", "noticeSurfaceSha256"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^PDR-DEP-[0-9]{4,}$" },
+        "kind": { "enum": ["header", "cmake-target", "abi-artifact"] },
+        "surface": { "type": "string", "minLength": 1 },
+        "symbol": { "type": "string", "minLength": 1 },
+        "state": { "enum": ["active", "removed"] },
+        "deprecatedSince": { "$ref": "#/$defs/semver" },
+        "removalAllowedFrom": { "$ref": "#/$defs/semver" },
+        "replacement": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "noticeSurfaceSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/contracts/runtime-capability-policy.schema.json",
+  "title": "PocoDDSRuntime Bundle Capability Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaultEffect", "rules"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "version": {"const": 1},
+    "defaultEffect": {"const": "deny"},
+    "rules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/rule"}
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "pattern": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(\\*|[A-Za-z0-9._:/-]+\\*?)$"
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "effect", "principal", "resourceKind", "resource", "actions"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "effect": {"enum": ["allow", "deny"]},
+        "principal": {"$ref": "#/$defs/pattern"},
+        "resourceKind": {"enum": ["service", "topic", "configuration", "device", "schema"]},
+        "resource": {"$ref": "#/$defs/pattern"},
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["discover", "use", "publish", "subscribe", "read", "write", "observe", "operate", "register", "deprecate"]}
+        }
+      },
+      "allOf": [
+        {"if": {"properties": {"resourceKind": {"const": "service"}}}, "then": {"properties": {"actions": {"items": {"enum": ["discover", "use"]}}}}},
+        {"if": {"properties": {"resourceKind": {"const": "topic"}}}, "then": {"properties": {"actions": {"items": {"enum": ["publish", "subscribe"]}}}}},
+        {"if": {"properties": {"resourceKind": {"const": "configuration"}}}, "then": {"properties": {"actions": {"items": {"enum": ["read", "write"]}}}}},
+        {"if": {"properties": {"resourceKind": {"const": "device"}}}, "then": {"properties": {"actions": {"items": {"enum": ["observe", "operate"]}}}}},
+        {"if": {"properties": {"resourceKind": {"const": "schema"}}}, "then": {"properties": {"actions": {"items": {"enum": ["read", "register", "deprecate"]}}}}}
+      ]
+    }
+  }
+}

@@ -1,0 +1,8 @@
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/process-dependencies"
+             class="PocoDDS::ProcessGraphEndpoint::ProcessGraphHandlerFactory"
+             library="pdr.platform.processGraph"
+             allowSpecialization="none"
+             hidden="true"/>
+</extensions>

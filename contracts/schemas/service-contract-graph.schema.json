@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.dev/contracts/service-contract-graph.schema.json",
+  "title": "Repository-wide production Bundle service-contract graph evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "passed", "scanRoot", "baseline",
+    "baselineSha256", "inputSetSha256", "inputs", "bundleCount",
+    "providerCount", "requirementCount", "requiredRequirementCount",
+    "requiredSatisfiedCount", "optionalUnsatisfiedCount", "bundles",
+    "requirements", "edges", "cycles", "violations", "warnings"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "service-contract-graph"},
+    "passed": {"type": "boolean"},
+    "scanRoot": {"type": "string", "minLength": 1},
+    "baseline": {"type": "string", "minLength": 1},
+    "baselineSha256": {"$ref": "#/$defs/sha256"},
+    "inputSetSha256": {"$ref": "#/$defs/sha256"},
+    "inputs": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/input"}},
+    "bundleCount": {"type": "integer", "minimum": 1},
+    "providerCount": {"type": "integer", "minimum": 0},
+    "requirementCount": {"type": "integer", "minimum": 0},
+    "requiredRequirementCount": {"type": "integer", "minimum": 0},
+    "requiredSatisfiedCount": {"type": "integer", "minimum": 0},
+    "optionalUnsatisfiedCount": {"type": "integer", "minimum": 0},
+    "bundles": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/bundle"}},
+    "requirements": {"type": "array", "items": {"$ref": "#/$defs/result"}},
+    "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}},
+    "cycles": {
+      "type": "array",
+      "items": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/identifier"}}
+    },
+    "violations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "warnings": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"passed": {"const": true}}},
+      "then": {"properties": {"violations": {"maxItems": 0}}},
+      "else": {"properties": {"violations": {"minItems": 1}}}
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "input": {
+      "type": "object", "additionalProperties": false,
+      "required": ["role", "path", "sha256"],
+      "properties": {
+        "role": {"enum": ["service-contract", "bundle-spec"]},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "provider": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract", "version", "serviceName"],
+      "properties": {
+        "contract": {"$ref": "#/$defs/identifier"},
+        "version": {"$ref": "#/$defs/version"},
+        "serviceName": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,192}$"}
+      }
+    },
+    "requirement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract", "versionRange", "required", "minimumProviders"],
+      "properties": {
+        "contract": {"$ref": "#/$defs/identifier"},
+        "versionRange": {"type": "string", "minLength": 1, "maxLength": 128},
+        "required": {"type": "boolean"},
+        "minimumProviders": {"type": "integer", "minimum": 1, "maximum": 64}
+      }
+    },
+    "bundle": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "owner", "path", "bndlspec", "bundleVersion", "runLevel", "lazyStart",
+        "contractSha256", "bundleSpecSha256", "provides", "requires"
+      ],
+      "properties": {
+        "owner": {"$ref": "#/$defs/identifier"},
+        "path": {"type": "string", "minLength": 1},
+        "bndlspec": {"type": "string", "minLength": 1},
+        "bundleVersion": {"$ref": "#/$defs/version"},
+        "runLevel": {"type": "integer", "minimum": 0, "maximum": 999},
+        "lazyStart": {"type": "boolean"},
+        "contractSha256": {"$ref": "#/$defs/sha256"},
+        "bundleSpecSha256": {"$ref": "#/$defs/sha256"},
+        "provides": {"type": "array", "items": {"$ref": "#/$defs/provider"}},
+        "requires": {"type": "array", "items": {"$ref": "#/$defs/requirement"}}
+      }
+    },
+    "result": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "owner", "contract", "versionRange", "required", "minimumProviders",
+        "status", "declaredProviders", "matchingProviders", "availableVersions",
+        "matchedProviders"
+      ],
+      "properties": {
+        "owner": {"$ref": "#/$defs/identifier"},
+        "contract": {"$ref": "#/$defs/identifier"},
+        "versionRange": {"type": "string", "minLength": 1},
+        "required": {"type": "boolean"},
+        "minimumProviders": {"type": "integer", "minimum": 1, "maximum": 64},
+        "status": {"enum": ["satisfied", "missing", "versionMismatch", "insufficientProviders"]},
+        "declaredProviders": {"type": "integer", "minimum": 0},
+        "matchingProviders": {"type": "integer", "minimum": 0},
+        "availableVersions": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/version"}},
+        "matchedProviders": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "edge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["consumer", "provider", "contract", "required"],
+      "properties": {
+        "consumer": {"$ref": "#/$defs/identifier"},
+        "provider": {"$ref": "#/$defs/identifier"},
+        "contract": {"$ref": "#/$defs/identifier"},
+        "required": {"type": "boolean"}
+      }
+    }
+  }
+}

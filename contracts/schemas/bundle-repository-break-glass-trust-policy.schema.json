@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/bundle-repository-break-glass-trust-policy.schema.json",
+  "title": "PocoDDSRuntime Bundle Repository Break-Glass Approver Trust Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "policyId", "maxApprovalLifetimeSeconds",
+    "minimumApprovals", "allowedApprovers", "revokedKeys"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "product": { "const": "PocoDDSBundleRepositoryBreakGlass" },
+    "policyId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+    "maxApprovalLifetimeSeconds": { "type": "integer", "minimum": 60, "maximum": 86400 },
+    "minimumApprovals": { "type": "integer", "minimum": 1, "maximum": 16 },
+    "allowedApprovers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "approverId", "keyId", "algorithm", "publicKeySha256",
+          "repositoryPatterns", "actions"
+        ],
+        "properties": {
+          "approverId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+          "keyId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "algorithm": { "const": "Ed25519" },
+          "publicKeySha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "repositoryPatterns": {
+            "type": "array", "minItems": 1,
+            "items": { "type": "string", "minLength": 1, "pattern": "^[^*\\s]+\\*?$" }
+          },
+          "actions": {
+            "type": "array", "minItems": 1, "uniqueItems": true,
+            "items": { "const": "downgrade-high-water" }
+          },
+          "notBefore": { "type": "string", "format": "date-time" },
+          "notAfter": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "revokedKeys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["keyId", "revokedAt", "reason"],
+        "properties": {
+          "keyId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "revokedAt": { "type": "string", "format": "date-time" },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

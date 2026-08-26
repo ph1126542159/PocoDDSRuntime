@@ -1,5 +1,7 @@
 #pragma once
 
+#include "PocoDDS/BundleManagement/BundleRepositoryAuthorization.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -28,8 +30,11 @@ namespace PocoDDS::BundleManagement
 struct BundleManagerOptions
 {
     std::string repositories;
+    std::string stateDirectory;
     std::int64_t intervalMilliseconds{1000};
     std::size_t stableScanCount{2};
+    bool inProcessReloadEnabled{false};
+    BundleRepositoryAuthorizationOptions authorization;
 };
 
 class PDR_BUNDLE_MANAGEMENT_API BundleManager final
@@ -49,6 +54,10 @@ class PDR_BUNDLE_MANAGEMENT_API BundleManager final
     bool running() const;
     std::size_t successfulReloads() const;
     std::size_t failedReloads() const;
+    std::size_t rejectedReloads() const;
+    std::size_t rolledBackReloads() const;
+    std::size_t restartRequiredReloads() const;
+    std::string lastError() const;
 
   private:
     class Impl;

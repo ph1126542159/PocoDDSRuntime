@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-backend-request.schema.json",
+  "title": "Registry leader authority backend request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "backendId", "authorityId", "registryId", "operation", "fencingToken", "grantSha256", "expectedCurrentToken", "expectedCurrentGrantSha256", "grantBase64"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendRequest"},
+    "requestId": {"$ref": "#/$defs/id"}, "backendId": {"$ref": "#/$defs/id"}, "authorityId": {"$ref": "#/$defs/id"}, "registryId": {"$ref": "#/$defs/id"},
+    "operation": {"enum": ["read-current", "read-grant", "compare-and-swap"]},
+    "fencingToken": {"type": ["integer", "null"], "minimum": 1}, "grantSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "expectedCurrentToken": {"type": ["integer", "null"], "minimum": 0}, "expectedCurrentGrantSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "grantBase64": {"type": ["string", "null"], "minLength": 1}
+  },
+  "allOf": [
+    {"if": {"properties": {"operation": {"const": "read-current"}}}, "then": {"properties": {"fencingToken": {"type": "null"}, "grantSha256": {"type": "null"}, "expectedCurrentToken": {"type": "null"}, "expectedCurrentGrantSha256": {"type": "null"}, "grantBase64": {"type": "null"}}}},
+    {"if": {"properties": {"operation": {"const": "read-grant"}}}, "then": {"properties": {"fencingToken": {"type": "integer", "minimum": 1}, "grantSha256": {"$ref": "#/$defs/sha256"}, "expectedCurrentToken": {"type": "null"}, "expectedCurrentGrantSha256": {"type": "null"}, "grantBase64": {"type": "null"}}}},
+    {"if": {"properties": {"operation": {"const": "compare-and-swap"}}}, "then": {"properties": {"fencingToken": {"type": "integer", "minimum": 1}, "grantSha256": {"$ref": "#/$defs/sha256"}, "expectedCurrentToken": {"type": "integer", "minimum": 0}, "expectedCurrentGrantSha256": {"$ref": "#/$defs/sha256"}, "grantBase64": {"type": "string", "minLength": 1}}}}
+  ],
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

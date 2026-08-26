@@ -7,7 +7,7 @@
   "required": [
     "schemaVersion", "operation", "transactionId", "createdAt", "project",
     "manifestSha256", "capabilities", "current", "candidate", "changes",
-    "participants", "requiresRestart", "applicable", "rejectionReasons"
+    "participants", "requiresRestart", "approval", "applicable", "rejectionReasons"
   ],
   "properties": {
     "schemaVersion": {"const": 1},
@@ -47,6 +47,7 @@
       }
     },
     "requiresRestart": {"type": "boolean"},
+    "approval": {"$ref": "#/$defs/approval"},
     "applicable": {"type": "boolean"},
     "rejectionReasons": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
   },
@@ -64,6 +65,72 @@
         "documentSha256": {"$ref": "#/$defs/sha256"},
         "valuesSha256": {"$ref": "#/$defs/sha256"},
         "configVersion": {"type": "integer", "minimum": 1}
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "policy", "rules"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "policy": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["path", "policyId", "sha256"],
+              "properties": {
+                "path": {"type": "string", "minLength": 1},
+                "policyId": {"type": "string", "minLength": 1},
+                "sha256": {"$ref": "#/$defs/sha256"}
+              }
+            }
+          ]
+        },
+        "rules": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/approvalRule"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"required": {"const": true}}},
+          "then": {
+            "properties": {
+              "policy": {"type": "object"},
+              "rules": {"minItems": 1}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"policy": {"type": "null"}}},
+          "then": {
+            "properties": {
+              "required": {"const": false},
+              "rules": {"maxItems": 0}
+            }
+          }
+        }
+      ]
+    },
+    "approvalRule": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "id", "changedPaths", "minimumApprovals", "requiredRoles",
+        "separateInitiator"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "changedPaths": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^/"}
+        },
+        "minimumApprovals": {"type": "integer", "minimum": 1, "maximum": 16},
+        "requiredRoles": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "separateInitiator": {"type": "boolean"}
       }
     }
   }

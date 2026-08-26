@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS HTTP Invocation Provider</name>
+    <symbolicName>pdr.service.httpInvocationProvider</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::ServiceClient::HttpInvocationProviderBundleActivator</class>
+      <library>pdr.service.httpInvocationProvider</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>110</runLevel>
+    <requiredBundles>
+      <bundle><symbolicName>osp.core</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+      <bundle><symbolicName>poco.net.ssl</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+      <bundle><symbolicName>pdr.service.serviceClientRuntime</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+  <files>bundle/*</files>
+</bundlespec>

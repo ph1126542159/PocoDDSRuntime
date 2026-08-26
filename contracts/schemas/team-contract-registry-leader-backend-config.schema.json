@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-backend-config.schema.json",
+  "title": "Pinned external-command backend for Registry leader authority state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "backendId", "kind", "authorityIds", "registryIds", "executable", "executableSha256", "arguments", "artifactPins", "environmentVariables", "timeoutSeconds", "maxResponseBytes"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendConfig"},
+    "backendId": {"$ref": "#/$defs/id"},
+    "kind": {"const": "external-command"},
+    "authorityIds": {"type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "registryIds": {"type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "executable": {"type": "string", "minLength": 1},
+    "executableSha256": {"$ref": "#/$defs/sha256"},
+    "arguments": {"type": "array", "maxItems": 32, "items": {"type": "string", "minLength": 1, "maxLength": 1024}},
+    "artifactPins": {"type": "array", "maxItems": 32, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}}}},
+    "environmentVariables": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"}},
+    "timeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 30},
+    "maxResponseBytes": {"type": "integer", "minimum": 1024, "maximum": 1048576}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

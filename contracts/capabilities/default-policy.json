@@ -1,0 +1,31 @@
+{
+  "$schema": "../schemas/runtime-capability-policy.schema.json",
+  "version": 1,
+  "defaultEffect": "deny",
+  "rules": [
+    {
+      "id": "runtime-schema-bootstrap",
+      "effect": "allow",
+      "principal": "pdr.runtime-core",
+      "resourceKind": "schema",
+      "resource": "pdr.runtime.*",
+      "actions": ["read", "register"]
+    },
+    {
+      "id": "operator-log-configuration",
+      "effect": "allow",
+      "principal": "operator",
+      "resourceKind": "configuration",
+      "resource": "logging.*",
+      "actions": ["read", "write"]
+    },
+    {
+      "id": "operator-capability-administration",
+      "effect": "allow",
+      "principal": "operator",
+      "resourceKind": "service",
+      "resource": "pdr.service.capabilityRuntime",
+      "actions": ["use"]
+    }
+  ]
+}

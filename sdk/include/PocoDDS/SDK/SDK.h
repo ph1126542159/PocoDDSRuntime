@@ -7,5 +7,7 @@
 #include <PocoDDS/Health/Health.h>
 #include <PocoDDS/Persistence/Persistence.h>
 #include <PocoDDS/Reliability/Reliability.h>
+#include <PocoDDS/ResourceGovernance/ResourceGovernor.h>
+#include <PocoDDS/Scheduling/Scheduler.h>
 #include <PocoDDS/Security/PrincipalStore.h>
 #include <PocoDDS/SDK/Version.h>

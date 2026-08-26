@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-backend-response.schema.json",
+  "title": "Registry leader authority backend response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "backendId", "operation", "passed", "found", "committed", "fencingToken", "grantSha256", "grantBase64", "error"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendResponse"},
+    "requestId": {"$ref": "#/$defs/id"}, "backendId": {"$ref": "#/$defs/id"}, "operation": {"enum": ["read-current", "read-grant", "compare-and-swap"]},
+    "passed": {"type": "boolean"}, "found": {"type": "boolean"}, "committed": {"type": ["boolean", "null"]},
+    "fencingToken": {"type": ["integer", "null"], "minimum": 0}, "grantSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "grantBase64": {"type": ["string", "null"], "minLength": 1}, "error": {"type": ["string", "null"], "minLength": 1, "maxLength": 1024}
+  },
+  "allOf": [
+    {"if": {"properties": {"passed": {"const": false}}}, "then": {"properties": {"error": {"type": "string", "minLength": 1, "maxLength": 1024}}}},
+    {"if": {"properties": {"passed": {"const": true}}}, "then": {"properties": {"error": {"type": "null"}}}},
+    {"if": {"properties": {"operation": {"enum": ["read-current", "read-grant"]}}}, "then": {"properties": {"committed": {"type": "null"}}, "allOf": [
+      {"if": {"properties": {"found": {"const": true}}}, "then": {"properties": {"fencingToken": {"type": "integer", "minimum": 1}, "grantSha256": {"$ref": "#/$defs/sha256"}, "grantBase64": {"type": "string", "minLength": 1}}}},
+      {"if": {"properties": {"found": {"const": false}}}, "then": {"properties": {"fencingToken": {"type": "null"}, "grantSha256": {"type": "null"}, "grantBase64": {"type": "null"}}}}
+    ]}},
+    {"if": {"properties": {"operation": {"const": "compare-and-swap"}}}, "then": {"properties": {"committed": {"type": "boolean"}, "grantBase64": {"type": "null"}}, "allOf": [
+      {"if": {"properties": {"found": {"const": true}}}, "then": {"properties": {"fencingToken": {"type": "integer", "minimum": 1}, "grantSha256": {"$ref": "#/$defs/sha256"}}}},
+      {"if": {"properties": {"found": {"const": false}}}, "then": {"properties": {"committed": {"const": false}, "fencingToken": {"type": "null"}, "grantSha256": {"type": "null"}}}},
+      {"if": {"properties": {"committed": {"const": true}}}, "then": {"properties": {"found": {"const": true}}}}
+    ]}}
+  ],
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

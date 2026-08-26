@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Store-and-Forward Outbox Runtime</name>
+    <symbolicName>pdr.service.outboxRuntime</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::StoreForward::RuntimeBundleActivator</class>
+      <library>pdr.service.outboxRuntime</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>127</runLevel>
+    <requiredBundles>
+      <bundle>
+        <symbolicName>osp.core</symbolicName>
+        <version>[1.0.0, 2.0.0)</version>
+      </bundle>
+      <bundle>
+        <symbolicName>pdr.service.schedulerRuntime</symbolicName>
+        <version>[1.0.0, 2.0.0)</version>
+      </bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+  <files>bundle/*</files>
+</bundlespec>

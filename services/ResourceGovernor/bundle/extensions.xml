@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/resource-governance"
+             class="PocoDDS::ResourceGovernance::ResourceGovernorHandlerFactory"
+             library="pdr.service.resourceGovernor"
+             allowSpecialization="all"
+             hidden="true"/>
+</extensions>

@@ -14,10 +14,29 @@
 
 #include "Poco/OSP/Configuration.h"
 #include "Poco/Exception.h"
+#include "Poco/Util/MapConfiguration.h"
 
 
 namespace Poco {
 namespace OSP {
+
+namespace
+{
+void copyProperties(const Poco::Util::AbstractConfiguration& configuration,
+	const std::string& prefix, std::map<std::string, std::string>& values)
+{
+	Poco::Util::AbstractConfiguration::Keys keys;
+	configuration.keys(prefix, keys);
+	for (const auto& child: keys)
+	{
+		const std::string key = prefix.empty() ? child : prefix + "." + child;
+		Poco::Util::AbstractConfiguration::Keys descendants;
+		configuration.keys(key, descendants);
+		if (descendants.empty()) values[key] = configuration.getRawString(key, "");
+		else copyProperties(configuration, key, values);
+	}
+}
+}
 
 
 Configuration::Configuration(AbstractConfiguration* pConfig):
@@ -37,6 +56,7 @@ Configuration::~Configuration()
 
 bool Configuration::getRaw(const std::string& key, std::string& value) const
 {
+	Poco::FastMutex::ScopedLock lock(_mutex);
 	if (_pConfig->hasProperty(key))
 	{
 		value = _pConfig->getRawString(key);
@@ -54,6 +74,7 @@ void Configuration::setRaw(const std::string& key, const std::string& value)
 
 void Configuration::enumerate(const std::string& key, Keys& range) const
 {
+	Poco::FastMutex::ScopedLock lock(_mutex);
 	_pConfig->keys(key, range);
 }
 
@@ -65,7 +86,36 @@ void Configuration::removeRaw(const std::string& key)
 
 void Configuration::setProperty(const std::string& key, const std::string& value)
 {
+	Poco::FastMutex::ScopedLock lock(_mutex);
 	_pConfig->setString(key, value);
+}
+
+
+void Configuration::replaceProperties(const std::map<std::string, std::string>& values)
+{
+	Poco::Util::MapConfiguration* pReplacement = new Poco::Util::MapConfiguration;
+	try
+	{
+		for (const auto& item: values) pReplacement->setString(item.first, item.second);
+	}
+	catch (...)
+	{
+		pReplacement->release();
+		throw;
+	}
+	Poco::FastMutex::ScopedLock lock(_mutex);
+	AbstractConfiguration* pPrevious = _pConfig;
+	_pConfig = pReplacement;
+	pPrevious->release();
+}
+
+
+std::map<std::string, std::string> Configuration::properties() const
+{
+	Poco::FastMutex::ScopedLock lock(_mutex);
+	std::map<std::string, std::string> values;
+	copyProperties(*_pConfig, "", values);
+	return values;
 }
 
 

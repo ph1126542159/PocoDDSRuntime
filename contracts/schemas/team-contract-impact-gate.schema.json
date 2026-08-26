@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-impact-gate.schema.json",
+  "title": "Team contract impact execution and Owner approval gate evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "operation", "passed", "impactReportSha256",
+    "impactInputSetSha256", "candidateLockSha256", "executionEvidenceSha256",
+    "junitSha256", "runnerAttestation", "approvalPolicy", "requiredOwners",
+    "approvedOwners", "approvals"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractImpactGate"},
+    "operation": {"const": "team-contract-impact-gate"},
+    "passed": {"const": true},
+    "impactReportSha256": {"$ref": "#/$defs/sha256"},
+    "impactInputSetSha256": {"$ref": "#/$defs/sha256"},
+    "candidateLockSha256": {"$ref": "#/$defs/sha256"},
+    "executionEvidenceSha256": {"$ref": "#/$defs/sha256"},
+    "junitSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "runnerAttestation": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object", "additionalProperties": false,
+          "required": [
+            "attestationSha256", "policyId", "policySha256", "runnerId",
+            "repository", "sourceRevision", "workflow", "jobId", "runId",
+            "keyId", "publicKeySha256", "issuedAt", "expiresAt"
+          ],
+          "properties": {
+            "attestationSha256": {"$ref": "#/$defs/sha256"},
+            "policyId": {"$ref": "#/$defs/identifier"},
+            "policySha256": {"$ref": "#/$defs/sha256"},
+            "runnerId": {"$ref": "#/$defs/identifier"},
+            "repository": {"type": "string", "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"},
+            "sourceRevision": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+            "workflow": {"$ref": "#/$defs/identifier"},
+            "jobId": {"$ref": "#/$defs/identifier"},
+            "runId": {"$ref": "#/$defs/identifier"},
+            "keyId": {"$ref": "#/$defs/identifier"},
+            "publicKeySha256": {"$ref": "#/$defs/sha256"},
+            "issuedAt": {"type": "string", "format": "date-time"},
+            "expiresAt": {"type": "string", "format": "date-time"}
+          }
+        }
+      ]
+    },
+    "approvalPolicy": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["policyId", "policySha256"],
+          "properties": {
+            "policyId": {"$ref": "#/$defs/identifier"},
+            "policySha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      ]
+    },
+    "requiredOwners": {"$ref": "#/$defs/owners"},
+    "approvedOwners": {"$ref": "#/$defs/owners"},
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": [
+          "owner", "approverId", "keyId", "approvalSha256", "publicKeySha256"
+        ],
+        "properties": {
+          "owner": {"$ref": "#/$defs/identifier"},
+          "approverId": {"$ref": "#/$defs/identifier"},
+          "keyId": {"$ref": "#/$defs/identifier"},
+          "approvalSha256": {"$ref": "#/$defs/sha256"},
+          "publicKeySha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "owners": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}}
+  }
+}

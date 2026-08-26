@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/process-desired-state.schema.json",
+  "title": "Managed subprocess desired state",
+  "description": "A committed primary or previous generation. The sibling .new file is staging only and never grants lifecycle authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generation", "states", "integrity"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "generation": {"type": "integer", "minimum": 1},
+    "states": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "desiredRunning"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[^\\r\\n\\u0000]+$"
+          },
+          "desiredRunning": {"type": "boolean"}
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "digest"],
+      "properties": {
+        "algorithm": {"const": "SHA-256"},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

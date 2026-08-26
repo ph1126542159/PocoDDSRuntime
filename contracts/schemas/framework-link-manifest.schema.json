@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/framework-link-manifest.schema.json",
+  "title": "PocoDDSRuntime configured CMake target link manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "profile", "sourceRoot", "buildRoot", "targets"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "cmake-target-link-manifest"},
+    "profile": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "sourceRoot": {"type": "string", "minLength": 1},
+    "buildRoot": {"type": "string", "minLength": 1},
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name", "type", "sourceDirectory", "sources", "dependencies",
+          "unresolvedLinkItems", "includeDirectories", "unresolvedIncludeItems"
+        ],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "type": {"type": "string", "minLength": 1},
+          "sourceDirectory": {"type": "string", "minLength": 1},
+          "sources": {
+            "type": "array", "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "dependencies": {
+            "type": "array", "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "unresolvedLinkItems": {
+            "type": "array", "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "includeDirectories": {
+            "type": "array", "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "unresolvedIncludeItems": {
+            "type": "array", "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    }
+  }
+}

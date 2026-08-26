@@ -82,6 +82,38 @@ IGNORED_TREE_PARTS = {
     "template-backups", "template-conflicts",
 }
 COMPOSITION_FILE = "pdr-project.components.cmake"
+COMPONENT_CONTRACT_FILE = "pdr-component.json"
+COMPONENT_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
+COMPONENT_TARGET = re.compile(r"^[A-Za-z_][A-Za-z0-9_.:+-]*$")
+COMPONENT_OWNER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@/+:-]*$")
+COMPONENT_PLANES = {
+    "module": "application", "service": "application",
+    "device": "management", "workflow": "management",
+    "bundle": "management", "plugin": "management",
+    "subprocess": "isolated",
+    "robot-module": "robotics", "robot-hardware-adapter": "robotics",
+    "robot-simulation-adapter": "robotics", "robot-process": "isolated",
+    "ros2-node": "external",
+}
+COMPONENT_ISOLATION = {
+    "bundle": "bundle", "plugin": "bundle",
+    "subprocess": "subprocess", "robot-process": "subprocess",
+    "ros2-node": "external-process",
+}
+ALLOWED_COMPONENT_DEPENDENCIES = {
+    "module": {"module"},
+    "service": {"module"},
+    "device": {"module"},
+    "workflow": {"module", "service"},
+    "bundle": {"module", "service"},
+    "plugin": {"module", "service"},
+    "subprocess": {"module"},
+    "robot-module": {"robot-module"},
+    "robot-hardware-adapter": {"robot-module"},
+    "robot-simulation-adapter": {"robot-module"},
+    "robot-process": {"robot-module"},
+    "ros2-node": set(),
+}
 
 
 def slugify(name: str) -> str:
@@ -99,6 +131,11 @@ def atomic_json(path: Path, document: dict[str, Any]) -> None:
         json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     temporary.replace(path)
+
+
+def project_manifest_document(project: dict[str, Any]) -> dict[str, Any]:
+    """Remove validation-only derived data before persisting pdr-project.yaml."""
+    return {key: value for key, value in project.items() if key != "componentContracts"}
 
 
 def load_manifest(path: Path) -> dict[str, Any]:
@@ -164,6 +201,128 @@ def validate_runtime_transports(value: Any) -> list[str]:
     if "inproc" not in result:
         raise ValueError("runtime.transports must include inproc for local Service delivery")
     return result
+
+
+def validate_component_contract(path: Path, relative: str,
+                                expected_kinds: set[str]) -> dict[str, Any]:
+    contract_path = path / COMPONENT_CONTRACT_FILE
+    try:
+        document = json.loads(contract_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"invalid {COMPONENT_CONTRACT_FILE} JSON: {relative}: {error}") from error
+    if not isinstance(document, dict):
+        raise ValueError(f"{COMPONENT_CONTRACT_FILE} root must be an object: {relative}")
+    fields = {
+        "schemaVersion", "id", "name", "kind", "plane", "target",
+        "owner", "isolation", "requires",
+    }
+    if set(document) != fields:
+        missing = sorted(fields - set(document))
+        unknown = sorted(set(document) - fields)
+        details = []
+        if missing:
+            details.append("missing=" + ",".join(missing))
+        if unknown:
+            details.append("unknown=" + ",".join(unknown))
+        raise ValueError(
+            f"{COMPONENT_CONTRACT_FILE} has invalid fields for {relative}: " + "; ".join(details)
+        )
+    if document["schemaVersion"] != 1:
+        raise ValueError(f"{COMPONENT_CONTRACT_FILE} schemaVersion must be 1: {relative}")
+    component_id = document["id"]
+    if not isinstance(component_id, str) or not COMPONENT_ID.fullmatch(component_id):
+        raise ValueError(f"component id must be lowercase kebab-case: {relative}")
+    name = document["name"]
+    if not isinstance(name, str) or not re.fullmatch(r"[A-Z][A-Za-z0-9]*", name):
+        raise ValueError(f"component name must be PascalCase: {relative}")
+    kind = document["kind"]
+    if kind not in expected_kinds:
+        raise ValueError(
+            f"component contract kind {kind!r} does not match registered category: {relative}"
+        )
+    expected_plane = COMPONENT_PLANES[kind]
+    if document["plane"] != expected_plane:
+        raise ValueError(
+            f"component {component_id} kind {kind} requires plane={expected_plane}"
+        )
+    expected_isolation = COMPONENT_ISOLATION.get(kind, "in-process")
+    if document["isolation"] != expected_isolation:
+        raise ValueError(
+            f"component {component_id} kind {kind} requires isolation={expected_isolation}"
+        )
+    target = document["target"]
+    if not isinstance(target, str) or not COMPONENT_TARGET.fullmatch(target):
+        raise ValueError(f"component target is not a valid CMake target: {component_id}")
+    owner = document["owner"]
+    if not isinstance(owner, str) or not COMPONENT_OWNER.fullmatch(owner):
+        raise ValueError(f"component owner is invalid: {component_id}")
+    requires = document["requires"]
+    if not isinstance(requires, list):
+        raise ValueError(f"component requires must be an array: {component_id}")
+    normalized_requires: list[str] = []
+    for required in requires:
+        if not isinstance(required, str) or not COMPONENT_ID.fullmatch(required):
+            raise ValueError(f"component dependency id is invalid: {component_id}")
+        if required == component_id:
+            raise ValueError(f"component cannot depend on itself: {component_id}")
+        if required in normalized_requires:
+            raise ValueError(f"duplicate component dependency {required}: {component_id}")
+        normalized_requires.append(required)
+    return {
+        "schemaVersion": 1, "id": component_id, "name": name, "kind": kind,
+        "plane": expected_plane, "target": target, "owner": owner,
+        "isolation": expected_isolation, "requires": normalized_requires,
+        "path": relative,
+        "contractSha256": hashlib.sha256(contract_path.read_bytes()).hexdigest(),
+    }
+
+
+def order_component_contracts(contracts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_id: dict[str, dict[str, Any]] = {}
+    targets: dict[str, str] = {}
+    for contract in contracts:
+        component_id = contract["id"]
+        if component_id in by_id:
+            raise ValueError(f"duplicate component id: {component_id}")
+        if contract["target"] in targets:
+            raise ValueError(
+                f"duplicate component target {contract['target']}: "
+                f"{targets[contract['target']]} and {component_id}"
+            )
+        by_id[component_id] = contract
+        targets[contract["target"]] = component_id
+
+    dependents: dict[str, list[str]] = {component_id: [] for component_id in by_id}
+    indegree: dict[str, int] = {}
+    for component_id, contract in by_id.items():
+        indegree[component_id] = len(contract["requires"])
+        for required in contract["requires"]:
+            dependency = by_id.get(required)
+            if dependency is None:
+                raise ValueError(
+                    f"component {component_id} requires unregistered component: {required}"
+                )
+            if dependency["kind"] not in ALLOWED_COMPONENT_DEPENDENCIES[contract["kind"]]:
+                raise ValueError(
+                    f"component dependency crosses boundary: {contract['kind']} {component_id} "
+                    f"cannot require {dependency['kind']} {required}"
+                )
+            dependents[required].append(component_id)
+
+    ready = sorted(component_id for component_id, degree in indegree.items() if degree == 0)
+    ordered: list[dict[str, Any]] = []
+    while ready:
+        component_id = ready.pop(0)
+        ordered.append(by_id[component_id])
+        for dependent in sorted(dependents[component_id]):
+            indegree[dependent] -= 1
+            if indegree[dependent] == 0:
+                ready.append(dependent)
+                ready.sort()
+    if len(ordered) != len(contracts):
+        cycle = sorted(component_id for component_id, degree in indegree.items() if degree > 0)
+        raise ValueError("component dependency cycle: " + ", ".join(cycle))
+    return ordered
 
 
 def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
@@ -285,9 +444,10 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
 
     config = document.get("config")
     if not isinstance(config, dict) or set(config) - {
-            "version", "layers", "migrations", "capabilities"}:
+            "version", "layers", "migrations", "capabilities", "approvalPolicy"}:
         raise ValueError(
-            "config must contain only version, layers, migrations and capabilities"
+            "config must contain only version, layers, migrations, capabilities and "
+            "approvalPolicy"
         )
     config_version = config.get("version")
     if (not isinstance(config_version, int) or isinstance(config_version, bool)
@@ -301,6 +461,13 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
     capabilities = (
         safe_relative_path(capabilities_value, "config.capabilities").as_posix()
         if capabilities_value is not None else None
+    )
+    approval_policy_value = config.get("approvalPolicy")
+    approval_policy = (
+        safe_relative_path(
+            approval_policy_value, "config.approvalPolicy"
+        ).as_posix()
+        if approval_policy_value is not None else None
     )
 
     acceptance = document.get("acceptance")
@@ -356,6 +523,9 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
     referenced.append(migrations)
     if capabilities is not None:
         referenced.append(capabilities)
+    if approval_policy is not None:
+        referenced.append(approval_policy)
+    component_contracts: list[dict[str, Any]] = []
     if check_paths:
         for relative in referenced:
             candidate = (root / relative).resolve()
@@ -371,6 +541,10 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
                 raise ValueError(f"configuration path must be a directory: {relative}")
         if capabilities is not None and not (root / capabilities).is_file():
             raise ValueError(f"configuration capabilities must be a file: {capabilities}")
+        if approval_policy is not None and not (root / approval_policy).is_file():
+            raise ValueError(
+                f"configuration approval policy must be a file: {approval_policy}"
+            )
 
         cmake_component_fields = COMPONENT_LISTS - {"webBundles"}
         for field in sorted(COMPONENT_LISTS - {"webBundles"}):
@@ -414,6 +588,29 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
                         f"component template kind {state['kind']} does not match "
                         f"components.{field}: {relative}"
                     )
+                contract_path = root / relative / COMPONENT_CONTRACT_FILE
+                contract_required = state is not None and state["appliedVersion"] >= 4
+                if contract_required and not contract_path.is_file():
+                    raise ValueError(
+                        f"current component template requires {COMPONENT_CONTRACT_FILE}: {relative}"
+                    )
+                if contract_path.is_file():
+                    contract = validate_component_contract(
+                        root / relative, relative, COMPONENT_FIELD_KINDS[field]
+                    )
+                    if state is not None and state["appliedVersion"] >= 4:
+                        expected = component_template.component_contract(
+                            state["kind"], state["name"]
+                        )
+                        if contract["name"] != state["name"]:
+                            raise ValueError(
+                                f"component contract name does not match template state: {relative}"
+                            )
+                        if contract["target"] != expected["target"]:
+                            raise ValueError(
+                                f"component contract target does not match generated public target: {relative}"
+                            )
+                    component_contracts.append(contract)
         for field in sorted(ADAPTER_LISTS):
             for relative in normalized_components["adapters"][field]:
                 state = component_template.require_current_clean(root / relative)
@@ -422,6 +619,30 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
                         f"component template kind {state['kind']} does not match "
                         f"components.adapters.{field}: {relative}"
                     )
+                contract_path = root / relative / COMPONENT_CONTRACT_FILE
+                contract_required = state is not None and state["appliedVersion"] >= 4
+                if contract_required and not contract_path.is_file():
+                    raise ValueError(
+                        f"current component template requires {COMPONENT_CONTRACT_FILE}: {relative}"
+                    )
+                if contract_path.is_file():
+                    contract = validate_component_contract(
+                        root / relative, relative, COMPONENT_FIELD_KINDS[field]
+                    )
+                    if state is not None and state["appliedVersion"] >= 4:
+                        expected = component_template.component_contract(
+                            state["kind"], state["name"]
+                        )
+                        if contract["name"] != state["name"]:
+                            raise ValueError(
+                                f"component contract name does not match template state: {relative}"
+                            )
+                        if contract["target"] != expected["target"]:
+                            raise ValueError(
+                                f"component contract target does not match generated public target: {relative}"
+                            )
+                    component_contracts.append(contract)
+        component_contracts = order_component_contracts(component_contracts)
 
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -432,10 +653,12 @@ def validate_manifest(path: Path, check_paths: bool = True) -> dict[str, Any]:
         "components": normalized_components,
         "config": {
             "version": config_version, "layers": layers, "migrations": migrations,
-        } | ({"capabilities": capabilities} if capabilities is not None else {}),
+        } | ({"capabilities": capabilities} if capabilities is not None else {}) \
+            | ({"approvalPolicy": approval_policy} if approval_policy is not None else {}),
         "acceptance": {"unit": acceptance["unit"], "sil": acceptance["sil"],
                        "hil": acceptance["hil"], "soakHours": soak_hours},
         "dependencies": normalized_dependencies,
+        "componentContracts": component_contracts,
     } | ({"version": project_version} if project_version is not None else {}) \
         | ({"robot": normalized_robot} if normalized_robot is not None else {}) \
         | ({"template": normalized_template} if normalized_template is not None else {})
@@ -470,6 +693,11 @@ def cmake_bracket(value: str) -> str:
 
 
 def composition_lines(project: dict[str, Any], manifest_sha256: str) -> list[str]:
+    contracts = project.get("componentContracts", [])
+    contract_by_path = {contract["path"]: contract for contract in contracts}
+    contract_by_id = {contract["id"]: contract for contract in contracts}
+    contract_order = {contract["path"]: index for index, contract in enumerate(contracts)}
+    known_targets = [contract["target"] for contract in contracts]
     lines = [
         "# Generated by pdr project sync. Do not edit by hand.",
         f'set(PDR_PROJECT_MANIFEST_SHA256 "{manifest_sha256}")',
@@ -484,28 +712,104 @@ def composition_lines(project: dict[str, Any], manifest_sha256: str) -> list[str
         "endif()",
         "unset(_pdr_manifest_sha256)",
         "",
-        "function(pdr_add_manifest_component relative category ordinal)",
+    ]
+    for contract in contracts:
+        contract_relative = contract["path"] + "/" + COMPONENT_CONTRACT_FILE
+        lines.extend([
+            f"set(_pdr_component_contract_path {cmake_bracket(contract_relative)})",
+            ('file(SHA256 "${CMAKE_CURRENT_LIST_DIR}/${_pdr_component_contract_path}" '
+             '_pdr_component_contract_sha256)'),
+            (f'if(NOT _pdr_component_contract_sha256 STREQUAL '
+             f'"{contract["contractSha256"]}")'),
+            (f'    message(FATAL_ERROR "{COMPONENT_CONTRACT_FILE} changed for '
+             f'{contract["id"]}; run: pdr project sync pdr-project.yaml")'),
+            "endif()",
+        ])
+    lines.extend([
+        "unset(_pdr_component_contract_path)",
+        "unset(_pdr_component_contract_sha256)",
+        "",
+        "set(PDR_PROJECT_COMPONENT_TARGETS " + " ".join(
+            cmake_bracket(target) for target in known_targets
+        ) + ")",
+        "",
+        ("function(pdr_add_manifest_component relative category ordinal component_id "
+         "component_kind component_target component_owner)"),
         '    set(source "${CMAKE_CURRENT_LIST_DIR}/${relative}")',
         '    if(NOT EXISTS "${source}/CMakeLists.txt")',
         '        message(FATAL_ERROR "Manifest component is missing CMakeLists.txt: ${relative}")',
         "    endif()",
+        "    foreach(required_target IN LISTS ARGN)",
+        '        if(NOT TARGET "${required_target}")',
+        ("            message(FATAL_ERROR \"Component ${component_id} requires ${required_target}, "
+         "but the dependency is disabled or has not been composed\")"),
+        "        endif()",
+        "    endforeach()",
         '    get_filename_component(name "${source}" NAME)',
         '    add_subdirectory("${source}"',
         '        "${CMAKE_CURRENT_BINARY_DIR}/components/${category}/${ordinal}-${name}")',
+        '    if(NOT component_target STREQUAL "")',
+        '        if(NOT TARGET "${component_target}")',
+        ("            message(FATAL_ERROR \"Component ${component_id} did not define declared "
+         "target ${component_target}\")"),
+        "        endif()",
+        '        set_property(TARGET "${component_target}" PROPERTY PDR_COMPONENT_ID "${component_id}")',
+        '        set_property(TARGET "${component_target}" PROPERTY PDR_COMPONENT_KIND "${component_kind}")',
+        '        set_property(TARGET "${component_target}" PROPERTY PDR_COMPONENT_OWNER "${component_owner}")',
+        '        if(ARGN)',
+        '            add_dependencies("${component_target}" ${ARGN})',
+        '        endif()',
+        '        get_target_property(direct_links "${component_target}" LINK_LIBRARIES)',
+        '        get_target_property(interface_links "${component_target}" INTERFACE_LINK_LIBRARIES)',
+        '        foreach(link IN LISTS direct_links interface_links)',
+        '            set(normalized_link "${link}")',
+        '            if(normalized_link MATCHES "^\\$<LINK_ONLY:([^>]+)>$")',
+        '                set(normalized_link "${CMAKE_MATCH_1}")',
+        '            endif()',
+        '            list(FIND PDR_PROJECT_COMPONENT_TARGETS "${normalized_link}" known_index)',
+        '            list(FIND ARGN "${normalized_link}" declared_index)',
+        '            if(known_index GREATER_EQUAL 0 AND declared_index EQUAL -1)',
+        ("                message(FATAL_ERROR \"Component ${component_id} links undeclared project "
+         "component target ${normalized_link}; add its id to pdr-component.json requires\")"),
+        "            endif()",
+        "        endforeach()",
+        "    endif()",
         "endfunction()",
         "",
-    ]
+    ])
+
+    def invocation(relative: str, field: str, ordinal: int) -> str:
+        contract = contract_by_path.get(relative)
+        if contract is None:
+            values = [relative, field, f"{ordinal:03d}", "", "", "", ""]
+            required_targets: list[str] = []
+        else:
+            values = [
+                relative, field, f"{ordinal:03d}", contract["id"], contract["kind"],
+                contract["target"], contract["owner"],
+            ]
+            required_targets = [contract_by_id[item]["target"] for item in contract["requires"]]
+        return "    pdr_add_manifest_component(" + " ".join(
+            [*(cmake_bracket(value) for value in values),
+             *(cmake_bracket(target) for target in required_targets)]
+        ) + ")"
+
+    def ordered_entries(fields: set[str]) -> list[tuple[str, str]]:
+        entries = [
+            (field, relative) for field in sorted(fields)
+            for relative in project["components"][field]
+        ]
+        return sorted(entries, key=lambda item: (
+            contract_order.get(item[1], len(contract_order) + entries.index(item)),
+            item[0], item[1],
+        ))
 
     def append_group(condition: str, fields: set[str]) -> None:
         lines.append(f"if({condition})")
         ordinal = 0
-        for field in sorted(fields):
-            for relative in project["components"][field]:
-                ordinal += 1
-                lines.append(
-                    f"    pdr_add_manifest_component({cmake_bracket(relative)} "
-                    f"{cmake_bracket(field)} {ordinal:03d})"
-                )
+        for field, relative in ordered_entries(fields):
+            ordinal += 1
+            lines.append(invocation(relative, field, ordinal))
         if ordinal == 0:
             lines.append("    # No registered components in this plane.")
         lines.extend(["endif()", ""])
@@ -513,19 +817,23 @@ def composition_lines(project: dict[str, Any], manifest_sha256: str) -> list[str
     append_group("PDR_PROJECT_BUILD_ROBOTICS", ROBOTICS_COMPONENT_LISTS)
     lines.append("if(PDR_PROJECT_BUILD_ROBOTICS)")
     adapter_ordinal = 0
-    for field in ("hardware", "simulation"):
-        for relative in project["components"]["adapters"][field]:
-            adapter_ordinal += 1
-            lines.append(
-                f"    pdr_add_manifest_component({cmake_bracket(relative)} "
-                f"{cmake_bracket(field)} {adapter_ordinal:03d})"
-            )
+    adapter_entries = [
+        (field, relative) for field in ("hardware", "simulation")
+        for relative in project["components"]["adapters"][field]
+    ]
+    adapter_entries.sort(key=lambda item: (
+        contract_order.get(item[1], len(contract_order) + adapter_entries.index(item)),
+        item[0], item[1],
+    ))
+    for field, relative in adapter_entries:
+        adapter_ordinal += 1
+        lines.append(invocation(relative, field, adapter_ordinal))
     if adapter_ordinal == 0:
         lines.append("    # No registered in-process robotics adapters.")
     lines.extend(["endif()", ""])
     append_group("PDR_PROJECT_BUILD_APPLICATION", APPLICATION_COMPONENT_LISTS)
     append_group("PDR_PROJECT_BUILD_MANAGEMENT", MANAGEMENT_COMPONENT_LISTS)
-    lines.append("unset(_pdr_project_root)")
+    lines.append("unset(PDR_PROJECT_COMPONENT_TARGETS)")
     return lines
 
 
@@ -581,13 +889,13 @@ def register_component_path(manifest: Path, kind: str, path: str | Path,
         raise ValueError(f"component is already registered: {relative}")
     target.append(relative)
     target.sort()
-    atomic_json(manifest, project)
+    atomic_json(manifest, project_manifest_document(project))
     try:
         validate_manifest(manifest, check_paths=True)
         write_composition_file(manifest)
     except Exception:
         target.remove(relative)
-        atomic_json(manifest, project)
+        atomic_json(manifest, project_manifest_document(project))
         raise
     return relative
 
@@ -600,7 +908,7 @@ def unregister_component_path(manifest: Path, kind: str, path: str | Path) -> st
     if relative not in target:
         raise ValueError(f"component is not registered: {relative}")
     target.remove(relative)
-    atomic_json(manifest, project)
+    atomic_json(manifest, project_manifest_document(project))
     write_composition_file(manifest)
     return relative
 
@@ -765,6 +1073,75 @@ def sync_project(args: Any) -> int:
     return 0
 
 
+def project_change_impact(args: Any) -> int:
+    """Produce a deterministic CI matrix from changed product-project paths."""
+    manifest = Path(args.manifest).resolve()
+    root = manifest.parent
+    project = validate_manifest(manifest, check_paths=True)
+    contracts = project.get("componentContracts", [])
+    by_id = {item["id"]: item for item in contracts}
+    changed: list[str] = []
+    directly_changed: set[str] = set()
+    framework_wide = False
+    for supplied in args.paths:
+        path = Path(supplied)
+        candidate = path.resolve() if path.is_absolute() else (root / path).resolve()
+        try:
+            relative = candidate.relative_to(root).as_posix()
+        except ValueError as error:
+            raise ValueError(f"changed path escapes project root: {supplied}") from error
+        if relative not in changed:
+            changed.append(relative)
+        matches = [
+            item for item in contracts
+            if relative == item["path"] or relative.startswith(item["path"] + "/")
+        ]
+        if matches:
+            directly_changed.update(item["id"] for item in matches)
+        else:
+            framework_wide = True
+
+    affected = set(by_id) if framework_wide else set(directly_changed)
+    changed_graph = True
+    while changed_graph:
+        changed_graph = False
+        for item in contracts:
+            if item["id"] not in affected and any(
+                    dependency in affected for dependency in item["requires"]):
+                affected.add(item["id"])
+                changed_graph = True
+
+    records = []
+    for item in contracts:
+        if item["id"] not in affected:
+            continue
+        direct = item["id"] in directly_changed
+        records.append({
+            "id": item["id"],
+            "path": item["path"],
+            "owner": item["owner"],
+            "target": item["target"],
+            "direct": direct,
+            "reason": ("framework-wide" if framework_wide and not direct
+                       else "changed" if direct else "dependency"),
+        })
+    records.sort(key=lambda item: item["id"])
+    report = {
+        "schemaVersion": 1,
+        "operation": "project-change-impact",
+        "manifest": str(manifest),
+        "changedPaths": sorted(changed),
+        "frameworkWide": framework_wide,
+        "owners": sorted({item["owner"] for item in records}),
+        "targets": sorted(item["target"] for item in records if item["target"]),
+        "components": records,
+    }
+    if args.output:
+        atomic_json(Path(args.output).resolve(), report)
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 0
+
+
 def add_project_dependency(args: Any) -> int:
     manifest = Path(args.manifest).resolve()
     project = validate_manifest(manifest, check_paths=True)
@@ -779,7 +1156,7 @@ def add_project_dependency(args: Any) -> int:
         "optional": args.optional,
     })
     project["dependencies"].sort(key=lambda item: item["name"].casefold())
-    atomic_json(manifest, project)
+    atomic_json(manifest, project_manifest_document(project))
     validate_manifest(manifest, check_paths=True)
     write_composition_file(manifest)
     print(f"PDR_PROJECT_DEPENDENCY_ADD_PASS name={args.name} version={args.version}")
@@ -795,7 +1172,7 @@ def remove_project_dependency(args: Any) -> int:
     project["dependencies"] = [
         item for item in project["dependencies"] if item["name"] != args.name
     ]
-    atomic_json(manifest, project)
+    atomic_json(manifest, project_manifest_document(project))
     write_composition_file(manifest)
     print(f"PDR_PROJECT_DEPENDENCY_REMOVE_PASS name={args.name}")
     return 0
@@ -858,7 +1235,7 @@ def set_project_version(args: Any) -> int:
     project = validate_manifest(manifest, check_paths=True)
     previous = project.get("version")
     project["version"] = args.version
-    atomic_json(manifest, project)
+    atomic_json(manifest, project_manifest_document(project))
     write_composition_file(manifest)
     print(
         f"PDR_PROJECT_VERSION_SET_PASS from={previous or '-'} to={args.version} "

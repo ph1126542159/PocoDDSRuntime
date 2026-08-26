@@ -12,7 +12,27 @@
 6. 平台治理入口：[框架模型选择与项目适配](architecture/framework-model-selection.md)、[分层规则](architecture/layering-rules.md)、[可扩展框架边界](architecture/extensibility.md)、[部署 Profile](architecture/deployment-profiles.md)、[稳定性与设备验收矩阵](operations/acceptance-matrix.md)、[ADR](adr/README.md)
 7. 运维入口：[运行手册](operations/runbook.md)、[故障排查](operations/troubleshooting.md)、[恢复手册](operations/recovery.md)
 8. 基于框架开发新产品时阅读：[产品项目工作区](development/project-workspaces.md)、[产品配置治理](development/project-configuration.md)、[项目模板升级](development/project-templates.md)、[组件模板升级](development/component-templates.md)、[统一资格流水线](development/project-pipelines.md)、[产品项目打包与验包](development/project-delivery.md)、[公共 SDK 与脚手架](development/sdk-and-scaffolding.md)、[机器人性能预算](architecture/performance-budgets.md)
-9. 生产部署和发布前阅读：[安全基线](security/README.md)、[下一版本发布说明](releases/NEXT.md)、[迁移指南](migration/0.1.0-development.md)
+9. 需要跨重启业务编排时阅读：[持久化 Workflow Runtime](development/workflow-runtime.md)
+10. 需要可靠外发和断网缓存时阅读：[Store-and-Forward Outbox](development/store-and-forward.md)
+11. 需要可插拔消息传输时阅读：[动态 Transport Provider](development/transport-providers.md)
+12. 需要跨 Bundle 原子热更新时阅读：[Runtime 事务式配置热更新](development/runtime-configuration-transactions.md)
+13. 需要治理消息、事件与服务结构版本时阅读：[Runtime Schema Registry](development/runtime-schema-registry.md)
+14. 需要统一周期任务和 Bundle 安全取消时阅读：[中央受治理调度](architecture/managed-scheduling.md)
+15. 需要显式 Service 版本依赖和 Readiness 传播时阅读：[Service 依赖契约](architecture/service-dependency-contracts.md)
+16. 需要安全停止 Provider、排空 Consumer 和失败回滚时阅读：[Bundle 事务式排空与恢复](architecture/lifecycle-maintenance.md)
+17. 需要按 Bundle/组件限制资源动作时阅读：[Runtime Bundle 能力权限](security/runtime-capabilities.md)
+18. 多人并行修改框架时阅读：[框架变更影响与多人协作门禁](development/framework-change-impact.md)
+19. 新增或调整组件依赖时阅读：[框架源码与 CMake 链接依赖边界](development/framework-dependency-boundaries.md)
+20. 组件不启动完整 Runtime 独立验证 Service 版本契约时阅读：[组件 Service 契约独立测试](development/component-contract-testing.md)
+21. 多个生产 Bundle 的 Provider/Consumer 版本迁移、依赖环和已发布基线门禁阅读：[生产 Service 契约图](development/service-contract-graph.md)
+22. 配置仓库 Reviewer 和强制 Owner 审批时阅读：[仓库所有权与 CODEOWNERS](development/repository-ownership.md)
+23. 修改公共头文件、导出 target 或 DLL 时阅读：[SDK API 与 ABI 兼容门禁](development/sdk-api-abi-compatibility.md)
+24. 新增故障注入或恢复场景时阅读：[框架故障注入与恢复矩阵](development/framework-recovery-matrix.md)
+25. 多 Runtime 实例需要在线、过期与重启代际视图时阅读：[Runtime 成员视图](development/runtime-membership.md)
+26. 多 Runtime 服务实例需要显式发现和健康感知路由时阅读：[Runtime Service Directory](development/runtime-service-directory.md)
+27. 跨 Runtime 调用需要 deadline、幂等重试、故障切换和实例熔断时阅读：[Service Client 韧性 SDK](development/runtime-service-client.md)
+28. 多仓库团队需要发布并锁定 Provider 契约时阅读：[团队契约包与锁文件](development/team-contract-packages.md)
+29. 生产部署和发布前阅读：[安全基线](security/README.md)、[下一版本发布说明](releases/NEXT.md)、[迁移指南](migration/0.1.0-development.md)
 
 ## 项目目录结构
 
@@ -78,6 +98,20 @@ PocoDDSRuntime/
 - [OSP](components/osp/README.md)：Bundle 生命周期与本地服务注册
 - [BundleManagement](components/bundle-management/README.md)：Bundle 目录热更新
 - [ProcessManagement](components/process-management/README.md)：子进程编排
+- [Workflow Runtime](development/workflow-runtime.md)：持久化业务流程、等待、重试、补偿与重启恢复
+- [Store-and-Forward Outbox](development/store-and-forward.md)：断网缓存、有序投递、退避重试和死信重投
+- [动态 Transport Provider](development/transport-providers.md)：运行时发现、创建与卸载消息传输实现
+- [Runtime 事务式配置热更新](development/runtime-configuration-transactions.md)：两阶段提交、受鉴权 patch API、版本冲突、幂等、回滚和崩溃恢复
+- [Runtime Schema Registry](development/runtime-schema-registry.md)：不可变 Schema、兼容性门禁、Provider 动态发现和 SQLite 历史
+- [Runtime Bundle 能力权限](security/runtime-capabilities.md)：默认拒绝、资源动作门禁、策略换代和审计边界
+- [中央受治理调度](architecture/managed-scheduling.md)：单定时线程、原子在线重排、fixed-delay/fixed-rate、misfire、抖动、拒绝退避和卸载屏障
+- [Service 依赖契约](architecture/service-dependency-contracts.md)：Bundle 本地 Provider/Requirement、版本匹配、Owner 校验、缺失原因和 Readiness 传播
+- [组件 Service 契约独立测试](development/component-contract-testing.md)：安装后 CMake/CTest、真实 Provider 契约、离线版本/数量验证和摘要绑定证据
+- [生产 Service 契约图](development/service-contract-graph.md)：完整生产 Bundle 图、Provider 基线、主版本迁移、环路/冲突检测和报告重算
+- [Bundle 事务式排空与恢复](architecture/lifecycle-maintenance.md)：在途请求屏障、Consumer 排空、依赖二次校验、逆序回滚和 Provider 优先恢复
+- [Runtime 成员视图](development/runtime-membership.md)：稳定实例 ID、持久代际、接收端 TTL、重放防护和有界墓碑
+- [Runtime Service Directory](development/runtime-service-directory.md)：显式端点广告、成员资格过滤、TTL、排空和确定性路由
+- [Service Client 韧性 SDK](development/runtime-service-client.md)：总 deadline、幂等重试、跨实例故障切换和 incarnation 级熔断
 - [DDS](components/dds/README.md)：Fast DDS 进程间通信
 - [Observability](components/observability/README.md)：业务链路追踪
 - [平台辅助库总览](components/platform-support/README.md)

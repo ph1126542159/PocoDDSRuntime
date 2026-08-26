@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/configuration-key-lifecycle-baseline.schema.json",
+  "title": "Published configuration key lifecycle compatibility baseline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "runtimeVersion", "entries"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "product": {
+      "const": "PocoDDSRuntimeConfigurationKeyLifecycleBaseline"
+    },
+    "runtimeVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "owner", "id", "participantId", "operation", "sourceKey",
+          "replacementKey", "deprecatedSince", "removalAllowedFrom"
+        ],
+        "properties": {
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 192,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "id": { "type": "string", "pattern": "^PDR-CFG-[0-9]{4,}$" },
+          "participantId": {
+            "$ref": "configuration-participants.schema.json#/$defs/participantId"
+          },
+          "operation": { "enum": ["rename", "remove"] },
+          "sourceKey": {
+            "$ref": "configuration-participants.schema.json#/$defs/prefix"
+          },
+          "replacementKey": {
+            "oneOf": [
+              { "$ref": "configuration-participants.schema.json#/$defs/prefix" },
+              { "type": "null" }
+            ]
+          },
+          "deprecatedSince": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          },
+          "removalAllowedFrom": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          }
+        }
+      }
+    }
+  }
+}

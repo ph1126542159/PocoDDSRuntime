@@ -272,6 +272,25 @@ if(NOT PDR_BUILD_LEGACY_RUNTIME)
             "At least PDR_BUILD_RUNTIME_CORE or PDR_BUILD_ROBOTICS_RUNTIME must remain enabled")
     endif()
     unset(CMAKE_FOLDER)
+    include(PDRFrameworkLinkManifest)
+    pdr_write_framework_link_manifest(
+        "${CMAKE_BINARY_DIR}/reports/framework-link-manifest.json")
+    if(BUILD_TESTING)
+        find_package(Python3 3.9 QUIET COMPONENTS Interpreter)
+        if(Python3_Interpreter_FOUND)
+            add_test(NAME framework-link-dependency-boundary
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_link_dependency_boundary.py"
+                    validate
+                    --root "${CMAKE_CURRENT_SOURCE_DIR}"
+                    --catalog "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-components.json"
+                    --manifest "${CMAKE_BINARY_DIR}/reports/framework-link-manifest.json"
+                    --expect-profile "${PDR_PROFILE}"
+                    --report "${CMAKE_BINARY_DIR}/reports/framework-link-dependency-boundary.json")
+            set_tests_properties(framework-link-dependency-boundary PROPERTIES
+                LABELS "architecture;cmake;component;dependency;contract")
+        endif()
+    endif()
     pdr_configure_test_output_tree("${CMAKE_CURRENT_SOURCE_DIR}")
     return()
 endif()
@@ -341,6 +360,16 @@ if(PDR_ENABLE_OBSERVABILITY)
     add_subdirectory(platform/observability)
 endif()
 add_subdirectory(platform/OSP)
+add_subdirectory(platform/resourcegovernance)
+add_subdirectory(platform/scheduling)
+add_subdirectory(platform/servicedependency)
+add_subdirectory(platform/membership)
+add_subdirectory(platform/servicedirectory)
+add_subdirectory(platform/serviceclient)
+add_subdirectory(platform/lifecycle)
+add_subdirectory(platform/capabilities)
+add_subdirectory(platform/configtransaction)
+add_subdirectory(platform/schemaregistry)
 add_subdirectory(platform/BundleManagement)
 add_subdirectory(platform/ProcessManagement)
 
@@ -355,8 +384,20 @@ endif()
 set(CMAKE_FOLDER "Devices")
 add_subdirectory(platform/devices)
 
+set(CMAKE_FOLDER "Gateway Extensions")
+add_subdirectory(platform/gateways)
+
+set(CMAKE_FOLDER "Transport Providers")
+add_subdirectory(platform/transportproviders)
+
 set(CMAKE_FOLDER "Application")
 add_subdirectory(application)
+
+set(CMAKE_FOLDER "Workflow")
+add_subdirectory(platform/workflow)
+
+set(CMAKE_FOLDER "Store and Forward")
+add_subdirectory(platform/storeforward)
 
 set(CMAKE_FOLDER "Communication")
 add_subdirectory(platform/DDS)
@@ -389,6 +430,8 @@ if(BUILD_TESTING)
         COMMAND "${CMAKE_COMMAND}"
             -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ValidateDocs.cmake")
+    set_tests_properties(documentation-files PROPERTIES LABELS "docs;architecture")
+    set_tests_properties(contract-files PROPERTIES LABELS "contract;architecture")
     add_test(NAME deployment-profiles
         COMMAND "${CMAKE_COMMAND}"
             -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
@@ -405,6 +448,81 @@ if(BUILD_TESTING)
             -DPDR_TEST_FASTDDS_TRANSPORT=$<TARGET_EXISTS:PDRFastDdsTransport>
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunSDKConsumerTest.cmake")
     if(Python3_Interpreter_FOUND)
+      add_test(NAME runtime-process-dependency-api-integration
+        COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_process_dependency_integration.py"
+            --runtime "$<TARGET_FILE:pdr-runtime>"
+            --config "$<TARGET_FILE_DIR:pdr-runtime>/pdr-runtime.properties"
+            --bundle-repository "${PDR_BUNDLE_OUTPUT_DIRECTORY}"
+            --fixture "$<TARGET_FILE:pdr-subprocess-manager-dependency-smoke>"
+            --report "${CMAKE_BINARY_DIR}/reports/process-dependency-api-integration.json"
+            --log "${CMAKE_BINARY_DIR}/reports/process-dependency-api-integration.log")
+      set_tests_properties(runtime-process-dependency-api-integration PROPERTIES
+          LABELS "runtime;process-management;dependency;api;integration;recovery;release"
+          TIMEOUT 30)
+      if(WIN32)
+        set_tests_properties(runtime-process-dependency-api-integration PROPERTIES
+            ENVIRONMENT_MODIFICATION
+                "PATH=path_list_prepend:${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+      endif()
+      add_test(NAME runtime-process-desired-state-integration
+        COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_process_desired_state_integration.py"
+            --runtime "$<TARGET_FILE:pdr-runtime>"
+            --config "$<TARGET_FILE_DIR:pdr-runtime>/pdr-runtime.properties"
+            --bundle-repository "${PDR_BUNDLE_OUTPUT_DIRECTORY}"
+            --fixture "$<TARGET_FILE:pdr-subprocess-manager-dependency-smoke>"
+            --report "${CMAKE_BINARY_DIR}/reports/process-desired-state-runtime-integration.json"
+            --log "${CMAKE_BINARY_DIR}/reports/process-desired-state-runtime-integration.log")
+      set_tests_properties(runtime-process-desired-state-integration PROPERTIES
+          LABELS "runtime;process-management;persistence;api;integration;recovery;release"
+          RESOURCE_LOCK pdr_runtime_http
+          TIMEOUT 45)
+      if(WIN32)
+        set_tests_properties(runtime-process-desired-state-integration PROPERTIES
+            ENVIRONMENT_MODIFICATION
+                "PATH=path_list_prepend:${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+      endif()
+      add_test(NAME runtime-configuration-participant-expectation-integration
+        COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_configuration_participant_expectation_integration.py"
+            --python "${Python3_EXECUTABLE}"
+            --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+            --executable "$<TARGET_FILE:pdr-runtime>"
+            --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+            --config "$<TARGET_FILE_DIR:pdr-runtime>/pdr-runtime.properties"
+            --path "${PDR_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
+            --path "$<TARGET_FILE_DIR:pdr-runtime>"
+            --report "${CMAKE_BINARY_DIR}/reports/runtime-configuration-participant-expectation-integration.json")
+      set_tests_properties(runtime-configuration-participant-expectation-integration PROPERTIES
+          LABELS "runtime;configuration;contract;dependency;health;integration;negative;recovery;release"
+          RESOURCE_LOCK pdr_runtime_http
+          TIMEOUT 35)
+      if(WIN32)
+        set_tests_properties(runtime-configuration-participant-expectation-integration PROPERTIES
+            ENVIRONMENT_MODIFICATION
+                "PATH=path_list_prepend:${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+      endif()
+      add_test(NAME runtime-configuration-key-lifecycle-integration
+        COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_configuration_key_lifecycle_integration.py"
+            --python "${Python3_EXECUTABLE}"
+            --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+            --executable "$<TARGET_FILE:pdr-runtime>"
+            --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+            --config "$<TARGET_FILE_DIR:pdr-runtime>/pdr-runtime.properties"
+            --path "${PDR_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
+            --path "$<TARGET_FILE_DIR:pdr-runtime>"
+            --report "${CMAKE_BINARY_DIR}/reports/runtime-configuration-key-lifecycle-integration.json")
+      set_tests_properties(runtime-configuration-key-lifecycle-integration PROPERTIES
+          LABELS "runtime;configuration;migration;deprecation;ownership;health;integration;negative;recovery;release"
+          RESOURCE_LOCK pdr_runtime_http
+          TIMEOUT 35)
+      if(WIN32)
+        set_tests_properties(runtime-configuration-key-lifecycle-integration PROPERTIES
+            ENVIRONMENT_MODIFICATION
+                "PATH=path_list_prepend:${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+      endif()
       add_test(NAME generated-device-consumer
         COMMAND "${CMAKE_COMMAND}"
             -DPDR_CMAKE=${CMAKE_COMMAND}
@@ -467,6 +585,53 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_component_template.py")
         set_tests_properties(component-template-cli PROPERTIES
             LABELS "sdk;component;template;migration;recovery")
+        add_test(NAME component-contract-testing-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_component_contract_test.py")
+        set_tests_properties(component-contract-testing-unit PROPERTIES
+            LABELS "sdk;component;contract;conformance;unit")
+        add_test(NAME service-contract-graph-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_service_contract_graph.py")
+        set_tests_properties(service-contract-graph-unit PROPERTIES
+            LABELS "architecture;service;contract;dependency;unit")
+        add_test(NAME service-contract-graph
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/service_contract_graph.py"
+                check
+                --root "${CMAKE_CURRENT_SOURCE_DIR}"
+                --scan-root services
+                --baseline contracts/service-contract-baseline.json
+                --report "${CMAKE_BINARY_DIR}/reports/service-contract-graph.json")
+        set_tests_properties(service-contract-graph PROPERTIES
+            LABELS "architecture;service;contract;dependency;ci")
+        add_test(NAME configuration-participant-declarations
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_configuration_participant_declarations.py")
+        set_tests_properties(configuration-participant-declarations PROPERTIES
+            LABELS "architecture;configuration;participant;contract;dependency;ci;unit")
+        add_test(NAME configuration-participant-contract
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/configuration_participant_contract.py"
+                --root "${CMAKE_CURRENT_SOURCE_DIR}"
+                --baseline "${CMAKE_CURRENT_SOURCE_DIR}/contracts/configuration-participant-baseline.json"
+                --report "${CMAKE_BINARY_DIR}/reports/configuration-participant-contract.json")
+        set_tests_properties(configuration-participant-contract PROPERTIES
+            LABELS "architecture;configuration;participant;contract;dependency;ci")
+        add_test(NAME configuration-key-lifecycle-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_configuration_key_lifecycle.py")
+        set_tests_properties(configuration-key-lifecycle-unit PROPERTIES
+            LABELS "architecture;configuration;migration;deprecation;contract;dependency;ci;unit")
+        add_test(NAME configuration-key-lifecycle-contract
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/configuration_key_lifecycle.py"
+                --root "${CMAKE_CURRENT_SOURCE_DIR}"
+                --runtime-version "${PROJECT_VERSION}"
+                --baseline "${CMAKE_CURRENT_SOURCE_DIR}/contracts/configuration-key-lifecycle-baseline.json"
+                --report "${CMAKE_BINARY_DIR}/reports/configuration-key-lifecycle-contract.json")
+        set_tests_properties(configuration-key-lifecycle-contract PROPERTIES
+            LABELS "architecture;configuration;migration;deprecation;contract;dependency;ci")
         add_test(NAME project-pipeline-cli
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_project_pipeline.py")
@@ -477,6 +642,172 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_project_package.py")
         set_tests_properties(project-package-cli PROPERTIES
             LABELS "sdk;project;release;security;sbom")
+        add_test(NAME team-contract-package-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_package.py")
+        set_tests_properties(team-contract-package-cli PROPERTIES
+            LABELS "sdk;team;contract;package;lock;security;unit")
+        add_test(NAME team-contract-impact-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_impact.py")
+        set_tests_properties(team-contract-impact-cli PROPERTIES
+            LABELS "sdk;team;contract;package;impact;dependency;unit")
+        add_test(NAME team-contract-impact-gate-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_impact_gate.py")
+        set_tests_properties(team-contract-impact-gate-cli PROPERTIES
+            LABELS "sdk;team;contract;impact;execution;evidence;approval;security;unit")
+        add_test(NAME team-contract-registry-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry.py")
+        set_tests_properties(team-contract-registry-cli PROPERTIES
+            LABELS "sdk;team;contract;registry;promotion;rollback;concurrency;lease;recovery;security;unit")
+        add_test(NAME process-file-lease-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_process_file_lease.py")
+        set_tests_properties(process-file-lease-cli PROPERTIES
+            LABELS "sdk;concurrency;fault-injection;lease;recovery;security;unit")
+        add_test(NAME team-contract-provenance-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_provenance.py")
+        set_tests_properties(team-contract-provenance-cli PROPERTIES
+            LABELS "sdk;team;contract;runner;attestation;registry;anchor;security;unit")
+        add_test(NAME team-contract-registry-recovery-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_recovery.py")
+        set_tests_properties(team-contract-registry-recovery-cli PROPERTIES
+            LABELS "sdk;team;contract;registry;anchor;backup;disaster-recovery;fault-injection;persistence;recovery;security;unit")
+        add_test(NAME team-contract-registry-standby-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_standby.py")
+        set_tests_properties(team-contract-registry-standby-cli PROPERTIES
+            LABELS "sdk;team;contract;registry;anchor;standby;read-only;replication;fault-injection;persistence;recovery;security;unit")
+        add_test(NAME team-contract-registry-leader-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader.py")
+        set_tests_properties(team-contract-registry-leader-cli PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;lease;fencing;standby;failover;fault-injection;persistence;recovery;security;unit")
+        add_test(NAME team-contract-registry-leader-backend-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_backend.py")
+        set_tests_properties(team-contract-registry-leader-backend-cli PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;backend;cas;fencing;failover;fault-injection;persistence;recovery;security;unit")
+        add_test(NAME team-contract-registry-leader-backend-conformance-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_backend_conformance.py")
+        set_tests_properties(team-contract-registry-leader-backend-conformance-cli PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;backend;conformance;cas;concurrency;fault-injection;persistence;recovery;security;unit")
+        add_test(NAME team-contract-registry-leader-backend-adapter-example
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_backend_adapter_example.py")
+        set_tests_properties(team-contract-registry-leader-backend-adapter-example PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;backend;adapter;example;conformance;cas;concurrency;persistence;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-registry-leader-etcd-adapter
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_etcd_adapter.py")
+        set_tests_properties(team-contract-registry-leader-etcd-adapter PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;backend;adapter;etcd;distributed;conformance;cas;concurrency;persistence;recovery;security;unit"
+            TIMEOUT 40)
+        add_test(NAME team-contract-registry-handoff-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_handoff.py")
+        set_tests_properties(team-contract-registry-handoff-cli PROPERTIES
+            LABELS "sdk;team;contract;registry;remote;drain;handoff;leader;fencing;standby;failover;fault-injection;persistence;recovery;security;unit")
+        add_test(NAME team-contract-registry-remote-drain-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_remote_drain.py")
+        set_tests_properties(team-contract-registry-remote-drain-cli PROPERTIES
+            LABELS "sdk;team;contract;registry;remote;rbac;drain;handoff;leader;fencing;failover;fault-injection;persistence;recovery;security;unit")
+        add_test(NAME team-contract-registry-remote-cli
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_remote.py")
+        set_tests_properties(team-contract-registry-remote-cli PROPERTIES
+            LABELS "sdk;team;contract;registry;remote;rbac;idempotency;recovery;audit;archive;standby;read-only;fault-injection;rotation;capacity;concurrency;lease;security;unit")
+        add_test(NAME team-contract-registry-audit-archive-recovery
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_remote.py")
+        set_tests_properties(team-contract-registry-audit-archive-recovery PROPERTIES
+            LABELS "sdk;team;contract;registry;remote;idempotency;recovery;audit;archive;fault-injection;security;unit")
+        add_test(NAME framework-change-impact
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_framework_change_impact.py")
+        set_tests_properties(framework-change-impact PROPERTIES
+            LABELS "architecture;ci;component;ownership;release")
+        add_test(NAME repository-ownership-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/repository_ownership.py"
+                verify
+                --catalog "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-components.json"
+                --registry "${CMAKE_CURRENT_SOURCE_DIR}/contracts/repository-owners.json"
+                --codeowners "${CMAKE_CURRENT_SOURCE_DIR}/.github/CODEOWNERS")
+        set_tests_properties(repository-ownership-policy PROPERTIES
+            LABELS "architecture;ci;component;ownership;contract")
+        add_test(NAME repository-ownership-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_repository_ownership.py")
+        set_tests_properties(repository-ownership-unit PROPERTIES
+            LABELS "architecture;ci;component;ownership;unit")
+        add_test(NAME framework-dependency-boundary-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_framework_dependency_boundary.py")
+        set_tests_properties(framework-dependency-boundary-unit PROPERTIES
+            LABELS "architecture;component;dependency;unit")
+        add_test(NAME framework-dependency-boundary
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_dependency_boundary.py"
+                validate
+                --root "${CMAKE_CURRENT_SOURCE_DIR}"
+                --catalog "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-components.json"
+                --report "${CMAKE_BINARY_DIR}/reports/framework-dependency-boundary.json")
+        set_tests_properties(framework-dependency-boundary PROPERTIES
+            LABELS "architecture;component;dependency;contract")
+        add_test(NAME framework-link-dependency-boundary-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_framework_link_dependency_boundary.py")
+        set_tests_properties(framework-link-dependency-boundary-unit PROPERTIES
+            LABELS "architecture;cmake;component;dependency;unit")
+        add_test(NAME framework-link-dependency-boundary
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_link_dependency_boundary.py"
+                validate
+                --root "${CMAKE_CURRENT_SOURCE_DIR}"
+                --catalog "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-components.json"
+                --manifest "${CMAKE_BINARY_DIR}/reports/framework-link-manifest.json"
+                --expect-profile "${PDR_PROFILE}"
+                --report "${CMAKE_BINARY_DIR}/reports/framework-link-dependency-boundary.json")
+        set_tests_properties(framework-link-dependency-boundary PROPERTIES
+            LABELS "architecture;cmake;component;dependency;contract")
+        add_test(NAME framework-component-build-groups-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_framework_component_build_groups.py")
+        set_tests_properties(framework-component-build-groups-unit PROPERTIES
+            LABELS "architecture;cmake;component;ownership;unit")
+        add_test(NAME framework-component-build-groups
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_component_build_groups.py"
+                --root "${CMAKE_CURRENT_SOURCE_DIR}"
+                --catalog "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-components.json"
+                --groups "${CMAKE_BINARY_DIR}/reports/framework-component-build-groups.json"
+                --links "${CMAKE_BINARY_DIR}/reports/framework-link-manifest.json"
+                --report "${CMAKE_BINARY_DIR}/reports/framework-component-build-groups-validation.json")
+        set_tests_properties(framework-component-build-groups PROPERTIES
+            LABELS "architecture;cmake;component;ownership;contract;service")
+        add_test(NAME framework-build-evidence-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_framework_build_evidence.py")
+        set_tests_properties(framework-build-evidence-unit PROPERTIES
+            LABELS "architecture;cmake;component;ci;release;unit")
+        add_test(NAME framework-change-impact-catalog
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_change_impact.py"
+                validate-ctest
+                --catalog "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-components.json"
+                --ctest "${CMAKE_CTEST_COMMAND}"
+                --test-dir "${CMAKE_BINARY_DIR}"
+                --config "$<CONFIG>")
+        set_tests_properties(framework-change-impact-catalog PROPERTIES
+            LABELS "architecture;ci;component;ownership;contract;release")
         add_test(NAME robotics-architecture-policy-tests
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_architecture_policy.py")
@@ -487,6 +818,40 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_plugin_manager.py")
         set_tests_properties(plugin-transactions PROPERTIES
             LABELS "plugin;release;recovery;security")
+        add_test(NAME bundle-repository-recovery
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/test_bundle_repository_recovery.py")
+        set_tests_properties(bundle-repository-recovery PROPERTIES
+            LABELS "runtime;bundle;transaction;recovery;security")
+        if(TARGET pdr-runtime)
+            add_test(NAME runtime-bundle-repository-transaction-integration
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_bundle_repository_transaction_integration.py"
+                    --runtime "$<TARGET_FILE:pdr-runtime>"
+                    --source-dir "$<TARGET_FILE_DIR:pdr-runtime>"
+                    --work-dir "${CMAKE_BINARY_DIR}/acceptance/runtime-bundle-repository-transaction"
+                    --report "${CMAKE_BINARY_DIR}/reports/runtime-bundle-repository-transaction.json")
+            set_tests_properties(runtime-bundle-repository-transaction-integration PROPERTIES
+                LABELS "runtime;bundle;transaction;recovery;integration;release"
+                RESOURCE_LOCK pdr_runtime_http
+                TIMEOUT 150)
+            if(TARGET pdr-launcher)
+                add_test(NAME runtime-launcher-bundle-deployment-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_launcher_bundle_deployment_integration.py"
+                        --runtime "$<TARGET_FILE:pdr-runtime>"
+                        --launcher "$<TARGET_FILE:pdr-launcher>"
+                        --source-dir "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --publisher "${CMAKE_CURRENT_SOURCE_DIR}/tools/bundle_repository_publisher.py"
+                        --fingerprint-checker "$<TARGET_FILE:pdr-bundle-repository-check>"
+                        --work-dir "${CMAKE_BINARY_DIR}/acceptance/runtime-launcher-bundle-deployment"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-launcher-bundle-deployment.json")
+                set_tests_properties(runtime-launcher-bundle-deployment-integration PROPERTIES
+                    LABELS "runtime;bundle;transaction;recovery;integration;release;process;security"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 180)
+            endif()
+        endif()
         add_test(NAME service-ownership-policy
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_service_ownership.py")
@@ -499,6 +864,107 @@ if(BUILD_TESTING)
         add_test(NAME compatibility-policy
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_compatibility.py")
+        add_test(NAME sdk-surface-guard-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_sdk_surface_guard.py")
+        set_tests_properties(sdk-surface-guard-policy PROPERTIES
+            LABELS "sdk;compatibility;abi;contract;unit")
+        add_test(NAME sdk-deprecation-policy-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_sdk_deprecation_guard.py")
+        set_tests_properties(sdk-deprecation-policy-unit PROPERTIES
+            LABELS "sdk;compatibility;deprecation;contract;unit")
+        add_test(NAME framework-recovery-matrix-policy-unit
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_framework_recovery_matrix.py")
+        set_tests_properties(framework-recovery-matrix-policy-unit PROPERTIES
+            LABELS "architecture;recovery;fault-injection;contract;unit")
+        add_test(NAME framework-recovery-matrix-contract
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_recovery_matrix.py"
+                validate
+                --matrix "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-recovery-matrix.json"
+                --catalog "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-components.json")
+        set_tests_properties(framework-recovery-matrix-contract PROPERTIES
+            LABELS "architecture;recovery;fault-injection;contract")
+        if(PDR_PROFILE STREQUAL "server")
+            add_test(NAME framework-recovery-matrix-execution
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_recovery_matrix.py"
+                    execute
+                    --matrix "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-recovery-matrix.json"
+                    --catalog "${CMAKE_CURRENT_SOURCE_DIR}/contracts/framework-components.json"
+                    --ctest "${CMAKE_CTEST_COMMAND}"
+                    --test-dir "${CMAKE_BINARY_DIR}"
+                    --config $<CONFIG>
+                    --profile "${PDR_PROFILE}"
+                    --report "${CMAKE_BINARY_DIR}/reports/framework-recovery-evidence.json")
+            set_tests_properties(framework-recovery-matrix-execution PROPERTIES
+                LABELS "architecture;recovery;fault-injection;contract;release"
+                RUN_SERIAL TRUE
+                TIMEOUT 180)
+        endif()
+        add_test(NAME sdk-header-self-containment-policy
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_sdk_header_self_containment.py")
+        set_tests_properties(sdk-header-self-containment-policy PROPERTIES
+            LABELS "sdk;header;compatibility;contract;unit")
+        set(pdr_sdk_surface_test_arguments
+            -DPDR_CMAKE=${CMAKE_COMMAND}
+            -DPDR_PYTHON=${Python3_EXECUTABLE}
+            -DPDR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
+            -DPDR_CONFIG=$<CONFIG>
+            -DPDR_RUNTIME_VERSION=${PROJECT_VERSION})
+        if(MSVC)
+            get_filename_component(pdr_msvc_tool_directory
+                "${CMAKE_CXX_COMPILER}" DIRECTORY)
+            find_program(PDR_DUMPBIN_EXECUTABLE NAMES dumpbin
+                HINTS "${pdr_msvc_tool_directory}")
+            if(NOT PDR_DUMPBIN_EXECUTABLE)
+                message(FATAL_ERROR
+                    "Windows SDK ABI testing requires dumpbin beside the MSVC compiler")
+            endif()
+            string(REGEX MATCH "^[0-9]+\\.[0-9]+" pdr_msvc_abi_version
+                "${CMAKE_CXX_COMPILER_VERSION}")
+            if(NOT pdr_msvc_abi_version)
+                message(FATAL_ERROR
+                    "Cannot derive the MSVC ABI key from ${CMAKE_CXX_COMPILER_VERSION}")
+            endif()
+            if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+                set(pdr_msvc_abi_architecture x64)
+            else()
+                set(pdr_msvc_abi_architecture x86)
+            endif()
+            list(APPEND pdr_sdk_surface_test_arguments
+                -DPDR_ABI_KEY=windows-msvc-${pdr_msvc_abi_version}-${pdr_msvc_abi_architecture}
+                -DPDR_SYMBOL_TOOL=${PDR_DUMPBIN_EXECUTABLE}
+                -DPDR_REQUIRE_ABI=TRUE)
+        endif()
+        add_test(NAME sdk-public-surface-compatibility
+            COMMAND "${CMAKE_COMMAND}"
+                ${pdr_sdk_surface_test_arguments}
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunSDKSurfaceCompatibility.cmake")
+        set_tests_properties(sdk-public-surface-compatibility PROPERTIES
+            LABELS "sdk;compatibility;abi;contract;release"
+            TIMEOUT 120)
+        if(TARGET PDRSDK AND TARGET PDRFastDdsTransport AND
+                TARGET PDRMqttTransport AND TARGET OSP)
+            add_test(NAME sdk-public-headers-self-contained
+                COMMAND "${CMAKE_COMMAND}"
+                    -DPDR_CMAKE=${CMAKE_COMMAND}
+                    -DPDR_PYTHON=${Python3_EXECUTABLE}
+                    -DPDR_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
+                    -DPDR_CONFIG=$<CONFIG>
+                    -DPDR_GENERATOR=${CMAKE_GENERATOR}
+                    -DPDR_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+                    -DPDR_DEPENDENCY_PREFIX=${PDR_INSTALL_PREFIX}
+                    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunSDKHeaderSelfContainment.cmake")
+            set_tests_properties(sdk-public-headers-self-contained PROPERTIES
+                LABELS "sdk;header;compatibility;contract;release"
+                TIMEOUT 300)
+        endif()
         add_test(NAME configuration-contract
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_config_contract.py")
@@ -587,6 +1053,7 @@ if(BUILD_TESTING)
                 -DPDR_BINARY_DIR=${CMAKE_BINARY_DIR}
                 -DPDR_CONFIG=$<CONFIG>
                 -DPDR_VERSION=${PROJECT_VERSION}
+                -DPDR_PROFILE=${PDR_PROFILE}
                 -DPDR_REQUIRE_CLEAN=${PDR_RELEASE_REQUIRE_CLEAN}
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunReleaseValidation.cmake")
         add_test(NAME upgrade-rollback
@@ -621,6 +1088,7 @@ if(BUILD_TESTING)
                     -DPDR_CONFIG=$<CONFIG>
                     -DPDR_RUNTIME_FILE_NAME=$<TARGET_FILE_NAME:pdr-runtime>
                     -DPDR_CONFIG_CHECK_FILE_NAME=$<TARGET_FILE_NAME:pdr-config-check>
+                    -DPDR_FASTDDS_PROFILE_CHECK_FILE_NAME=$<TARGET_FILE_NAME:pdr-fastdds-profile-check>
                     -DPDR_IDENTITY_CHECK_FILE_NAME=$<TARGET_FILE_NAME:pdr-identity-check>
                     -DPDR_SIGNATURE_CHECK_FILE_NAME=$<TARGET_FILE_NAME:pdr-signature-check>
                     -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunRuntimePackageSmoke.cmake")
@@ -764,6 +1232,112 @@ if(BUILD_TESTING)
                     LABELS "runtime;security;identity;integration"
                     RESOURCE_LOCK pdr_runtime_http
                     TIMEOUT 45)
+                add_test(NAME runtime-capability-management-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_capability_management_integration.py"
+                        --python "${Python3_EXECUTABLE}"
+                        --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --policy "${CMAKE_CURRENT_SOURCE_DIR}/platform/capabilities/tests/data/persistent-policy-v2.json"
+                        --database "${CMAKE_BINARY_DIR}/reports/runtime-capability-management/capabilities.sqlite"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-capability-management-integration.json")
+                set_tests_properties(runtime-capability-management-integration PROPERTIES
+                    LABELS "runtime;security;capability;authorization;integration;recovery;release"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 75)
+                add_test(NAME runtime-resource-governance-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_resource_governance_integration.py"
+                        --python "${Python3_EXECUTABLE}"
+                        --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-resource-governance-integration.json")
+                set_tests_properties(runtime-resource-governance-integration PROPERTIES
+                    LABELS "runtime;security;resource-governance;backpressure;integration;release"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 60)
+                add_test(NAME runtime-scheduler-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_scheduler_integration.py"
+                        --python "${Python3_EXECUTABLE}"
+                        --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-scheduler-integration.json")
+                set_tests_properties(runtime-scheduler-integration PROPERTIES
+                    LABELS "runtime;security;scheduling;resource-governance;integration;release"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 60)
+                add_test(NAME runtime-schedule-configuration-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_schedule_configuration_integration.py"
+                        --python "${Python3_EXECUTABLE}"
+                        --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-schedule-configuration-integration.json")
+                set_tests_properties(runtime-schedule-configuration-integration PROPERTIES
+                    LABELS "runtime;security;scheduling;configuration;transaction;integration;release"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 90)
+                add_test(NAME runtime-service-dependency-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_service_dependency_integration.py"
+                        --python "${Python3_EXECUTABLE}"
+                        --runtime-smoke "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-service-dependency-integration.json")
+                set_tests_properties(runtime-service-dependency-integration PROPERTIES
+                    LABELS "runtime;architecture;service;dependency;readiness;security;integration;release"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 60)
+                add_test(NAME runtime-lifecycle-maintenance-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_lifecycle_maintenance_integration.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --workspace "${CMAKE_BINARY_DIR}/runtime-lifecycle-maintenance"
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-lifecycle-maintenance-integration.json")
+                set_tests_properties(runtime-lifecycle-maintenance-integration PROPERTIES
+                    LABELS "runtime;architecture;lifecycle;drain;rollback;dependency;security;integration;release"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 90)
+                add_test(NAME runtime-lifecycle-recovery-integration
+                    COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_lifecycle_recovery_integration.py"
+                        --executable "$<TARGET_FILE:pdr-runtime>"
+                        --seed-executable "$<TARGET_FILE:pdr-maintenance-journal-seed>"
+                        --working-directory "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --config "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
+                        --workspace "${CMAKE_BINARY_DIR}/runtime-lifecycle-recovery"
+                        --path "${PDR_INSTALL_PREFIX}/bin"
+                        --path "$<TARGET_FILE_DIR:pdr-runtime>"
+                        --report "${CMAKE_BINARY_DIR}/reports/runtime-lifecycle-recovery-integration.json")
+                set_tests_properties(runtime-lifecycle-recovery-integration PROPERTIES
+                    LABELS "runtime;architecture;lifecycle;persistence;recovery;idempotency;dependency;security;integration;release"
+                    RESOURCE_LOCK pdr_runtime_http
+                    TIMEOUT 120)
                 add_test(NAME runtime-alert-debounce
                     COMMAND "${Python3_EXECUTABLE}"
                         "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
@@ -1070,6 +1644,9 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-runtime.properties"
                "${PDR_GENERATED_SUBPROCESS_CONFIG}"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/pdr-production-identity.properties.example"
+              "${CMAKE_CURRENT_SOURCE_DIR}/config/fastdds-deployment.properties.example"
+              "${CMAKE_CURRENT_SOURCE_DIR}/config/bundle-break-glass-trust-policy.example.json"
+              "${CMAKE_CURRENT_SOURCE_DIR}/config/project-config-approval-policy.example.json"
               "${CMAKE_CURRENT_SOURCE_DIR}/config/release-pipeline.example.json"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples")
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/contracts/"
@@ -1079,10 +1656,34 @@ install(PROGRAMS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_manager.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_config.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_config_transaction.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_config_approval.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_config_audit.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_config_audit_checkpoint.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_config_status.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_template.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/component_template.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/component_contract_test.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/configuration_participant_contract.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/configuration_key_lifecycle.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/service_contract_graph.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/schema_contract.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_pipeline.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/project_package.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_package.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_impact.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_impact_gate.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_provenance.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_remote.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_audit_archive.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_recovery.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_standby.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_leader.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_leader_backend.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_leader_backend_conformance.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_handoff.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_access_policy.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/process_file_lease.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_architecture.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/release_manifest.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/release_qualification.py"
@@ -1090,9 +1691,23 @@ install(PROGRAMS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/evidence_bundle.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/release_pipeline.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/upgrade_manager.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/bundle_repository_publisher.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/bundle_repository_recovery.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/bundle_repository_break_glass.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_change_impact.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_dependency_boundary.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_link_dependency_boundary.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_component_build_groups.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_build_evidence.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/framework_recovery_matrix.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/sdk_surface_guard.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/sdk_deprecation_guard.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/sdk_header_self_containment.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/repository_ownership.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/plugin_manager.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/upgrade_transaction_integration.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_smoke.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/runtime_process_desired_state_integration.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/soak_runner.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/device_acceptance.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/protocol_acceptance.py"
@@ -1100,6 +1715,17 @@ install(PROGRAMS
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.ps1"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-registry-leader-backend-file/file_backend_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-registry-leader-backend-file/create_backend_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-registry-leader-backend-file/README.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-registry-leader-backend-file")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-registry-leader-backend-etcdctl/etcd_backend_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-registry-leader-backend-etcdctl/create_backend_configs.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-registry-leader-backend-etcdctl/etcd_cluster_preflight.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-registry-leader-backend-etcdctl/README.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-registry-leader-backend-etcdctl")
 if(NOT WIN32)
     install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.py"
         DESTINATION "${CMAKE_INSTALL_BINDIR}" RENAME pdr)
@@ -1158,6 +1784,7 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/PocoDDSRuntimeConfigVersion.cmake"
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PocoDDSPlugins.cmake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PocoDDSComponentTesting.cmake"
     DESTINATION "${PDR_PACKAGE_CMAKE_DIR}")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/pdr-plugin-runtime.json"
     DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -1186,3 +1813,10 @@ configure_file(
     @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/pdr-profile.json"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime")
+
+# Export the configured, alias-resolved project target graph after every
+# legacy-runtime subdirectory has declared its targets. The architecture gate
+# consumes this manifest instead of approximating CMake syntax from text.
+include(PDRFrameworkLinkManifest)
+pdr_write_framework_link_manifest(
+    "${CMAKE_BINARY_DIR}/reports/framework-link-manifest.json")

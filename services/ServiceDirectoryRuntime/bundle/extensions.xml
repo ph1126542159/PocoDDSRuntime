@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/service-directory"
+             class="PocoDDS::ServiceDirectory::ServiceDirectoryHandlerFactory"
+             library="pdr.service.serviceDirectoryRuntime"
+             allowSpecialization="all"
+             hidden="true"/>
+</extensions>

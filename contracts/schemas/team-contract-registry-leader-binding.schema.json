@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-binding.schema.json",
+  "title": "Local Registry binding to a file or external-command leader authority",
+  "oneOf": [
+    {"$ref": "#/$defs/fileBinding"},
+    {"$ref": "#/$defs/backendBinding"}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "product", "authorityId", "registryId", "leaderId", "fencingToken", "grantPath", "grantSha256", "trustPolicyPath", "trustPolicyId", "trustPolicySha256", "promotedFromStandbyMarkerSha256", "boundAt"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBinding"},
+        "authorityId": {"$ref": "#/$defs/id"},
+        "registryId": {"$ref": "#/$defs/id"},
+        "leaderId": {"$ref": "#/$defs/id"},
+        "fencingToken": {"type": "integer", "minimum": 1},
+        "grantPath": {"type": "string", "minLength": 1},
+        "grantSha256": {"$ref": "#/$defs/sha256"},
+        "trustPolicyPath": {"type": "string", "minLength": 1},
+        "trustPolicyId": {"$ref": "#/$defs/id"},
+        "trustPolicySha256": {"$ref": "#/$defs/sha256"},
+        "promotedFromStandbyMarkerSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "boundAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "backendBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "product", "authorityId", "registryId", "leaderId", "fencingToken", "grantPath", "grantSha256", "trustPolicyPath", "trustPolicyId", "trustPolicySha256", "promotedFromStandbyMarkerSha256", "boundAt", "authorityBackend"],
+      "properties": {
+        "schemaVersion": {"const": 2},
+        "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBinding"},
+        "authorityId": {"$ref": "#/$defs/id"},
+        "registryId": {"$ref": "#/$defs/id"},
+        "leaderId": {"$ref": "#/$defs/id"},
+        "fencingToken": {"type": "integer", "minimum": 1},
+        "grantPath": {"type": "null"},
+        "grantSha256": {"$ref": "#/$defs/sha256"},
+        "trustPolicyPath": {"type": "string", "minLength": 1},
+        "trustPolicyId": {"$ref": "#/$defs/id"},
+        "trustPolicySha256": {"$ref": "#/$defs/sha256"},
+        "promotedFromStandbyMarkerSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "boundAt": {"type": "string", "format": "date-time"},
+        "authorityBackend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "backendId", "configPath", "configSha256"],
+          "properties": {
+            "kind": {"const": "external-command"},
+            "backendId": {"$ref": "#/$defs/id"},
+            "configPath": {"type": "string", "minLength": 1},
+            "configSha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      }
+    }
+  }
+}

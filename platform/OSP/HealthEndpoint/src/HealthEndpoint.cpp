@@ -11,6 +11,7 @@
 #include "Poco/OSP/Web/WebRequestHandlerFactory.h"
 #include "Poco/URI.h"
 #include "PocoDDS/Health/Health.h"
+#include "PocoDDS/ProcessManagement/ProcessDependencyGraph.h"
 #include "PocoDDS/ProcessManagement/SubprocessManager.h"
 #include "PocoDDS/Devices/Device.h"
 #include "PocoDDS/Devices/DeviceService.h"
@@ -123,6 +124,34 @@ public:
                 requiredRunning ? "" : "PDR-HEALTH-SUBPROCESS-REQUIRED_NOT_RUNNING",
                 requiredRunning ? "" : "Inspect the affected process log, then restart it from process management.",
                 std::move(affected)}));
+
+            const auto graph =
+                ProcessManagement::activeProcessDependencyGraph();
+            const auto& persistence = graph.desiredStatePersistence;
+            if (persistence.enabled)
+            {
+                std::vector<std::string> affectedSnapshots;
+                if (!persistence.primaryValid)
+                    affectedSnapshots.emplace_back("primary");
+                if (persistence.previousAvailable &&
+                    !persistence.previousValid)
+                    affectedSnapshots.emplace_back("previous");
+                registry.add(std::make_shared<StaticContributor>(
+                    Health::Report{
+                        "desired-state-persistence",
+                        persistence.healthy ? Health::Status::up
+                                            : Health::Status::degraded,
+                        "generation " +
+                            std::to_string(persistence.generation) +
+                            ", integrity " + persistence.integrityState,
+                        persistence.healthy
+                            ? ""
+                            : "PDR-HEALTH-PROCESS-DESIRED-STATE-INTEGRITY",
+                        persistence.healthy
+                            ? ""
+                            : "Preserve the state files and Runtime log, then perform an approved lifecycle commit or offline recovery.",
+                        std::move(affectedSnapshots)}));
+            }
         }
         else
         {

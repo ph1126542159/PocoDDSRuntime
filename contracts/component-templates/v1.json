@@ -10,7 +10,7 @@
     "workflow": "7e5404ea83b331695a3617d9c60b064645b6800abcb0dbef6d9e388a3587e5ff",
     "bundle": "39cdd2f3ae1d4cefdd22fd941b72b8026e2ff5357627569aab76f658260a8a08",
     "plugin": "722517968cf054755f9040a8763414a19edb8d2b4e13af26277bcfc23a4e41e2",
-    "subprocess": "6cc37b53d4c9192ecdbbfe1681afa784112561fcdd69daff1ae1e9b45eac313d",
+    "subprocess": "e1c730a6380b68d0403b22e33c447de5ec3277e06e169775dba7e2f6aece581a",
     "robot-module": "cc8da4d691f96de5d5accd5847ed4405445e9f9e5aba73a6f85a21e47e9823ac",
     "robot-hardware-adapter": "903fdd8d9f98136b896357241353b4d020a6f52e094d6b8e696d8d1d8d9ecc71",
     "robot-simulation-adapter": "c549fd832a29bd02fa8bd8ea482cc102c7ae266585270b66e00581485751badd",

@@ -2,8 +2,9 @@ myiot_add_osp_bundle(PDR_DeviceGateway_Bundle "pdr.device.gateway"
     SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/BundleActivator.cpp
     LINK_LIBS
         PocoDDS::FastDDS
-        PocoDDS::Devices
+        PocoDDS::DeviceCore
         PocoDDS::Configuration
+        PocoDDS::GatewayAPI
         Poco::OSP
         Poco::Util
         Poco::Foundation

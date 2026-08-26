@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-drain-command.schema.json",
+  "title": "Path-free operator command for remote Registry drain control",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "registryId", "operation", "handoffId", "expectedGeneration", "expectedRevision", "expectedStateSha256", "reason", "issuedAt", "expiresAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteDrainCommand"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "operation": {"enum": ["start", "finalize", "resume"]},
+    "handoffId": {"$ref": "#/$defs/id"},
+    "expectedGeneration": {"type": "integer", "minimum": 0},
+    "expectedRevision": {"type": "integer", "minimum": 0},
+    "expectedStateSha256": {"$ref": "#/$defs/sha256"},
+    "reason": {"type": ["string", "null"], "minLength": 1, "maxLength": 512},
+    "issuedAt": {"type": ["string", "null"], "format": "date-time"},
+    "expiresAt": {"type": ["string", "null"], "format": "date-time"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"operation": {"const": "finalize"}}},
+      "then": {
+        "properties": {
+          "reason": {"type": "null"},
+          "issuedAt": {"type": "string", "format": "date-time"},
+          "expiresAt": {"type": "string", "format": "date-time"}
+        }
+      },
+      "else": {
+        "properties": {
+          "reason": {"type": "string", "minLength": 1, "maxLength": 512},
+          "issuedAt": {"type": "null"},
+          "expiresAt": {"type": "null"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

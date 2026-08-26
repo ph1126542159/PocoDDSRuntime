@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.dev/contracts/sdk-header-self-containment-plan.schema.json",
+  "title": "Installed SDK public-header self-containment plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operation", "surfaceSha256", "publicHeaders", "cmakeLibraryTargets"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "operation": { "const": "sdk-header-self-containment-plan" },
+    "surfaceSha256": { "$ref": "#/$defs/sha256" },
+    "publicHeaders": {
+      "type": "object", "minProperties": 1,
+      "propertyNames": { "pattern": "^include/PocoDDS/.+\\.(h|hh|hpp|hxx)$" },
+      "additionalProperties": { "$ref": "#/$defs/header" }
+    },
+    "cmakeLibraryTargets": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^PocoDDS::\\S+$" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "header": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tokenSha256", "tokenCount"],
+      "properties": {
+        "tokenSha256": { "$ref": "#/$defs/sha256" },
+        "tokenCount": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

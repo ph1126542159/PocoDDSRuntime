@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "product": "PocoDDSBundleRepositoryBreakGlass",
+  "policyId": "site-recovery-break-glass-v1",
+  "maxApprovalLifetimeSeconds": 1800,
+  "minimumApprovals": 2,
+  "allowedApprovers": [
+    {
+      "approverId": "recovery-officer",
+      "keyId": "recovery-officer-2026",
+      "algorithm": "Ed25519",
+      "publicKeySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "repositoryPatterns": ["runtime-main"],
+      "actions": ["downgrade-high-water"]
+    },
+    {
+      "approverId": "security-officer",
+      "keyId": "security-officer-2026",
+      "algorithm": "Ed25519",
+      "publicKeySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "repositoryPatterns": ["runtime-main"],
+      "actions": ["downgrade-high-water"]
+    },
+    {
+      "approverId": "operations-manager",
+      "keyId": "operations-manager-2026",
+      "algorithm": "Ed25519",
+      "publicKeySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "repositoryPatterns": ["runtime-main"],
+      "actions": ["downgrade-high-water"]
+    }
+  ],
+  "revokedKeys": []
+}

@@ -81,6 +81,10 @@ def sync_project(args: argparse.Namespace) -> int:
     return load_project_manager().sync_project(args)
 
 
+def project_change_impact(args: argparse.Namespace) -> int:
+    return load_project_manager().project_change_impact(args)
+
+
 def load_project_config():
     path = Path(__file__).resolve().with_name("project_config.py")
     spec = importlib.util.spec_from_file_location("pdr_project_config_cli", path)
@@ -107,6 +111,76 @@ def load_project_config_transaction():
 
 def plan_project_config(args: argparse.Namespace) -> int:
     return load_project_config_transaction().plan_command(args)
+
+
+def preflight_project_config(args: argparse.Namespace) -> int:
+    return load_project_config_transaction().preflight_command(args)
+
+
+def load_project_config_approval():
+    path = Path(__file__).resolve().with_name("project_config_approval.py")
+    spec = importlib.util.spec_from_file_location("pdr_project_config_approval_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project configuration approval tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def request_project_config_approval(args: argparse.Namespace) -> int:
+    return load_project_config_approval().request_command(args)
+
+
+def approve_project_config(args: argparse.Namespace) -> int:
+    return load_project_config_approval().approve_command(args)
+
+
+def load_project_config_audit():
+    path = Path(__file__).resolve().with_name("project_config_audit.py")
+    spec = importlib.util.spec_from_file_location("pdr_project_config_audit_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project configuration audit tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def verify_project_config_audit(args: argparse.Namespace) -> int:
+    return load_project_config_audit().verify_command(args)
+
+
+def load_project_config_audit_checkpoint():
+    path = Path(__file__).resolve().with_name("project_config_audit_checkpoint.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_project_config_audit_checkpoint_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project configuration audit checkpoint tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def checkpoint_project_config_audit(args: argparse.Namespace) -> int:
+    return load_project_config_audit_checkpoint().checkpoint_command(args)
+
+
+def verify_project_config_audit_checkpoint(args: argparse.Namespace) -> int:
+    return load_project_config_audit_checkpoint().verify_checkpoint_command(args)
+
+
+def load_project_config_status():
+    path = Path(__file__).resolve().with_name("project_config_status.py")
+    spec = importlib.util.spec_from_file_location("pdr_project_config_status_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load project configuration status tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def project_config_status(args: argparse.Namespace) -> int:
+    return load_project_config_status().status_command(args)
 
 
 def apply_project_config(args: argparse.Namespace) -> int:
@@ -169,6 +243,262 @@ def recover_component_template(args: argparse.Namespace) -> int:
     return load_component_template().recover_command(args)
 
 
+def component_dependency(args: argparse.Namespace) -> int:
+    return load_component_template().dependency_command(args)
+
+
+def load_component_contract_test():
+    path = Path(__file__).resolve().with_name("component_contract_test.py")
+    spec = importlib.util.spec_from_file_location("pdr_component_contract_test_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load component contract test tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def component_contract_test(args: argparse.Namespace) -> int:
+    return load_component_contract_test().validate_command(args)
+
+
+def component_contract_verify(args: argparse.Namespace) -> int:
+    return load_component_contract_test().verify_report_command(args)
+
+
+def load_configuration_participant_contract():
+    path = Path(__file__).resolve().with_name("configuration_participant_contract.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_configuration_participant_contract_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load configuration participant contract tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def configuration_participant_contract_test(args: argparse.Namespace) -> int:
+    return load_configuration_participant_contract().validate_command(args)
+
+
+def load_configuration_key_lifecycle():
+    path = Path(__file__).resolve().with_name("configuration_key_lifecycle.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_configuration_key_lifecycle_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load configuration key lifecycle tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def configuration_key_lifecycle_test(args: argparse.Namespace) -> int:
+    return load_configuration_key_lifecycle().validate_command(args)
+
+
+def load_service_contract_graph():
+    path = Path(__file__).resolve().with_name("service_contract_graph.py")
+    spec = importlib.util.spec_from_file_location("pdr_service_contract_graph_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load service contract graph tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def service_contract_graph_check(args: argparse.Namespace) -> int:
+    return load_service_contract_graph().check_command(args)
+
+
+def service_contract_graph_verify(args: argparse.Namespace) -> int:
+    return load_service_contract_graph().verify_command(args)
+
+
+def service_contract_baseline_snapshot(args: argparse.Namespace) -> int:
+    return load_service_contract_graph().snapshot_command(args)
+
+
+def load_schema_contract():
+    path = Path(__file__).resolve().with_name("schema_contract.py")
+    spec = importlib.util.spec_from_file_location("pdr_schema_contract_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load schema contract tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def scaffold_schema(args: argparse.Namespace) -> int:
+    try:
+        return load_schema_contract().scaffold_command(args)
+    except (OSError, ValueError) as error:
+        print(f"SCHEMA_SCAFFOLD_ERROR: {error}", file=sys.stderr)
+        return 2
+
+
+CAPABILITY_ACTIONS = {
+    "service": {"discover", "use"},
+    "topic": {"publish", "subscribe"},
+    "configuration": {"read", "write"},
+    "device": {"observe", "operate"},
+    "schema": {"read", "register", "deprecate"},
+}
+
+
+def scaffold_capability_policy(args: argparse.Namespace) -> int:
+    try:
+        if args.action not in CAPABILITY_ACTIONS[args.resource_kind]:
+            raise ValueError(
+                f"action {args.action} is not valid for {args.resource_kind} resources"
+            )
+        output = Path(args.output).resolve()
+        if output.exists() and not args.force:
+            raise FileExistsError(f"output already exists: {output}")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        document = {
+            "$schema": str(
+                (tool_root() / "contracts" / "schemas" /
+                 "runtime-capability-policy.schema.json").resolve()
+            ),
+            "version": 1,
+            "defaultEffect": "deny",
+            "rules": [{
+                "id": args.rule_id,
+                "effect": args.effect,
+                "principal": args.principal,
+                "resourceKind": args.resource_kind,
+                "resource": args.resource,
+                "actions": [args.action],
+            }],
+        }
+        output.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n",
+                          encoding="utf-8")
+        print(json.dumps({"created": str(output), "defaultEffect": "deny",
+                          "ruleCount": 1}, ensure_ascii=False))
+        return 0
+    except (OSError, ValueError) as error:
+        print(f"CAPABILITY_SCAFFOLD_ERROR: {error}", file=sys.stderr)
+        return 2
+
+
+def check_capability(args: argparse.Namespace) -> int:
+    if not args.validate and not all(
+            (args.principal, args.resource_kind, args.resource, args.action)):
+        print("CAPABILITY_CHECK_ERROR: decision mode requires --principal, "
+              "--resource-kind, --resource and --action", file=sys.stderr)
+        return 2
+    executable = Path(args.checker).resolve() if args.checker else None
+    if executable is None:
+        name = "pdr-capability-check.exe" if os.name == "nt" else "pdr-capability-check"
+        candidates = [
+            tool_root() / "build" / "bin" / name,
+            tool_root() / "build" / "workflow-validation" / "bin" / name,
+        ]
+        located = shutil.which(name)
+        if located:
+            candidates.insert(0, Path(located))
+        executable = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if executable is None or not executable.is_file():
+        print("CAPABILITY_CHECK_ERROR: pdr-capability-check executable not found",
+              file=sys.stderr)
+        return 2
+    command = [str(executable), "--policy", str(Path(args.policy).resolve())]
+    if args.validate:
+        command.append("--validate")
+    else:
+        command.extend([
+            "--principal", args.principal,
+            "--resource-kind", args.resource_kind,
+            "--resource", args.resource,
+            "--action", args.action,
+        ])
+    return subprocess.run(command, check=False).returncode
+
+
+def check_capability_store(args: argparse.Namespace) -> int:
+    executable = Path(args.checker).resolve() if args.checker else None
+    if executable is None:
+        name = "pdr-capability-store-check.exe" if os.name == "nt" else \
+            "pdr-capability-store-check"
+        candidates = [
+            tool_root() / "build" / "bin" / name,
+            tool_root() / "build" / "workflow-validation" / "bin" / name,
+        ]
+        located = shutil.which(name)
+        if located:
+            candidates.insert(0, Path(located))
+        executable = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if executable is None or not executable.is_file():
+        print("CAPABILITY_STORE_CHECK_ERROR: native checker executable not found",
+              file=sys.stderr)
+        return 2
+    return subprocess.run([
+        str(executable),
+        "--database", str(Path(args.database).resolve()),
+        "--seed-policy", str(Path(args.seed_policy).resolve()),
+    ], check=False).returncode
+
+
+def apply_capability_store(args: argparse.Namespace) -> int:
+    executable = Path(args.checker).resolve() if args.checker else None
+    if executable is None:
+        name = "pdr-capability-store-apply.exe" if os.name == "nt" else \
+            "pdr-capability-store-apply"
+        candidates = [
+            tool_root() / "build" / "bin" / name,
+            tool_root() / "build" / "workflow-validation" / "bin" / name,
+        ]
+        located = shutil.which(name)
+        if located:
+            candidates.insert(0, Path(located))
+        executable = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if executable is None or not executable.is_file():
+        print("CAPABILITY_STORE_APPLY_ERROR: native apply executable not found",
+              file=sys.stderr)
+        return 2
+    return subprocess.run([
+        str(executable),
+        "--database", str(Path(args.database).resolve()),
+        "--seed-policy", str(Path(args.seed_policy).resolve()),
+        "--candidate-policy", str(Path(args.candidate_policy).resolve()),
+        "--actor", args.actor,
+        "--request-id", args.request_id,
+        "--expected-generation", str(args.expected_generation),
+    ], check=False).returncode
+
+
+def manage_lifecycle_store(args: argparse.Namespace) -> int:
+    executable = Path(args.tool).resolve() if args.tool else None
+    if executable is None:
+        name = "pdr-lifecycle-store.exe" if os.name == "nt" else \
+            "pdr-lifecycle-store"
+        candidates = [
+            tool_root() / "build" / "bin" / name,
+            tool_root() / "build" / "workflow-validation" / "bin" / name,
+        ]
+        located = shutil.which(name)
+        if located:
+            candidates.insert(0, Path(located))
+        executable = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if executable is None or not executable.is_file():
+        print("LIFECYCLE_STORE_ERROR: native lifecycle store tool not found",
+              file=sys.stderr)
+        return 2
+    command = [
+        str(executable),
+        "--action", "check" if args.lifecycle_command == "store-check" else "backup",
+        "--database", str(Path(args.database).resolve()),
+    ]
+    if args.lifecycle_command == "store-check":
+        command.extend(["--limit", str(args.limit)])
+    else:
+        command.extend(["--destination", str(Path(args.destination).resolve())])
+    return subprocess.run(command, check=False).returncode
+
+
 def add_project_dependency(args: argparse.Namespace) -> int:
     return load_project_manager().add_project_dependency(args)
 
@@ -197,6 +527,401 @@ def create_project_package(args: argparse.Namespace) -> int:
 
 def verify_project_package(args: argparse.Namespace) -> int:
     return load_project_package().verify_project_package(args)
+
+
+def load_team_contract_package():
+    path = Path(__file__).resolve().with_name("team_contract_package.py")
+    spec = importlib.util.spec_from_file_location("pdr_team_contract_package_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load team contract package tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def pack_team_contract_package(args: argparse.Namespace) -> int:
+    return run_team_contract_package("pack", args)
+
+
+def verify_team_contract_package(args: argparse.Namespace) -> int:
+    return run_team_contract_package("verify", args)
+
+
+def lock_team_contract_packages(args: argparse.Namespace) -> int:
+    return run_team_contract_package("create_lock", args)
+
+
+def resolve_team_contract_packages(args: argparse.Namespace) -> int:
+    return run_team_contract_package("resolve", args)
+
+
+def run_team_contract_package(action: str, args: argparse.Namespace) -> int:
+    try:
+        return getattr(load_team_contract_package(), action)(args)
+    except (OSError, ValueError) as error:
+        print(f"PDR_TEAM_CONTRACT_PACKAGE_ERROR: {error}", file=sys.stderr)
+        return 2
+
+
+def load_team_contract_impact():
+    path = Path(__file__).resolve().with_name("team_contract_impact.py")
+    spec = importlib.util.spec_from_file_location("pdr_team_contract_impact_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load team contract impact tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def analyze_team_contract_impact(args: argparse.Namespace) -> int:
+    return load_team_contract_impact().impact_command(args)
+
+
+def load_team_contract_impact_gate():
+    path = Path(__file__).resolve().with_name("team_contract_impact_gate.py")
+    spec = importlib.util.spec_from_file_location("pdr_team_contract_impact_gate_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load team contract impact gate tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def execute_team_contract_impact(args: argparse.Namespace) -> int:
+    return load_team_contract_impact_gate().execute_command(args)
+
+
+def approve_team_contract_impact(args: argparse.Namespace) -> int:
+    return load_team_contract_impact_gate().approve_command(args)
+
+
+def gate_team_contract_impact(args: argparse.Namespace) -> int:
+    return load_team_contract_impact_gate().gate_command(args)
+
+
+def load_team_contract_registry():
+    path = Path(__file__).resolve().with_name("team_contract_registry.py")
+    spec = importlib.util.spec_from_file_location("pdr_team_contract_registry_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load team contract Registry tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def init_team_contract_registry(args: argparse.Namespace) -> int:
+    return load_team_contract_registry().init_command(args)
+
+
+def publish_team_contract_registry(args: argparse.Namespace) -> int:
+    return load_team_contract_registry().publish_command(args)
+
+
+def promote_team_contract_registry(args: argparse.Namespace) -> int:
+    return load_team_contract_registry().promote_command(args)
+
+
+def rollback_team_contract_registry(args: argparse.Namespace) -> int:
+    return load_team_contract_registry().rollback_command(args)
+
+
+def resolve_team_contract_registry(args: argparse.Namespace) -> int:
+    return load_team_contract_registry().resolve_command(args)
+
+
+def verify_team_contract_registry(args: argparse.Namespace) -> int:
+    return load_team_contract_registry().verify_command(args)
+
+
+def inspect_team_contract_registry_lease(args: argparse.Namespace) -> int:
+    return load_team_contract_registry().lease_status_command(args)
+
+
+def load_team_contract_provenance():
+    path = Path(__file__).resolve().with_name("team_contract_provenance.py")
+    spec = importlib.util.spec_from_file_location("pdr_team_contract_provenance_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load team contract provenance tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def attest_team_contract_runner(args: argparse.Namespace) -> int:
+    return load_team_contract_provenance().runner_attest_command(args)
+
+
+def verify_team_contract_runner(args: argparse.Namespace) -> int:
+    return load_team_contract_provenance().runner_verify_command(args)
+
+
+def authorize_team_contract_gate(args: argparse.Namespace) -> int:
+    return load_team_contract_provenance().gate_authorize_command(args)
+
+
+def verify_team_contract_gate_authorization(args: argparse.Namespace) -> int:
+    return load_team_contract_provenance().gate_authorization_verify_command(args)
+
+
+def anchor_team_contract_registry(args: argparse.Namespace) -> int:
+    return load_team_contract_provenance().registry_anchor_command(args)
+
+
+def verify_team_contract_registry_anchor(args: argparse.Namespace) -> int:
+    return load_team_contract_provenance().registry_anchor_verify_command(args)
+
+
+def load_team_contract_registry_remote():
+    path = Path(__file__).resolve().with_name("team_contract_registry_remote.py")
+    spec = importlib.util.spec_from_file_location("pdr_team_contract_registry_remote_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load remote team contract Registry tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_team_contract_registry_audit_archive():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_registry_audit_archive.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_audit_archive_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Registry audit archive tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_team_contract_registry_recovery():
+    path = Path(__file__).resolve().with_name("team_contract_registry_recovery.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_recovery_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Registry recovery tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_team_contract_registry_standby():
+    path = Path(__file__).resolve().with_name("team_contract_registry_standby.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_standby_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Registry standby tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_team_contract_registry_leader():
+    path = Path(__file__).resolve().with_name("team_contract_registry_leader.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_leader_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Registry leader tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_team_contract_registry_handoff():
+    path = Path(__file__).resolve().with_name("team_contract_registry_handoff.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_handoff_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Registry handoff tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_team_contract_registry_access_policy():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_registry_access_policy.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_access_policy_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Registry access-policy tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def serve_team_contract_registry_remote(args: argparse.Namespace) -> int:
+    return load_team_contract_registry_remote().serve_command(args)
+
+
+def checkpoint_team_contract_registry_remote_audit(args: argparse.Namespace) -> int:
+    return load_team_contract_registry_remote().audit_checkpoint_create_command(args)
+
+
+def verify_team_contract_registry_remote_audit_checkpoint(
+        args: argparse.Namespace) -> int:
+    return load_team_contract_registry_remote().audit_checkpoint_verify_command(args)
+
+
+def manage_team_contract_registry_remote_audit_archive(
+        args: argparse.Namespace) -> int:
+    archive = load_team_contract_registry_audit_archive()
+    return getattr(archive, f"{args.archive_operation}_command")(args)
+
+
+def manage_team_contract_registry_recovery(args: argparse.Namespace) -> int:
+    recovery = load_team_contract_registry_recovery()
+    return getattr(recovery, f"{args.recovery_operation}_command")(args)
+
+
+def manage_team_contract_registry_standby(args: argparse.Namespace) -> int:
+    standby = load_team_contract_registry_standby()
+    return getattr(standby, f"{args.standby_operation}_command")(args)
+
+
+def manage_team_contract_registry_leader(args: argparse.Namespace) -> int:
+    leader = load_team_contract_registry_leader()
+    return getattr(leader, f"{args.leader_operation}_command")(args)
+
+
+def load_team_contract_registry_leader_backend_conformance():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_registry_leader_backend_conformance.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_leader_backend_conformance_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Registry leader backend conformance tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def qualify_team_contract_registry_leader_backend(
+        args: argparse.Namespace) -> int:
+    return load_team_contract_registry_leader_backend_conformance().execute_command(
+        args
+    )
+
+
+def load_team_contract_registry_leader_etcd_preflight():
+    root = tool_root()
+    candidates = (
+        root / "examples/team-contract-registry-leader-backend-etcdctl",
+        root / "share/PocoDDSRuntime/examples/team-contract-registry-leader-backend-etcdctl",
+    )
+    directory = next((item for item in candidates if item.is_dir()), None)
+    if directory is None:
+        raise RuntimeError("cannot locate Registry leader etcd adapter SDK example")
+    path = directory / "etcd_cluster_preflight.py"
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_leader_etcd_preflight_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Registry leader etcd preflight tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(directory))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
+    return module
+
+
+def preflight_team_contract_registry_leader_etcd(
+        args: argparse.Namespace) -> int:
+    return load_team_contract_registry_leader_etcd_preflight().execute(args)
+
+
+def manage_team_contract_registry_handoff(args: argparse.Namespace) -> int:
+    handoff = load_team_contract_registry_handoff()
+    return getattr(handoff, f"{args.handoff_operation}_command")(args)
+
+
+def sign_team_contract_registry_access_policy(args: argparse.Namespace) -> int:
+    return load_team_contract_registry_access_policy().sign_command(args)
+
+
+def activate_team_contract_registry_access_policy(args: argparse.Namespace) -> int:
+    return load_team_contract_registry_access_policy().activate_command(args)
+
+
+def invoke_team_contract_registry_remote(args: argparse.Namespace) -> int:
+    args.command = args.remote_operation
+    remote = load_team_contract_registry_remote()
+    if args.remote_operation == "status":
+        return remote.status_client_command(args)
+    if args.remote_operation == "audit-verify":
+        return remote.audit_client_command(args)
+    if args.remote_operation == "audit-archive-status":
+        return remote.audit_archive_status_client_command(args)
+    if args.remote_operation == "recover":
+        return remote.recovery_client_command(args)
+    if args.remote_operation == "capacity":
+        return remote.capacity_client_command(args)
+    if args.remote_operation in {"drain-start", "drain-finalize", "drain-resume"}:
+        return remote.remote_drain_client_command(args)
+    if args.remote_operation == "drain-status":
+        return remote.remote_drain_status_client_command(args)
+    if args.remote_operation == "lease-status":
+        return remote.lease_status_client_command(args)
+    return remote.client_command(args)
+
+
+def add_team_contract_private_key_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--key-id", required=True)
+    parser.add_argument("--private-key-environment", required=True)
+    parser.add_argument("--private-key-passphrase-environment")
+
+
+def add_team_contract_registry_trust_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--trust-policy", required=True)
+    parser.add_argument("--expected-trust-policy-id", required=True)
+    parser.add_argument("--expected-trust-policy-sha256", required=True)
+    parser.add_argument("--verification-time")
+
+
+def add_team_contract_registry_limits(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--maximum-files", type=int, default=64)
+    parser.add_argument("--maximum-expanded-bytes", type=int, default=16 * 1024 * 1024)
+
+
+def add_team_contract_registry_remote_client_arguments(
+        parser: argparse.ArgumentParser, mutation: bool = False) -> None:
+    parser.add_argument("--url", required=True)
+    parser.add_argument("--registry-id", required=True)
+    parser.add_argument("--request-id", required=True)
+    parser.add_argument("--token-environment", required=True)
+    parser.add_argument("--expected-revision", type=int, required=mutation)
+    parser.add_argument("--allow-insecure-loopback", action="store_true")
+    parser.add_argument("--ca-file")
+    parser.add_argument("--timeout", type=float, default=30.0)
+    parser.add_argument("--report")
+    parser.set_defaults(handler=invoke_team_contract_registry_remote)
+
+
+def add_team_contract_registry_remote_query_arguments(
+        parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--url", required=True)
+    parser.add_argument("--registry-id", required=True)
+    parser.add_argument("--token-environment", required=True)
+    parser.add_argument("--allow-insecure-loopback", action="store_true")
+    parser.add_argument("--ca-file")
+    parser.add_argument("--timeout", type=float, default=30.0)
+    parser.add_argument("--report")
+    parser.set_defaults(handler=invoke_team_contract_registry_remote)
 
 
 def load_upgrade_manager():
@@ -1514,7 +2239,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 endif()
 
 add_executable({cmake_target} src/main.cpp)
-target_link_libraries({cmake_target} PRIVATE PocoDDS::SDK)
+target_link_libraries({cmake_target} PRIVATE PocoDDS::SDK Poco::Util)
 if(DEFINED PDR_SUBPROCESS_OUTPUT_ROOT)
     set({name}_OUTPUT_ROOT "${{PDR_SUBPROCESS_OUTPUT_ROOT}}")
 else()
@@ -1543,46 +2268,75 @@ install(FILES config/pdr-subprocess-entry.properties
 '''
     source = f'''#include <PocoDDS/SDK/SDK.h>
 
+#include <Poco/Util/ServerApplication.h>
+
 #include <atomic>
 #include <chrono>
-#include <csignal>
+#include <fstream>
 #include <iostream>
+#include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 namespace
 {{
 std::atomic_bool running{{true}};
+std::string healthFile;
 
-void requestStop(int)
+void writeHealth(std::string_view state)
 {{
-    running.store(false);
+    if (healthFile.empty()) return;
+    const auto now = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    std::ofstream output(healthFile, std::ios::trunc);
+    output << state << ' ' << now << '\\n';
 }}
 }}
 
-int main(int argc, char** argv)
+class GeneratedSubprocess final : public Poco::Util::ServerApplication
 {{
-    for (int index = 1; index < argc; ++index)
+  protected:
+    int main(const std::vector<std::string>& arguments) override
     {{
-        if (std::string_view(argv[index]) == "--self-test")
+        for (const auto& value : arguments)
         {{
-            std::cout << "{target.upper().replace('-', '_')}_SELF_TEST_PASS sdk="
-                      << PocoDDS::SDK::versionString << '\\n';
-            return 0;
+            const std::string_view argument(value);
+            if (argument == "--self-test")
+            {{
+                std::cout << "{target.upper().replace('-', '_')}_SELF_TEST_PASS sdk="
+                          << PocoDDS::SDK::versionString << '\\n';
+                return Application::EXIT_OK;
+            }}
+            constexpr std::string_view healthPrefix = "--health-file=";
+            if (argument.substr(0, healthPrefix.size()) == healthPrefix)
+                healthFile = std::string(argument.substr(healthPrefix.size()));
         }}
-    }}
 
-    std::signal(SIGINT, requestStop);
-    std::signal(SIGTERM, requestStop);
-    std::cout << "{target.upper().replace('-', '_')}_READY" << std::endl;
-    while (running.load())
-    {{
-        std::cout << "{target.upper().replace('-', '_')}_HEARTBEAT" << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        running.store(true);
+        writeHealth("ready");
+        std::cout << "{target.upper().replace('-', '_')}_READY" << std::endl;
+        std::thread heartbeat([] {{
+            while (running.load())
+            {{
+                writeHealth("running");
+                std::cout << "{target.upper().replace('-', '_')}_HEARTBEAT"
+                          << std::endl;
+                for (int waited = 0; running.load() && waited < 1000;
+                     waited += 25)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+            }}
+        }});
+        waitForTerminationRequest();
+        running.store(false);
+        heartbeat.join();
+        writeHealth("stopped");
+        std::cout << "{target.upper().replace('-', '_')}_STOPPED" << std::endl;
+        return Application::EXIT_OK;
     }}
-    std::cout << "{target.upper().replace('-', '_')}_STOPPED" << std::endl;
-    return 0;
-}}
+}};
+
+POCO_SERVER_MAIN(GeneratedSubprocess)
 '''
     configuration = f'''# Merge this block into pdr-subprocesses.properties and replace N with
 # the next contiguous numeric slot. Paths are relative to the Runtime bin directory.
@@ -1590,9 +2344,20 @@ subprocess.N.enabled = true
 subprocess.N.name = {target}
 subprocess.N.location = local
 subprocess.N.required = false
+subprocess.N.dependency.count = 0
 subprocess.N.path = processes/{target}/{target}{'.exe' if os.name == 'nt' else ''}
 subprocess.N.workingDirectory = processes/{target}
-subprocess.N.argument.count = 0
+subprocess.N.restartPolicy = on-failure
+subprocess.N.restartMaximumAttempts = 5
+subprocess.N.restartInitialBackoffMilliseconds = 250
+subprocess.N.restartMaximumBackoffMilliseconds = 30000
+subprocess.N.restartBackoffMultiplier = 2.0
+subprocess.N.restartResetAfterMilliseconds = 60000
+subprocess.N.readinessFile = processes/{target}/pdr-subprocess.heartbeat
+subprocess.N.readinessTimeoutMilliseconds = 10000
+subprocess.N.heartbeatTimeoutMilliseconds = 5000
+subprocess.N.argument.count = 1
+subprocess.N.argument.0 = --health-file=pdr-subprocess.heartbeat
 '''
     readme = f'''# {name} subprocess
 
@@ -3096,6 +3861,101 @@ def validate_restored_runtime(args: argparse.Namespace) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog="pdr", description=__doc__)
     commands = result.add_subparsers(dest="command", required=True)
+    schema = commands.add_parser(
+        "schema", help="scaffold provider-owned, versioned Runtime schema contracts"
+    )
+    schema_commands = schema.add_subparsers(dest="schema_command", required=True)
+    schema_scaffold = schema_commands.add_parser(
+        "scaffold", help="create a JSON Schema contract without editing a central registry"
+    )
+    schema_scaffold.add_argument("subject")
+    schema_scaffold.add_argument("--owner", required=True)
+    schema_scaffold.add_argument(
+        "--kind", choices=("message", "event", "command", "configuration", "service"),
+        default="event",
+    )
+    schema_scaffold.add_argument("--version", default="1.0.0")
+    schema_scaffold.add_argument(
+        "--compatibility", choices=("none", "backward", "forward", "full"),
+        default="backward",
+    )
+    schema_scaffold.add_argument("--output", required=True)
+    schema_scaffold.add_argument("--force", action="store_true")
+    schema_scaffold.set_defaults(handler=scaffold_schema)
+    capability = commands.add_parser(
+        "capability", help="scaffold and evaluate default-deny Bundle capability policies"
+    )
+    capability_commands = capability.add_subparsers(
+        dest="capability_command", required=True
+    )
+    capability_scaffold = capability_commands.add_parser(
+        "scaffold", help="create a standalone policy without editing a central registry"
+    )
+    capability_scaffold.add_argument("--rule-id", required=True)
+    capability_scaffold.add_argument("--effect", choices=("allow", "deny"), default="allow")
+    capability_scaffold.add_argument("--principal", required=True)
+    capability_scaffold.add_argument(
+        "--resource-kind", choices=tuple(CAPABILITY_ACTIONS), required=True
+    )
+    capability_scaffold.add_argument("--resource", required=True)
+    capability_scaffold.add_argument(
+        "--action", choices=tuple(sorted(set().union(*CAPABILITY_ACTIONS.values()))),
+        required=True,
+    )
+    capability_scaffold.add_argument("--output", required=True)
+    capability_scaffold.add_argument("--force", action="store_true")
+    capability_scaffold.set_defaults(handler=scaffold_capability_policy)
+    capability_check = capability_commands.add_parser(
+        "check", help="validate a policy or explain one authorization decision"
+    )
+    capability_check.add_argument("--policy", required=True)
+    capability_check.add_argument("--checker")
+    capability_check.add_argument("--validate", action="store_true")
+    capability_check.add_argument("--principal")
+    capability_check.add_argument("--resource-kind", choices=tuple(CAPABILITY_ACTIONS))
+    capability_check.add_argument("--resource")
+    capability_check.add_argument(
+        "--action", choices=tuple(sorted(set().union(*CAPABILITY_ACTIONS.values())))
+    )
+    capability_check.set_defaults(handler=check_capability)
+    capability_store_check = capability_commands.add_parser(
+        "store-check", help="initialize or verify the durable SQLite policy store"
+    )
+    capability_store_check.add_argument("--database", required=True)
+    capability_store_check.add_argument("--seed-policy", required=True)
+    capability_store_check.add_argument("--checker")
+    capability_store_check.set_defaults(handler=check_capability_store)
+    capability_store_apply = capability_commands.add_parser(
+        "store-apply", help="offline transactional policy replacement; Runtime must be stopped"
+    )
+    capability_store_apply.add_argument("--database", required=True)
+    capability_store_apply.add_argument("--seed-policy", required=True)
+    capability_store_apply.add_argument("--candidate-policy", required=True)
+    capability_store_apply.add_argument("--actor", required=True)
+    capability_store_apply.add_argument("--request-id", required=True)
+    capability_store_apply.add_argument("--expected-generation", type=int, required=True)
+    capability_store_apply.add_argument("--checker")
+    capability_store_apply.set_defaults(handler=apply_capability_store)
+    lifecycle = commands.add_parser(
+        "lifecycle", help="inspect and back up the durable Bundle maintenance journal"
+    )
+    lifecycle_commands = lifecycle.add_subparsers(
+        dest="lifecycle_command", required=True
+    )
+    lifecycle_store_check = lifecycle_commands.add_parser(
+        "store-check", help="offline integrity check and bounded JSON plan export"
+    )
+    lifecycle_store_check.add_argument("--database", required=True)
+    lifecycle_store_check.add_argument("--limit", type=int, default=256)
+    lifecycle_store_check.add_argument("--tool")
+    lifecycle_store_check.set_defaults(handler=manage_lifecycle_store)
+    lifecycle_store_backup = lifecycle_commands.add_parser(
+        "store-backup", help="create a verified consistent SQLite backup; Runtime must be stopped"
+    )
+    lifecycle_store_backup.add_argument("--database", required=True)
+    lifecycle_store_backup.add_argument("--destination", required=True)
+    lifecycle_store_backup.add_argument("--tool")
+    lifecycle_store_backup.set_defaults(handler=manage_lifecycle_store)
     project = commands.add_parser(
         "project", help="create, validate and resolve a deterministic product project"
     )
@@ -3160,6 +4020,14 @@ def parser() -> argparse.ArgumentParser:
     project_sync.add_argument("manifest")
     project_sync.add_argument("--output")
     project_sync.set_defaults(handler=sync_project)
+    project_impact = project_commands.add_parser(
+        "impact",
+        help="map changed paths to directly changed and dependency-affected component owners",
+    )
+    project_impact.add_argument("manifest")
+    project_impact.add_argument("paths", nargs="+")
+    project_impact.add_argument("--output")
+    project_impact.set_defaults(handler=project_change_impact)
     project_config = project_commands.add_parser(
         "config", help="resolve layered, secret-safe and migration-aware product configuration"
     )
@@ -3182,6 +4050,40 @@ def parser() -> argparse.ArgumentParser:
     project_config_plan.add_argument("--candidate", required=True)
     project_config_plan.add_argument("--output", required=True)
     project_config_plan.set_defaults(handler=plan_project_config)
+    project_config_preflight = project_config_commands.add_parser(
+        "preflight", help="run all affected participants without committing configuration"
+    )
+    project_config_preflight.add_argument("manifest")
+    project_config_preflight.add_argument("--plan", required=True)
+    project_config_preflight.add_argument("--current", required=True)
+    project_config_preflight.add_argument("--candidate", required=True)
+    project_config_preflight.add_argument("--output", required=True)
+    project_config_preflight.set_defaults(handler=preflight_project_config)
+    project_config_approval_request = project_config_commands.add_parser(
+        "approval-request",
+        help="bind a short-lived high-risk approval request to an exact configuration plan",
+    )
+    project_config_approval_request.add_argument("manifest")
+    project_config_approval_request.add_argument("--plan", required=True)
+    project_config_approval_request.add_argument("--ticket", required=True)
+    project_config_approval_request.add_argument("--initiator", required=True)
+    project_config_approval_request.add_argument(
+        "--expires-in-seconds", type=int, default=1800
+    )
+    project_config_approval_request.add_argument("--output", required=True)
+    project_config_approval_request.set_defaults(handler=request_project_config_approval)
+    project_config_approve = project_config_commands.add_parser(
+        "approve", help="sign an exact high-risk configuration approval request"
+    )
+    project_config_approve.add_argument("--request", required=True)
+    project_config_approve.add_argument("--approver-id", required=True)
+    project_config_approve.add_argument("--key-id", required=True)
+    project_config_approve.add_argument(
+        "--private-key-path-environment", required=True
+    )
+    project_config_approve.add_argument("--private-key-passphrase-environment")
+    project_config_approve.add_argument("--signature-output", required=True)
+    project_config_approve.set_defaults(handler=approve_project_config)
     project_config_apply = project_config_commands.add_parser(
         "apply", help="preflight and transactionally commit a configuration plan"
     )
@@ -3189,7 +4091,17 @@ def parser() -> argparse.ArgumentParser:
     project_config_apply.add_argument("--plan", required=True)
     project_config_apply.add_argument("--current", required=True)
     project_config_apply.add_argument("--candidate", required=True)
+    project_config_apply.add_argument("--actor", required=True)
     project_config_apply.add_argument("--state-dir", default="build/config-transactions")
+    project_config_apply.add_argument("--preflight-evidence")
+    project_config_apply.add_argument("--require-approval-policy", action="store_true")
+    project_config_apply.add_argument("--approval-request")
+    project_config_apply.add_argument("--approval-policy")
+    project_config_apply.add_argument("--expected-approval-policy-id")
+    project_config_apply.add_argument("--expected-approval-policy-sha256")
+    project_config_apply.add_argument("--approval-trusted-keys-directory")
+    project_config_apply.add_argument("--approval-signature", action="append", default=[])
+    project_config_apply.add_argument("--signature-check-executable")
     project_config_apply.add_argument("--allow-restart", action="store_true")
     project_config_apply.set_defaults(handler=apply_project_config)
     project_config_recover = project_config_commands.add_parser(
@@ -3197,8 +4109,69 @@ def parser() -> argparse.ArgumentParser:
     )
     project_config_recover.add_argument("manifest")
     project_config_recover.add_argument("--journal", required=True)
+    project_config_recover.add_argument("--actor", required=True)
     project_config_recover.add_argument("--retry-rollback", action="store_true")
     project_config_recover.set_defaults(handler=recover_project_config)
+    project_config_status_parser = project_config_commands.add_parser(
+        "status",
+        help="report lock, recovery and audit readiness for team handoff",
+    )
+    project_config_status_parser.add_argument("manifest")
+    project_config_status_parser.add_argument(
+        "--state-dir", default="build/config-transactions"
+    )
+    project_config_status_parser.add_argument("--check", action="store_true")
+    project_config_status_parser.add_argument("--json", action="store_true")
+    project_config_status_parser.add_argument("--report")
+    project_config_status_parser.set_defaults(handler=project_config_status)
+    project_config_verify_audit = project_config_commands.add_parser(
+        "verify-audit", help="verify the transaction audit hash chain, head and journals"
+    )
+    project_config_verify_audit.add_argument(
+        "--state-dir", default="build/config-transactions"
+    )
+    project_config_verify_audit.add_argument("--report")
+    project_config_verify_audit.set_defaults(handler=verify_project_config_audit)
+    project_config_audit_checkpoint = project_config_commands.add_parser(
+        "audit-checkpoint", help="create and sign a portable audit-chain anchor"
+    )
+    project_config_audit_checkpoint.add_argument(
+        "--state-dir", default="build/config-transactions"
+    )
+    project_config_audit_checkpoint.add_argument("--actor", required=True)
+    project_config_audit_checkpoint.add_argument("--checkpoint-id")
+    project_config_audit_checkpoint.add_argument("--key-id", required=True)
+    project_config_audit_checkpoint.add_argument(
+        "--private-key-path-environment", required=True
+    )
+    project_config_audit_checkpoint.add_argument(
+        "--private-key-passphrase-environment"
+    )
+    project_config_audit_checkpoint.add_argument("--output", required=True)
+    project_config_audit_checkpoint.add_argument("--signature-output", required=True)
+    project_config_audit_checkpoint.set_defaults(handler=checkpoint_project_config_audit)
+    project_config_verify_checkpoint = project_config_commands.add_parser(
+        "verify-audit-checkpoint",
+        help="verify a signed checkpoint and optionally prove it is in the current chain",
+    )
+    project_config_verify_checkpoint.add_argument("--checkpoint", required=True)
+    project_config_verify_checkpoint.add_argument("--signature", required=True)
+    project_config_verify_checkpoint.add_argument("--public-key", required=True)
+    project_config_verify_checkpoint.add_argument("--expected-key-id", required=True)
+    project_config_verify_checkpoint.add_argument(
+        "--expected-public-key-sha256", required=True
+    )
+    project_config_verify_checkpoint.add_argument(
+        "--signature-check-executable", required=True
+    )
+    project_config_verify_checkpoint.add_argument("--state-dir")
+    project_config_verify_checkpoint.add_argument(
+        "--expected-min-sequence", type=int, default=1
+    )
+    project_config_verify_checkpoint.add_argument("--report")
+    project_config_verify_checkpoint.set_defaults(
+        handler=verify_project_config_audit_checkpoint
+    )
     project_template = project_commands.add_parser(
         "template", help="inspect, adopt and transactionally upgrade project scaffolding"
     )
@@ -3410,6 +4383,1094 @@ def parser() -> argparse.ArgumentParser:
     component_recover.add_argument("--journal", required=True)
     component_recover.add_argument("--retry-rollback", action="store_true")
     component_recover.set_defaults(handler=recover_component_template)
+
+    component_dependency_parser = component_commands.add_parser(
+        "dependency", help="manage explicit dependencies in pdr-component.json"
+    )
+    component_dependency_commands = component_dependency_parser.add_subparsers(
+        dest="dependency_operation", required=True
+    )
+    for operation in ("add", "remove"):
+        dependency_command = component_dependency_commands.add_parser(
+            operation, help=f"{operation} one declared project-component dependency"
+        )
+        dependency_command.add_argument("component")
+        dependency_command.add_argument("dependency")
+        dependency_command.set_defaults(handler=component_dependency)
+    dependency_list = component_dependency_commands.add_parser(
+        "list", help="list declared project-component dependencies"
+    )
+    dependency_list.add_argument("component")
+    dependency_list.add_argument("--json", action="store_true")
+    dependency_list.set_defaults(handler=component_dependency)
+
+    component_contract = component_commands.add_parser(
+        "contract-test",
+        help="validate service requirements against explicit provider contracts",
+    )
+    component_contract.add_argument("component")
+    component_contract.add_argument("--service-contract", required=True)
+    component_contract.add_argument("--provider-contract", action="append", default=[])
+    component_contract.add_argument("--report")
+    component_contract.set_defaults(handler=component_contract_test)
+
+    component_contract_verify_parser = component_commands.add_parser(
+        "contract-verify",
+        help="recompute and verify component contract evidence and all bound inputs",
+    )
+    component_contract_verify_parser.add_argument("verify_report")
+    component_contract_verify_parser.set_defaults(handler=component_contract_verify)
+
+    participant_contract = component_commands.add_parser(
+        "participant-contract-test",
+        help="validate configuration participant ownership against explicit team contracts",
+    )
+    participant_contract.add_argument("declaration")
+    participant_contract.add_argument(
+        "--provider-declaration", action="append", default=[]
+    )
+    participant_contract.add_argument("--baseline")
+    participant_contract.add_argument("--report")
+    participant_contract.set_defaults(
+        handler=configuration_participant_contract_test
+    )
+
+    key_lifecycle = component_commands.add_parser(
+        "key-lifecycle-test",
+        help="validate Bundle-owned key deprecations against project migrations",
+    )
+    key_lifecycle.add_argument("declaration")
+    key_lifecycle.add_argument(
+        "--provider-declaration", action="append", default=[]
+    )
+    key_lifecycle.add_argument(
+        "--participant-declaration", action="append", default=[], required=True
+    )
+    key_lifecycle.add_argument("--migration", action="append", default=[])
+    key_lifecycle.add_argument("--runtime-version", required=True)
+    key_lifecycle.add_argument("--baseline")
+    key_lifecycle.add_argument("--report")
+    key_lifecycle.set_defaults(handler=configuration_key_lifecycle_test)
+
+    service_contract = commands.add_parser(
+        "service-contract",
+        help="validate the production Bundle service dependency graph",
+    )
+    service_contract_commands = service_contract.add_subparsers(
+        dest="service_contract_command", required=True
+    )
+    service_contract_graph = service_contract_commands.add_parser(
+        "graph", help="check all production contracts against the published baseline"
+    )
+    service_contract_graph.add_argument("--root", type=Path, default=Path("."))
+    service_contract_graph.add_argument(
+        "--scan-root", type=Path, default=Path("services")
+    )
+    service_contract_graph.add_argument(
+        "--baseline", type=Path,
+        default=Path("contracts/service-contract-baseline.json"),
+    )
+    service_contract_graph.add_argument("--report", type=Path, required=True)
+    service_contract_graph.set_defaults(handler=service_contract_graph_check)
+    service_contract_verify = service_contract_commands.add_parser(
+        "verify", help="recompute and verify service-contract graph evidence"
+    )
+    service_contract_verify.add_argument("--root", type=Path, default=Path("."))
+    service_contract_verify.add_argument(
+        "--scan-root", type=Path, default=Path("services")
+    )
+    service_contract_verify.add_argument(
+        "--baseline", type=Path,
+        default=Path("contracts/service-contract-baseline.json"),
+    )
+    service_contract_verify.add_argument("--report", type=Path, required=True)
+    service_contract_verify.set_defaults(handler=service_contract_graph_verify)
+    service_contract_snapshot = service_contract_commands.add_parser(
+        "baseline-snapshot",
+        help="snapshot reviewed production contracts for a deliberate baseline update",
+    )
+    service_contract_snapshot.add_argument("--root", type=Path, default=Path("."))
+    service_contract_snapshot.add_argument(
+        "--scan-root", type=Path, default=Path("services")
+    )
+    service_contract_snapshot.add_argument("--output", type=Path, required=True)
+    service_contract_snapshot.set_defaults(handler=service_contract_baseline_snapshot)
+
+    team_contract = commands.add_parser(
+        "contract-package",
+        help="publish, lock and resolve immutable cross-team contract packages",
+    )
+    team_contract_commands = team_contract.add_subparsers(
+        dest="team_contract_command", required=True
+    )
+    team_contract_pack = team_contract_commands.add_parser(
+        "pack", help="create a deterministic content-addressed contract package"
+    )
+    team_contract_pack.add_argument("--package-id", required=True)
+    team_contract_pack.add_argument("--version", required=True)
+    team_contract_pack.add_argument("--owner", required=True)
+    team_contract_pack.add_argument("--input", action="append", default=[])
+    team_contract_pack.add_argument("--output", required=True)
+    team_contract_pack.add_argument("--source-date-epoch", type=int, default=0)
+    team_contract_pack.add_argument("--ed25519-private-key-environment")
+    team_contract_pack.add_argument("--private-key-passphrase-environment")
+    team_contract_pack.add_argument("--signing-key-id")
+    team_contract_pack.add_argument("--maximum-files", type=int, default=64)
+    team_contract_pack.add_argument(
+        "--maximum-expanded-bytes", type=int, default=16 * 1024 * 1024
+    )
+    team_contract_pack.add_argument("--force", action="store_true")
+    team_contract_pack.set_defaults(handler=pack_team_contract_package)
+
+    team_contract_verify = team_contract_commands.add_parser(
+        "verify", help="verify package identity, entry set and every digest"
+    )
+    team_contract_verify.add_argument("package")
+    team_contract_verify.add_argument("--maximum-files", type=int, default=64)
+    team_contract_verify.add_argument(
+        "--maximum-expanded-bytes", type=int, default=16 * 1024 * 1024
+    )
+    team_contract_verify.add_argument("--report")
+    team_contract_verify.add_argument("--require-signature", action="store_true")
+    team_contract_verify.add_argument("--trust-policy")
+    team_contract_verify.add_argument("--expected-trust-policy-id")
+    team_contract_verify.add_argument("--expected-trust-policy-sha256")
+    team_contract_verify.add_argument("--verification-time")
+    team_contract_verify.set_defaults(handler=verify_team_contract_package)
+
+    team_contract_lock = team_contract_commands.add_parser(
+        "lock", help="write a path-independent lock for exact package identities"
+    )
+    team_contract_lock.add_argument("--package", action="append", default=[])
+    team_contract_lock.add_argument("--output", required=True)
+    team_contract_lock.add_argument("--maximum-files", type=int, default=64)
+    team_contract_lock.add_argument(
+        "--maximum-expanded-bytes", type=int, default=16 * 1024 * 1024
+    )
+    team_contract_lock.add_argument("--force", action="store_true")
+    team_contract_lock.add_argument("--require-signature", action="store_true")
+    team_contract_lock.add_argument("--trust-policy")
+    team_contract_lock.add_argument("--expected-trust-policy-id")
+    team_contract_lock.add_argument("--expected-trust-policy-sha256")
+    team_contract_lock.add_argument("--verification-time")
+    team_contract_lock.set_defaults(handler=lock_team_contract_packages)
+
+    team_contract_resolve = team_contract_commands.add_parser(
+        "resolve", help="verify a lock and expose stable paths for existing contract tests"
+    )
+    team_contract_resolve.add_argument("--lock", required=True)
+    team_contract_resolve.add_argument("--package", action="append", default=[])
+    team_contract_resolve.add_argument("--output", required=True)
+    team_contract_resolve.add_argument("--report")
+    team_contract_resolve.add_argument("--require-signature", action="store_true")
+    team_contract_resolve.add_argument("--trust-policy")
+    team_contract_resolve.add_argument("--expected-trust-policy-id")
+    team_contract_resolve.add_argument("--expected-trust-policy-sha256")
+    team_contract_resolve.add_argument("--verification-time")
+    team_contract_resolve.add_argument("--maximum-files", type=int, default=64)
+    team_contract_resolve.add_argument(
+        "--maximum-expanded-bytes", type=int, default=16 * 1024 * 1024
+    )
+    team_contract_resolve.set_defaults(handler=resolve_team_contract_packages)
+
+    team_contract_impact = team_contract_commands.add_parser(
+        "impact", help="preview a signed lock upgrade and route affected consumer tests"
+    )
+    team_contract_impact.add_argument("--current-lock", required=True)
+    team_contract_impact.add_argument("--current-package", action="append", default=[])
+    team_contract_impact.add_argument("--candidate-lock", required=True)
+    team_contract_impact.add_argument("--candidate-package", action="append", default=[])
+    team_contract_impact.add_argument("--consumer-catalog", required=True)
+    team_contract_impact.add_argument("--require-signature", action="store_true")
+    for side in ("current", "candidate"):
+        team_contract_impact.add_argument(f"--{side}-trust-policy")
+        team_contract_impact.add_argument(f"--{side}-expected-trust-policy-id")
+        team_contract_impact.add_argument(f"--{side}-expected-trust-policy-sha256")
+    team_contract_impact.add_argument("--verification-time")
+    team_contract_impact.add_argument("--report", required=True)
+    team_contract_impact.set_defaults(handler=analyze_team_contract_impact)
+
+    team_contract_execute = team_contract_commands.add_parser(
+        "impact-execute",
+        help="execute the exact CTest labels selected by a compatible impact report",
+    )
+    team_contract_execute.add_argument("--report", required=True)
+    team_contract_execute.add_argument("--ctest", required=True)
+    team_contract_execute.add_argument("--test-dir", required=True)
+    team_contract_execute.add_argument("--config", default="Release")
+    team_contract_execute.add_argument("--evidence", required=True)
+    team_contract_execute.add_argument("--junit", required=True)
+    team_contract_execute.set_defaults(handler=execute_team_contract_impact)
+
+    team_contract_approve = team_contract_commands.add_parser(
+        "impact-approve", help="sign one short-lived affected Consumer Owner approval"
+    )
+    team_contract_approve.add_argument("--report", required=True)
+    team_contract_approve.add_argument("--owner", required=True)
+    team_contract_approve.add_argument("--approver-id", required=True)
+    team_contract_approve.add_argument("--key-id", required=True)
+    team_contract_approve.add_argument("--private-key-environment", required=True)
+    team_contract_approve.add_argument("--private-key-passphrase-environment")
+    team_contract_approve.add_argument("--issued-at")
+    team_contract_approve.add_argument("--lifetime-seconds", type=int, default=3600)
+    team_contract_approve.add_argument("--output", required=True)
+    team_contract_approve.set_defaults(handler=approve_team_contract_impact)
+
+    team_contract_gate = team_contract_commands.add_parser(
+        "impact-gate", help="bind execution evidence and every affected Owner approval"
+    )
+    team_contract_gate.add_argument("--report", required=True)
+    team_contract_gate.add_argument("--evidence", required=True)
+    team_contract_gate.add_argument("--junit", required=True)
+    team_contract_gate.add_argument("--ctest")
+    team_contract_gate.add_argument("--test-dir")
+    team_contract_gate.add_argument("--config", default="Release")
+    team_contract_gate.add_argument("--approval-policy")
+    team_contract_gate.add_argument("--expected-approval-policy-id")
+    team_contract_gate.add_argument("--expected-approval-policy-sha256")
+    team_contract_gate.add_argument("--approval", action="append", default=[])
+    team_contract_gate.add_argument("--runner-attestation")
+    team_contract_gate.add_argument("--runner-trust-policy")
+    team_contract_gate.add_argument("--expected-runner-trust-policy-id")
+    team_contract_gate.add_argument("--expected-runner-trust-policy-sha256")
+    team_contract_gate.add_argument("--verification-time")
+    team_contract_gate.add_argument("--gate-report", required=True)
+    team_contract_gate.set_defaults(handler=gate_team_contract_impact)
+
+    registry_init = team_contract_commands.add_parser(
+        "registry-init", help="initialize a pinned immutable contract Registry"
+    )
+    registry_init.add_argument("--registry", required=True)
+    registry_init.add_argument("--registry-id", required=True)
+    registry_init.add_argument("--channel", action="append", default=[])
+    registry_init.add_argument("--actor", required=True)
+    registry_init.add_argument("--occurred-at")
+    registry_init.add_argument("--report")
+    add_team_contract_registry_trust_arguments(registry_init)
+    registry_init.set_defaults(handler=init_team_contract_registry)
+
+    registry_publish = team_contract_commands.add_parser(
+        "registry-publish", help="publish a trusted immutable package blob"
+    )
+    registry_publish.add_argument("--registry", required=True)
+    registry_publish.add_argument("--package", required=True)
+    registry_publish.add_argument("--expected-revision", type=int)
+    registry_publish.add_argument("--actor", required=True)
+    registry_publish.add_argument("--occurred-at")
+    registry_publish.add_argument("--report")
+    add_team_contract_registry_trust_arguments(registry_publish)
+    add_team_contract_registry_limits(registry_publish)
+    registry_publish.set_defaults(handler=publish_team_contract_registry)
+
+    registry_promote = team_contract_commands.add_parser(
+        "registry-promote", help="promote one exact lock through ordered channels"
+    )
+    registry_promote.add_argument("--registry", required=True)
+    registry_promote.add_argument("--channel", required=True)
+    registry_promote.add_argument("--lock", required=True)
+    registry_promote.add_argument("--expected-generation", type=int, required=True)
+    registry_promote.add_argument("--expected-revision", type=int)
+    registry_promote.add_argument("--impact-gate")
+    registry_promote.add_argument("--runner-attestation")
+    registry_promote.add_argument("--runner-trust-policy")
+    registry_promote.add_argument("--expected-runner-trust-policy-id")
+    registry_promote.add_argument("--expected-runner-trust-policy-sha256")
+    registry_promote.add_argument("--gate-authorization")
+    registry_promote.add_argument("--gate-authorization-policy")
+    registry_promote.add_argument("--expected-gate-authorization-policy-id")
+    registry_promote.add_argument("--expected-gate-authorization-policy-sha256")
+    registry_promote.add_argument("--actor", required=True)
+    registry_promote.add_argument("--occurred-at")
+    registry_promote.add_argument("--report")
+    add_team_contract_registry_trust_arguments(registry_promote)
+    add_team_contract_registry_limits(registry_promote)
+    registry_promote.set_defaults(handler=promote_team_contract_registry)
+
+    registry_rollback = team_contract_commands.add_parser(
+        "registry-rollback", help="restore an earlier immutable channel generation"
+    )
+    registry_rollback.add_argument("--registry", required=True)
+    registry_rollback.add_argument("--channel", required=True)
+    registry_rollback.add_argument("--expected-generation", type=int, required=True)
+    registry_rollback.add_argument("--expected-revision", type=int)
+    registry_rollback.add_argument("--to-generation", type=int, required=True)
+    registry_rollback.add_argument("--actor", required=True)
+    registry_rollback.add_argument("--reason", required=True)
+    registry_rollback.add_argument("--occurred-at")
+    registry_rollback.add_argument("--report")
+    add_team_contract_registry_trust_arguments(registry_rollback)
+    add_team_contract_registry_limits(registry_rollback)
+    registry_rollback.set_defaults(handler=rollback_team_contract_registry)
+
+    registry_resolve = team_contract_commands.add_parser(
+        "registry-resolve", help="resolve a promoted channel without package paths"
+    )
+    registry_resolve.add_argument("--registry", required=True)
+    registry_resolve.add_argument("--channel", required=True)
+    registry_resolve.add_argument("--output", required=True)
+    registry_resolve.add_argument("--package-report")
+    registry_resolve.add_argument("--report", required=True)
+    add_team_contract_registry_trust_arguments(registry_resolve)
+    add_team_contract_registry_limits(registry_resolve)
+    registry_resolve.set_defaults(handler=resolve_team_contract_registry)
+
+    registry_verify = team_contract_commands.add_parser(
+        "registry-verify", help="verify Registry history, blobs, locks and signatures"
+    )
+    registry_verify.add_argument("--registry", required=True)
+    registry_verify.add_argument("--report")
+    add_team_contract_registry_trust_arguments(registry_verify)
+    add_team_contract_registry_limits(registry_verify)
+    registry_verify.set_defaults(handler=verify_team_contract_registry)
+
+    registry_lease_status = team_contract_commands.add_parser(
+        "registry-lease-status", help="inspect the OS-owned Registry writer lease"
+    )
+    registry_lease_status.add_argument("--registry", required=True)
+    registry_lease_status.add_argument("--report")
+    registry_lease_status.set_defaults(handler=inspect_team_contract_registry_lease)
+
+    remote_serve = team_contract_commands.add_parser(
+        "registry-remote-serve", help="serve one Registry with scoped remote RBAC"
+    )
+    remote_serve.add_argument("--registry", required=True)
+    remote_serve.add_argument("--bind", default="127.0.0.1")
+    remote_serve.add_argument("--port", type=int, default=9443)
+    remote_serve.add_argument("--tls-certificate")
+    remote_serve.add_argument("--tls-private-key")
+    remote_serve.add_argument("--allow-insecure-loopback", action="store_true")
+    remote_serve.add_argument("--control-directory")
+    remote_serve.add_argument("--audit-archive-directory")
+    remote_serve.add_argument("--access-policy", required=True)
+    remote_serve.add_argument("--expected-access-policy-id", required=True)
+    remote_serve.add_argument("--expected-access-policy-sha256", required=True)
+    remote_serve.add_argument("--access-policy-trust-policy")
+    remote_serve.add_argument("--expected-access-policy-trust-policy-id")
+    remote_serve.add_argument("--expected-access-policy-trust-policy-sha256")
+    remote_serve.add_argument("--trust-policy", required=True)
+    remote_serve.add_argument("--expected-trust-policy-id", required=True)
+    remote_serve.add_argument("--expected-trust-policy-sha256", required=True)
+    remote_serve.add_argument("--runner-trust-policy")
+    remote_serve.add_argument("--expected-runner-trust-policy-id")
+    remote_serve.add_argument("--expected-runner-trust-policy-sha256")
+    remote_serve.add_argument("--gate-authorization-policy")
+    remote_serve.add_argument("--expected-gate-authorization-policy-id")
+    remote_serve.add_argument("--expected-gate-authorization-policy-sha256")
+    remote_serve.add_argument("--verification-time")
+    remote_serve.add_argument("--maximum-files", type=int, default=64)
+    remote_serve.add_argument("--maximum-expanded-bytes", type=int,
+                              default=16 * 1024 * 1024)
+    remote_serve.add_argument("--node-id")
+    remote_serve.add_argument("--handoff-evidence-directory")
+    remote_serve.add_argument("--handoff-key-id")
+    remote_serve.add_argument("--handoff-private-key-environment")
+    remote_serve.add_argument("--handoff-private-key-passphrase-environment")
+    remote_serve.add_argument("--handoff-leader-verification-time")
+    remote_serve.add_argument("--quiet", action="store_true")
+    remote_serve.set_defaults(handler=serve_team_contract_registry_remote)
+
+    remote_publish = team_contract_commands.add_parser(
+        "registry-remote-publish", help="upload a signed package without server paths"
+    )
+    remote_publish.add_argument("--package", required=True)
+    remote_publish.set_defaults(remote_operation="publish")
+    add_team_contract_registry_remote_client_arguments(remote_publish, mutation=True)
+
+    remote_promote = team_contract_commands.add_parser(
+        "registry-remote-promote", help="upload and promote a lock with Gate evidence"
+    )
+    remote_promote.add_argument("--channel", required=True)
+    remote_promote.add_argument("--lock", required=True)
+    remote_promote.add_argument("--expected-generation", type=int, required=True)
+    remote_promote.add_argument("--impact-gate")
+    remote_promote.add_argument("--runner-attestation")
+    remote_promote.add_argument("--gate-authorization")
+    remote_promote.set_defaults(remote_operation="promote")
+    add_team_contract_registry_remote_client_arguments(remote_promote, mutation=True)
+
+    remote_rollback = team_contract_commands.add_parser(
+        "registry-remote-rollback", help="create a remote rollback generation"
+    )
+    remote_rollback.add_argument("--channel", required=True)
+    remote_rollback.add_argument("--expected-generation", type=int, required=True)
+    remote_rollback.add_argument("--to-generation", type=int, required=True)
+    remote_rollback.add_argument("--reason", required=True)
+    remote_rollback.set_defaults(remote_operation="rollback")
+    add_team_contract_registry_remote_client_arguments(remote_rollback, mutation=True)
+
+    remote_verify = team_contract_commands.add_parser(
+        "registry-remote-verify", help="verify Registry history through the remote service"
+    )
+    remote_verify.set_defaults(remote_operation="verify")
+    add_team_contract_registry_remote_client_arguments(remote_verify)
+
+    remote_resolve = team_contract_commands.add_parser(
+        "registry-remote-resolve", help="download a channel without server paths"
+    )
+    remote_resolve.add_argument("--channel", required=True)
+    remote_resolve.add_argument("--output", required=True)
+    remote_resolve.set_defaults(remote_operation="resolve")
+    add_team_contract_registry_remote_client_arguments(remote_resolve)
+
+    remote_status = team_contract_commands.add_parser(
+        "registry-remote-status", help="query one durable remote request disposition"
+    )
+    remote_status.add_argument("--request-id", required=True)
+    remote_status.set_defaults(remote_operation="status")
+    add_team_contract_registry_remote_query_arguments(remote_status)
+
+    remote_audit = team_contract_commands.add_parser(
+        "registry-remote-audit-verify",
+        help="verify the immutable remote request audit chain",
+    )
+    remote_audit.set_defaults(remote_operation="audit-verify")
+    add_team_contract_registry_remote_query_arguments(remote_audit)
+
+    remote_archive_status = team_contract_commands.add_parser(
+        "registry-remote-audit-archive-status",
+        help="show registered remote audit archive continuity",
+    )
+    remote_archive_status.set_defaults(remote_operation="audit-archive-status")
+    add_team_contract_registry_remote_query_arguments(remote_archive_status)
+
+    remote_capacity = team_contract_commands.add_parser(
+        "registry-remote-capacity",
+        help="show bounded remote control-state usage and limits",
+    )
+    remote_capacity.set_defaults(remote_operation="capacity")
+    add_team_contract_registry_remote_query_arguments(remote_capacity)
+
+    def add_remote_drain_client_arguments(command: argparse.ArgumentParser) -> None:
+        command.add_argument("--handoff-id", required=True)
+        command.add_argument("--expected-generation", type=int, required=True)
+        command.add_argument("--expected-revision", type=int, required=True)
+        command.add_argument("--expected-state-sha256", required=True)
+        add_team_contract_registry_remote_query_arguments(command)
+
+    remote_drain_start = team_contract_commands.add_parser(
+        "registry-remote-drain-start",
+        help="close remote command admission through operator RBAC",
+    )
+    add_remote_drain_client_arguments(remote_drain_start)
+    remote_drain_start.add_argument("--reason", required=True)
+    remote_drain_start.set_defaults(
+        remote_operation="drain-start", remote_drain_operation="start",
+        issued_at=None, expires_at=None, evidence_output=None,
+    )
+
+    remote_drain_finalize = team_contract_commands.add_parser(
+        "registry-remote-drain-finalize",
+        help="request signed zero-inflight handoff evidence",
+    )
+    add_remote_drain_client_arguments(remote_drain_finalize)
+    remote_drain_finalize.add_argument("--issued-at", required=True)
+    remote_drain_finalize.add_argument("--expires-at", required=True)
+    remote_drain_finalize.add_argument("--evidence-output", required=True)
+    remote_drain_finalize.set_defaults(
+        remote_operation="drain-finalize", remote_drain_operation="finalize",
+        reason=None,
+    )
+
+    remote_drain_resume = team_contract_commands.add_parser(
+        "registry-remote-drain-resume",
+        help="reopen admission only while the old node remains Leader",
+    )
+    add_remote_drain_client_arguments(remote_drain_resume)
+    remote_drain_resume.add_argument("--reason", required=True)
+    remote_drain_resume.set_defaults(
+        remote_operation="drain-resume", remote_drain_operation="resume",
+        issued_at=None, expires_at=None, evidence_output=None,
+    )
+
+    remote_drain_status = team_contract_commands.add_parser(
+        "registry-remote-drain-status", help="inspect drain state through RBAC"
+    )
+    remote_drain_status.set_defaults(remote_operation="drain-status")
+    add_team_contract_registry_remote_query_arguments(remote_drain_status)
+
+    remote_leases = team_contract_commands.add_parser(
+        "registry-remote-lease-status",
+        help="inspect remote command and Registry writer leases",
+    )
+    remote_leases.set_defaults(remote_operation="lease-status")
+    add_team_contract_registry_remote_query_arguments(remote_leases)
+
+    remote_recover = team_contract_commands.add_parser(
+        "registry-remote-recover",
+        help="explicitly terminate one interrupted remote request",
+    )
+    remote_recover.add_argument("--recovery-id", required=True)
+    remote_recover.add_argument("--target-request-id", required=True)
+    remote_recover.add_argument("--target-request-sha256", required=True)
+    remote_recover.add_argument("--expected-started-revision", type=int, required=True)
+    remote_recover.add_argument("--expected-current-revision", type=int, required=True)
+    remote_recover.add_argument(
+        "--disposition", choices=("aborted", "uncertain"), required=True
+    )
+    remote_recover.add_argument("--reason", required=True)
+    remote_recover.set_defaults(remote_operation="recover")
+    add_team_contract_registry_remote_query_arguments(remote_recover)
+
+    remote_audit_checkpoint = team_contract_commands.add_parser(
+        "registry-remote-audit-checkpoint",
+        help="sign an externally stored remote request audit checkpoint",
+    )
+    remote_audit_checkpoint.add_argument("--control-directory", required=True)
+    remote_audit_checkpoint.add_argument("--audit-archive-directory")
+    remote_audit_checkpoint.add_argument("--registry-id", required=True)
+    remote_audit_checkpoint.add_argument("--checkpoint-id", required=True)
+    remote_audit_checkpoint.add_argument("--auditor-id", required=True)
+    remote_audit_checkpoint.add_argument("--key-id", required=True)
+    remote_audit_checkpoint.add_argument("--private-key-environment", required=True)
+    remote_audit_checkpoint.add_argument("--private-key-passphrase-environment")
+    remote_audit_checkpoint.add_argument("--issued-at")
+    remote_audit_checkpoint.add_argument("--output", required=True)
+    remote_audit_checkpoint.set_defaults(
+        handler=checkpoint_team_contract_registry_remote_audit
+    )
+
+    remote_audit_checkpoint_verify = team_contract_commands.add_parser(
+        "registry-remote-audit-checkpoint-verify",
+        help="verify external checkpoint signature and audit-chain continuity",
+    )
+    remote_audit_checkpoint_verify.add_argument("--control-directory", required=True)
+    remote_audit_checkpoint_verify.add_argument("--audit-archive-directory")
+    remote_audit_checkpoint_verify.add_argument("--registry-id", required=True)
+    remote_audit_checkpoint_verify.add_argument("--checkpoint", required=True)
+    remote_audit_checkpoint_verify.add_argument("--audit-policy", required=True)
+    remote_audit_checkpoint_verify.add_argument(
+        "--expected-audit-policy-id", required=True
+    )
+    remote_audit_checkpoint_verify.add_argument(
+        "--expected-audit-policy-sha256", required=True
+    )
+    remote_audit_checkpoint_verify.add_argument("--verification-time")
+    remote_audit_checkpoint_verify.add_argument("--report")
+    remote_audit_checkpoint_verify.set_defaults(
+        handler=verify_team_contract_registry_remote_audit_checkpoint
+    )
+
+    def add_remote_audit_archive_common(command: argparse.ArgumentParser) -> None:
+        command.add_argument("--control-directory", required=True)
+        command.add_argument("--audit-archive-directory",
+                             dest="archive_directory", required=True)
+        command.add_argument("--registry-id", required=True)
+        command.add_argument("--report")
+        command.set_defaults(handler=manage_team_contract_registry_remote_audit_archive)
+
+    def add_remote_audit_archive_trust(command: argparse.ArgumentParser) -> None:
+        command.add_argument("--audit-policy", required=True)
+        command.add_argument("--expected-audit-policy-id", required=True)
+        command.add_argument("--expected-audit-policy-sha256", required=True)
+        command.add_argument("--verification-time")
+
+    remote_archive_create = team_contract_commands.add_parser(
+        "registry-remote-audit-archive-create",
+        help="create and register a signed-checkpoint-bound audit segment",
+    )
+    add_remote_audit_archive_common(remote_archive_create)
+    add_remote_audit_archive_trust(remote_archive_create)
+    remote_archive_create.add_argument("--archive-id", required=True)
+    remote_archive_create.add_argument("--checkpoint", required=True)
+    remote_archive_create.add_argument("--through-sequence", type=int)
+    remote_archive_create.add_argument("--created-at")
+    remote_archive_create.add_argument("--output", required=True)
+    remote_archive_create.set_defaults(archive_operation="create")
+
+    remote_archive_verify = team_contract_commands.add_parser(
+        "registry-remote-audit-archive-verify",
+        help="verify archive bytes, marker chain and checkpoint signatures",
+    )
+    add_remote_audit_archive_common(remote_archive_verify)
+    add_remote_audit_archive_trust(remote_archive_verify)
+    remote_archive_verify.set_defaults(archive_operation="verify")
+
+    remote_archive_prune = team_contract_commands.add_parser(
+        "registry-remote-audit-archive-prune",
+        help="explicitly remove online records already preserved in an archive",
+    )
+    add_remote_audit_archive_common(remote_archive_prune)
+    remote_archive_prune.add_argument(
+        "--expected-through-sequence", type=int, required=True
+    )
+    remote_archive_prune.add_argument(
+        "--expected-through-record-sha256", required=True
+    )
+    remote_archive_prune.add_argument("--confirm-prune", action="store_true")
+    remote_archive_prune.set_defaults(archive_operation="prune")
+
+    remote_archive_local_status = team_contract_commands.add_parser(
+        "registry-remote-audit-archive-inspect",
+        help="inspect registered audit archives from local control state",
+    )
+    add_remote_audit_archive_common(remote_archive_local_status)
+    remote_archive_local_status.set_defaults(archive_operation="status")
+
+    def add_registry_recovery_trust(command: argparse.ArgumentParser) -> None:
+        command.add_argument("--trust-policy", required=True)
+        command.add_argument("--expected-trust-policy-id", required=True)
+        command.add_argument("--expected-trust-policy-sha256", required=True)
+        command.add_argument("--anchor-policy", required=True)
+        command.add_argument("--expected-anchor-policy-id", required=True)
+        command.add_argument("--expected-anchor-policy-sha256", required=True)
+        command.add_argument("--verification-time")
+        command.add_argument("--maximum-files", type=int, default=64)
+        command.add_argument("--maximum-expanded-bytes", type=int,
+                             default=16 * 1024 * 1024)
+        command.add_argument("--report")
+        command.set_defaults(handler=manage_team_contract_registry_recovery)
+
+    registry_recovery_create = team_contract_commands.add_parser(
+        "registry-recovery-create",
+        help="create an externally anchored portable Registry recovery point",
+    )
+    registry_recovery_create.add_argument("--registry", required=True)
+    registry_recovery_create.add_argument("--recovery-point-id", required=True)
+    registry_recovery_create.add_argument("--anchor", required=True)
+    registry_recovery_create.add_argument("--operator", required=True)
+    registry_recovery_create.add_argument("--created-at")
+    registry_recovery_create.add_argument("--output", required=True)
+    add_registry_recovery_trust(registry_recovery_create)
+    registry_recovery_create.set_defaults(recovery_operation="create")
+
+    registry_recovery_verify = team_contract_commands.add_parser(
+        "registry-recovery-verify",
+        help="independently verify a portable Registry recovery point",
+    )
+    registry_recovery_verify.add_argument("--recovery-point", required=True)
+    registry_recovery_verify.add_argument("--expected-recovery-point-sha256")
+    add_registry_recovery_trust(registry_recovery_verify)
+    registry_recovery_verify.set_defaults(recovery_operation="verify")
+
+    registry_recovery_restore = team_contract_commands.add_parser(
+        "registry-recovery-restore",
+        help="atomically restore an anchored Registry into an absent destination",
+    )
+    registry_recovery_restore.add_argument("--recovery-point", required=True)
+    registry_recovery_restore.add_argument(
+        "--expected-recovery-point-sha256", required=True
+    )
+    registry_recovery_restore.add_argument("--destination", required=True)
+    registry_recovery_restore.add_argument("--restore-id", required=True)
+    registry_recovery_restore.add_argument("--operator", required=True)
+    registry_recovery_restore.add_argument("--operation-audit", required=True)
+    registry_recovery_restore.add_argument(
+        "--confirm-source-unavailable", action="store_true"
+    )
+    add_registry_recovery_trust(registry_recovery_restore)
+    registry_recovery_restore.set_defaults(recovery_operation="restore")
+
+    registry_standby_init = team_contract_commands.add_parser(
+        "registry-standby-init",
+        help="initialize an externally anchored read-only Registry standby",
+    )
+    registry_standby_init.add_argument("--recovery-point", required=True)
+    registry_standby_init.add_argument(
+        "--expected-recovery-point-sha256", required=True
+    )
+    registry_standby_init.add_argument("--destination", required=True)
+    registry_standby_init.add_argument("--standby-id", required=True)
+    registry_standby_init.add_argument("--operator", required=True)
+    registry_standby_init.add_argument("--operation-audit", required=True)
+    registry_standby_init.add_argument("--updated-at")
+    add_registry_recovery_trust(registry_standby_init)
+    registry_standby_init.set_defaults(
+        handler=manage_team_contract_registry_standby, standby_operation="init"
+    )
+
+    registry_standby_sync = team_contract_commands.add_parser(
+        "registry-standby-sync",
+        help="fast-forward a stopped standby and preserve its prior directory",
+    )
+    registry_standby_sync.add_argument("--recovery-point", required=True)
+    registry_standby_sync.add_argument(
+        "--expected-recovery-point-sha256", required=True
+    )
+    registry_standby_sync.add_argument("--destination", required=True)
+    registry_standby_sync.add_argument("--standby-id", required=True)
+    registry_standby_sync.add_argument("--sync-id", required=True)
+    registry_standby_sync.add_argument("--operator", required=True)
+    registry_standby_sync.add_argument("--operation-audit", required=True)
+    registry_standby_sync.add_argument("--previous-output", required=True)
+    registry_standby_sync.add_argument(
+        "--expected-revision", type=int, required=True
+    )
+    registry_standby_sync.add_argument("--expected-state-sha256", required=True)
+    registry_standby_sync.add_argument(
+        "--expected-sync-generation", type=int, required=True
+    )
+    registry_standby_sync.add_argument(
+        "--confirm-standby-stopped", action="store_true"
+    )
+    registry_standby_sync.add_argument("--updated-at")
+    add_registry_recovery_trust(registry_standby_sync)
+    registry_standby_sync.set_defaults(
+        handler=manage_team_contract_registry_standby, standby_operation="sync"
+    )
+
+    registry_standby_status = team_contract_commands.add_parser(
+        "registry-standby-status",
+        help="verify Registry standby identity, marker and current state",
+    )
+    registry_standby_status.add_argument("--registry", required=True)
+    add_registry_recovery_trust(registry_standby_status)
+    registry_standby_status.set_defaults(
+        handler=manage_team_contract_registry_standby, standby_operation="status"
+    )
+
+    def add_registry_leader_trust(command: argparse.ArgumentParser) -> None:
+        command.add_argument("--leader-trust-policy", required=True)
+        command.add_argument("--expected-leader-trust-policy-id", required=True)
+        command.add_argument("--expected-leader-trust-policy-sha256", required=True)
+
+    registry_leader_issue = team_contract_commands.add_parser(
+        "registry-leader-issue",
+        help="issue the next external signed leader or fence grant",
+    )
+    registry_leader_issue_backend = \
+        registry_leader_issue.add_mutually_exclusive_group(required=True)
+    registry_leader_issue_backend.add_argument("--authority")
+    registry_leader_issue_backend.add_argument("--authority-backend-config")
+    registry_leader_issue.add_argument(
+        "--expected-authority-backend-config-sha256"
+    )
+    registry_leader_issue.add_argument("--authority-id", required=True)
+    registry_leader_issue.add_argument("--registry-id", required=True)
+    registry_leader_issue.add_argument(
+        "--purpose", choices=("leadership", "fence"), required=True
+    )
+    registry_leader_issue.add_argument("--leader-id")
+    registry_leader_issue.add_argument(
+        "--expected-current-token", type=int, required=True
+    )
+    registry_leader_issue.add_argument(
+        "--expected-current-grant-sha256", required=True
+    )
+    registry_leader_issue.add_argument(
+        "--baseline-revision", type=int, required=True
+    )
+    registry_leader_issue.add_argument("--baseline-state-sha256", required=True)
+    registry_leader_issue.add_argument("--issued-at")
+    registry_leader_issue.add_argument("--not-before", required=True)
+    registry_leader_issue.add_argument("--expires-at", required=True)
+    registry_leader_issue.add_argument("--key-id", required=True)
+    registry_leader_issue.add_argument(
+        "--private-key-environment", required=True
+    )
+    registry_leader_issue.add_argument("--private-key-passphrase-environment")
+    registry_leader_issue.add_argument("--operator", required=True)
+    registry_leader_issue.add_argument("--operation-audit")
+    registry_leader_issue.add_argument("--report")
+    registry_leader_issue.add_argument("--handoff-evidence")
+    registry_leader_issue.add_argument("--handoff-trust-policy")
+    registry_leader_issue.add_argument("--expected-handoff-trust-policy-id")
+    registry_leader_issue.add_argument("--expected-handoff-trust-policy-sha256")
+    registry_leader_issue.add_argument("--handoff-verification-time")
+    add_registry_leader_trust(registry_leader_issue)
+    registry_leader_issue.set_defaults(
+        handler=manage_team_contract_registry_leader, leader_operation="issue"
+    )
+
+    registry_leader_activate = team_contract_commands.add_parser(
+        "registry-leader-activate",
+        help="bind an exact external leader grant to a primary or standby",
+    )
+    registry_leader_activate.add_argument("--registry", required=True)
+    registry_leader_activate.add_argument("--node-id", required=True)
+    registry_leader_activate_source = \
+        registry_leader_activate.add_mutually_exclusive_group(required=True)
+    registry_leader_activate_source.add_argument("--current-grant")
+    registry_leader_activate_source.add_argument("--authority-backend-config")
+    registry_leader_activate.add_argument("--authority-id")
+    registry_leader_activate.add_argument(
+        "--expected-authority-backend-config-sha256"
+    )
+    registry_leader_activate.add_argument(
+        "--expected-current-grant-sha256", required=True
+    )
+    registry_leader_activate.add_argument("--operator", required=True)
+    registry_leader_activate.add_argument("--operation-audit", required=True)
+    registry_leader_activate.add_argument(
+        "--confirm-enroll-primary", action="store_true"
+    )
+    registry_leader_activate.add_argument("--bound-at")
+    registry_leader_activate.add_argument("--report")
+    registry_leader_activate.add_argument("--trust-policy", required=True)
+    registry_leader_activate.add_argument(
+        "--expected-trust-policy-id", required=True
+    )
+    registry_leader_activate.add_argument(
+        "--expected-trust-policy-sha256", required=True
+    )
+    registry_leader_activate.add_argument("--verification-time")
+    registry_leader_activate.add_argument("--leader-verification-time")
+    registry_leader_activate.add_argument("--maximum-files", type=int, default=64)
+    registry_leader_activate.add_argument(
+        "--maximum-expanded-bytes", type=int, default=16 * 1024 * 1024
+    )
+    add_registry_leader_trust(registry_leader_activate)
+    registry_leader_activate.set_defaults(
+        handler=manage_team_contract_registry_leader, leader_operation="activate"
+    )
+
+    registry_leader_status = team_contract_commands.add_parser(
+        "registry-leader-status",
+        help="verify the current writable Registry leader and lease",
+    )
+    registry_leader_status.add_argument("--registry", required=True)
+    registry_leader_status.add_argument("--verification-time")
+    registry_leader_status.add_argument("--report")
+    registry_leader_status.set_defaults(
+        handler=manage_team_contract_registry_leader, leader_operation="status"
+    )
+
+    registry_leader_backend_conformance = team_contract_commands.add_parser(
+        "registry-leader-backend-conformance",
+        help="qualify one adapter in an explicitly dedicated empty scope",
+    )
+    registry_leader_backend_conformance.add_argument(
+        "--backend-config", required=True
+    )
+    registry_leader_backend_conformance.add_argument(
+        "--expected-backend-config-sha256", required=True
+    )
+    registry_leader_backend_conformance.add_argument(
+        "--authority-id", required=True
+    )
+    registry_leader_backend_conformance.add_argument(
+        "--registry-id", required=True
+    )
+    registry_leader_backend_conformance.add_argument(
+        "--confirm-dedicated-empty-scope", action="store_true"
+    )
+    registry_leader_backend_conformance.add_argument("--report")
+    registry_leader_backend_conformance.set_defaults(
+        handler=qualify_team_contract_registry_leader_backend
+    )
+
+    registry_leader_etcd_preflight = team_contract_commands.add_parser(
+        "registry-leader-etcd-preflight",
+        help="verify pinned etcd cluster topology before authority writes",
+    )
+    registry_leader_etcd_preflight.add_argument("--config", required=True)
+    registry_leader_etcd_preflight.add_argument(
+        "--expected-config-sha256", required=True
+    )
+    registry_leader_etcd_preflight.add_argument("--report")
+    registry_leader_etcd_preflight.set_defaults(
+        handler=preflight_team_contract_registry_leader_etcd
+    )
+
+    def add_registry_handoff_common(
+            command: argparse.ArgumentParser, identity: bool = True) -> None:
+        command.add_argument("--control-directory", required=True)
+        command.add_argument("--audit-archive-directory")
+        command.add_argument("--registry-id", required=True)
+        if identity:
+            command.add_argument("--registry", required=True)
+            command.add_argument("--node-id", required=True)
+            command.add_argument("--handoff-id", required=True)
+            command.add_argument("--expected-generation", type=int, required=True)
+            command.add_argument("--expected-revision", type=int, required=True)
+            command.add_argument("--expected-state-sha256", required=True)
+            command.add_argument("--operator", required=True)
+        command.add_argument("--report")
+
+    registry_drain_start = team_contract_commands.add_parser(
+        "registry-drain-start",
+        help="persistently close remote command admission before handoff",
+    )
+    add_registry_handoff_common(registry_drain_start)
+    registry_drain_start.add_argument("--reason", required=True)
+    registry_drain_start.set_defaults(
+        handler=manage_team_contract_registry_handoff, handoff_operation="start"
+    )
+
+    registry_drain_finalize = team_contract_commands.add_parser(
+        "registry-drain-finalize",
+        help="prove zero pending requests and sign portable handoff evidence",
+    )
+    add_registry_handoff_common(registry_drain_finalize)
+    registry_drain_finalize.add_argument("--leader-verification-time")
+    registry_drain_finalize.add_argument("--issued-at", required=True)
+    registry_drain_finalize.add_argument("--expires-at", required=True)
+    registry_drain_finalize.add_argument("--key-id", required=True)
+    registry_drain_finalize.add_argument(
+        "--private-key-environment", required=True
+    )
+    registry_drain_finalize.add_argument("--private-key-passphrase-environment")
+    registry_drain_finalize.add_argument("--output", required=True)
+    registry_drain_finalize.set_defaults(
+        handler=manage_team_contract_registry_handoff, handoff_operation="finalize"
+    )
+
+    registry_drain_resume = team_contract_commands.add_parser(
+        "registry-drain-resume",
+        help="reopen command admission only for a still-authorized old leader",
+    )
+    add_registry_handoff_common(registry_drain_resume)
+    registry_drain_resume.add_argument("--reason", required=True)
+    registry_drain_resume.set_defaults(
+        handler=manage_team_contract_registry_handoff, handoff_operation="resume"
+    )
+
+    registry_drain_status = team_contract_commands.add_parser(
+        "registry-drain-status", help="inspect persistent Registry drain state"
+    )
+    add_registry_handoff_common(registry_drain_status, identity=False)
+    registry_drain_status.set_defaults(
+        handler=manage_team_contract_registry_handoff, handoff_operation="status"
+    )
+
+    access_policy_sign = team_contract_commands.add_parser(
+        "registry-access-policy-sign",
+        help="sign an exact successor for remote access-policy hot reload",
+    )
+    access_policy_sign.add_argument("--input", required=True)
+    access_policy_sign.add_argument(
+        "--expected-previous-policy-sha256", required=True
+    )
+    access_policy_sign.add_argument("--policy-revision", type=int, required=True)
+    access_policy_sign.add_argument("--issued-at")
+    access_policy_sign.add_argument("--key-id", required=True)
+    access_policy_sign.add_argument("--private-key-environment", required=True)
+    access_policy_sign.add_argument("--private-key-passphrase-environment")
+    access_policy_sign.add_argument(
+        "--max-active-request-records", type=int, default=100000
+    )
+    access_policy_sign.add_argument("--max-recovery-records", type=int, default=100000)
+    access_policy_sign.add_argument("--max-audit-records", type=int, default=1000000)
+    access_policy_sign.add_argument(
+        "--max-control-bytes", type=int, default=4 * 1024 * 1024 * 1024
+    )
+    access_policy_sign.add_argument("--output", required=True)
+    access_policy_sign.set_defaults(handler=sign_team_contract_registry_access_policy)
+
+    access_policy_activate = team_contract_commands.add_parser(
+        "registry-access-policy-activate",
+        help="verify and atomically activate one signed access-policy revision",
+    )
+    access_policy_activate.add_argument("--active-policy", required=True)
+    access_policy_activate.add_argument("--candidate", required=True)
+    access_policy_activate.add_argument(
+        "--expected-current-policy-sha256", required=True
+    )
+    access_policy_activate.add_argument("--trust-policy", required=True)
+    access_policy_activate.add_argument("--expected-trust-policy-id", required=True)
+    access_policy_activate.add_argument("--expected-trust-policy-sha256", required=True)
+    access_policy_activate.add_argument("--verification-time")
+    access_policy_activate.add_argument("--report")
+    access_policy_activate.set_defaults(
+        handler=activate_team_contract_registry_access_policy
+    )
+
+    runner_attest = team_contract_commands.add_parser(
+        "runner-attest", help="sign exact impact execution with a CI Runner identity"
+    )
+    runner_attest.add_argument("--report", required=True)
+    runner_attest.add_argument("--evidence", required=True)
+    runner_attest.add_argument("--junit")
+    runner_attest.add_argument("--runner-id", required=True)
+    runner_attest.add_argument("--repository", required=True)
+    runner_attest.add_argument("--source-revision", required=True)
+    runner_attest.add_argument("--workflow", required=True)
+    runner_attest.add_argument("--job-id", required=True)
+    runner_attest.add_argument("--run-id", required=True)
+    runner_attest.add_argument("--issued-at")
+    runner_attest.add_argument("--lifetime-seconds", type=int, default=3600)
+    runner_attest.add_argument("--output", required=True)
+    add_team_contract_private_key_arguments(runner_attest)
+    runner_attest.set_defaults(handler=attest_team_contract_runner)
+
+    runner_verify = team_contract_commands.add_parser(
+        "runner-verify", help="verify Runner signature, scope and exact execution evidence"
+    )
+    runner_verify.add_argument("--attestation", required=True)
+    runner_verify.add_argument("--report", required=True)
+    runner_verify.add_argument("--evidence", required=True)
+    runner_verify.add_argument("--junit")
+    runner_verify.add_argument("--trust-policy", required=True)
+    runner_verify.add_argument("--expected-trust-policy-id", required=True)
+    runner_verify.add_argument("--expected-trust-policy-sha256", required=True)
+    runner_verify.add_argument("--verification-time")
+    runner_verify.add_argument("--verification-report")
+    runner_verify.set_defaults(handler=verify_team_contract_runner)
+
+    gate_authorize = team_contract_commands.add_parser(
+        "gate-authorize", help="replay and sign a complete impact Gate for release"
+    )
+    gate_authorize.add_argument("--gate-report", required=True)
+    gate_authorize.add_argument("--report", required=True)
+    gate_authorize.add_argument("--evidence", required=True)
+    gate_authorize.add_argument("--junit", required=True)
+    gate_authorize.add_argument("--ctest")
+    gate_authorize.add_argument("--test-dir")
+    gate_authorize.add_argument("--config", default="Release")
+    gate_authorize.add_argument("--approval-policy")
+    gate_authorize.add_argument("--expected-approval-policy-id")
+    gate_authorize.add_argument("--expected-approval-policy-sha256")
+    gate_authorize.add_argument("--approval", action="append", default=[])
+    gate_authorize.add_argument("--runner-attestation")
+    gate_authorize.add_argument("--runner-trust-policy")
+    gate_authorize.add_argument("--expected-runner-trust-policy-id")
+    gate_authorize.add_argument("--expected-runner-trust-policy-sha256")
+    gate_authorize.add_argument("--verification-time")
+    gate_authorize.add_argument("--registry-id", required=True)
+    gate_authorize.add_argument("--channel", action="append", required=True)
+    gate_authorize.add_argument("--authorization-id", required=True)
+    gate_authorize.add_argument("--authorizer-id", required=True)
+    gate_authorize.add_argument("--issued-at")
+    gate_authorize.add_argument("--lifetime-seconds", type=int, default=3600)
+    gate_authorize.add_argument("--output", required=True)
+    add_team_contract_private_key_arguments(gate_authorize)
+    gate_authorize.set_defaults(handler=authorize_team_contract_gate)
+
+    gate_authorization_verify = team_contract_commands.add_parser(
+        "gate-authorization-verify", help="verify a Registry-scoped Gate authorization"
+    )
+    gate_authorization_verify.add_argument("--gate-report", required=True)
+    gate_authorization_verify.add_argument("--authorization", required=True)
+    gate_authorization_verify.add_argument("--authorization-policy", required=True)
+    gate_authorization_verify.add_argument(
+        "--expected-authorization-policy-id", required=True
+    )
+    gate_authorization_verify.add_argument(
+        "--expected-authorization-policy-sha256", required=True
+    )
+    gate_authorization_verify.add_argument("--expected-registry-id", required=True)
+    gate_authorization_verify.add_argument("--expected-channel", required=True)
+    gate_authorization_verify.add_argument("--verification-time")
+    gate_authorization_verify.add_argument("--verification-report")
+    gate_authorization_verify.set_defaults(
+        handler=verify_team_contract_gate_authorization
+    )
+
+    registry_anchor = team_contract_commands.add_parser(
+        "registry-anchor", help="sign the current Registry state outside its root"
+    )
+    registry_anchor.add_argument("--registry", required=True)
+    registry_anchor.add_argument("--anchor-id", required=True)
+    registry_anchor.add_argument("--anchor-service-id", required=True)
+    registry_anchor.add_argument("--previous-anchor")
+    registry_anchor.add_argument("--issued-at")
+    registry_anchor.add_argument("--output", required=True)
+    add_team_contract_private_key_arguments(registry_anchor)
+    add_team_contract_registry_trust_arguments(registry_anchor)
+    add_team_contract_registry_limits(registry_anchor)
+    registry_anchor.set_defaults(handler=anchor_team_contract_registry)
+
+    registry_anchor_verify = team_contract_commands.add_parser(
+        "registry-anchor-verify", help="detect Registry rollback against an external anchor"
+    )
+    registry_anchor_verify.add_argument("--registry", required=True)
+    registry_anchor_verify.add_argument("--anchor", required=True)
+    registry_anchor_verify.add_argument("--anchor-policy", required=True)
+    registry_anchor_verify.add_argument("--expected-anchor-policy-id", required=True)
+    registry_anchor_verify.add_argument("--expected-anchor-policy-sha256", required=True)
+    registry_anchor_verify.add_argument("--verification-report")
+    add_team_contract_registry_trust_arguments(registry_anchor_verify)
+    add_team_contract_registry_limits(registry_anchor_verify)
+    registry_anchor_verify.set_defaults(handler=verify_team_contract_registry_anchor)
 
     new = commands.add_parser("new", help="create a framework module")
     new.add_argument("kind", choices=KINDS)

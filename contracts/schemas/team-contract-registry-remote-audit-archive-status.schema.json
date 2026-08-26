@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-audit-archive-status.schema.json",
+  "title": "Remote Registry audit archive status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "registryId", "archiveCount", "archivedThroughSequence", "archivedThroughRecordSha256", "archiveBytes", "onlineAuditRecords", "verifiedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteAuditArchiveStatus"},
+    "passed": {"const": true},
+    "registryId": {"$ref": "#/$defs/id"},
+    "archiveCount": {"type": "integer", "minimum": 0},
+    "archivedThroughSequence": {"type": "integer", "minimum": 0},
+    "archivedThroughRecordSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "archiveBytes": {"type": "integer", "minimum": 0},
+    "onlineAuditRecords": {"type": "integer", "minimum": 0},
+    "verifiedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

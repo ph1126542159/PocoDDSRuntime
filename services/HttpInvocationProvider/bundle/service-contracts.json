@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "provides": [],
+  "requires": [
+    {
+      "contract": "pdr.service-client-runtime",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": true,
+      "minimumProviders": 1
+    }
+  ]
+}

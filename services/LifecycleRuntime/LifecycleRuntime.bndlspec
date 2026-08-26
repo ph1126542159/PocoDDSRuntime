@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Lifecycle Maintenance Runtime</name>
+    <symbolicName>pdr.service.lifecycleRuntime</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::Lifecycle::LifecycleRuntimeBundleActivator</class>
+      <library>pdr.service.lifecycleRuntime</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <!-- Start before every manageable business Bundle so persisted drained
+         plans restore auto-start admission before business activation. -->
+    <runLevel>005</runLevel>
+    <requiredBundles>
+      <bundle><symbolicName>osp.core</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+      <bundle><symbolicName>osp.web</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+      <bundle><symbolicName>pdr.platform.managementAuth</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+      <bundle><symbolicName>pdr.service.serviceDependencyRuntime</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+  <files>bundle/*</files>
+</bundlespec>

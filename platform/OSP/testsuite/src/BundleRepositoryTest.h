@@ -25,6 +25,8 @@ public:
 	~BundleRepositoryTest();
 
 	void testLoad();
+	void testValidateWithoutMutation();
+	void testValidateRejectsMalformedCandidate();
 	void testInstall();
 	void testBundleFilterAcceptAll();
 	void testBundleFilterRejectAll();

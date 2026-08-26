@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-impact-approval.schema.json",
+  "title": "Short-lived signed affected Consumer Owner approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "operation", "decision", "impactReportSha256",
+    "impactInputSetSha256", "candidateLockSha256", "owner", "approverId",
+    "keyId", "issuedAt", "expiresAt", "signature"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractImpactApproval"},
+    "operation": {"const": "team-contract-impact-approve"},
+    "decision": {"const": "approve"},
+    "impactReportSha256": {"$ref": "#/$defs/sha256"},
+    "impactInputSetSha256": {"$ref": "#/$defs/sha256"},
+    "candidateLockSha256": {"$ref": "#/$defs/sha256"},
+    "owner": {"$ref": "#/$defs/identifier"},
+    "approverId": {"$ref": "#/$defs/identifier"},
+    "keyId": {"$ref": "#/$defs/identifier"},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"},
+    "signature": {"type": "string", "minLength": 88, "maxLength": 88}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

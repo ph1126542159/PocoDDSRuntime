@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/framework-link-dependency-boundary.schema.json",
+  "title": "PocoDDSRuntime configured CMake link dependency boundary report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "profile", "passed", "componentCount", "manifestTargetCount",
+    "analyzedProductionTargets", "resolvedProjectTargetLinks", "declaredDependencies",
+    "resolvedProjectIncludeDirectories", "observedEdges", "unclassifiedTargets",
+    "ambiguousTargets", "unresolvedLinkItems", "unresolvedIncludeItems",
+    "privateIncludeDirectoryViolations", "violations"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "framework-link-dependency-boundary"},
+    "profile": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "passed": {"type": "boolean"},
+    "componentCount": {"type": "integer", "minimum": 1},
+    "manifestTargetCount": {"type": "integer", "minimum": 0},
+    "analyzedProductionTargets": {"type": "integer", "minimum": 0},
+    "resolvedProjectTargetLinks": {"type": "integer", "minimum": 0},
+    "resolvedProjectIncludeDirectories": {"type": "integer", "minimum": 0},
+    "declaredDependencies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array", "uniqueItems": true,
+        "items": {"$ref": "#/$defs/componentId"}
+      }
+    },
+    "observedEdges": {"type": "array", "items": {"$ref": "#/$defs/edge"}},
+    "unclassifiedTargets": {
+      "type": "array", "items": {"$ref": "#/$defs/targetClassification"}
+    },
+    "ambiguousTargets": {
+      "type": "array", "items": {"$ref": "#/$defs/targetClassification"}
+    },
+    "unresolvedLinkItems": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["target", "component", "items"],
+        "properties": {
+          "target": {"$ref": "#/$defs/targetName"},
+          "component": {"$ref": "#/$defs/componentId"},
+          "items": {"type": "array", "minItems": 1, "uniqueItems": true,
+                    "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    },
+    "unresolvedIncludeItems": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["target", "component", "items"],
+        "properties": {
+          "target": {"$ref": "#/$defs/targetName"},
+          "component": {"$ref": "#/$defs/componentId"},
+          "items": {"type": "array", "minItems": 1, "uniqueItems": true,
+                    "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    },
+    "privateIncludeDirectoryViolations": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["consumer", "provider", "consumerTarget", "includeDirectory"],
+        "properties": {
+          "consumer": {"$ref": "#/$defs/componentId"},
+          "provider": {"$ref": "#/$defs/componentId"},
+          "consumerTarget": {"$ref": "#/$defs/targetName"},
+          "includeDirectory": {"$ref": "#/$defs/path"}
+        }
+      }
+    },
+    "violations": {"type": "array", "items": {"$ref": "#/$defs/edge"}}
+  },
+  "$defs": {
+    "componentId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "targetName": {"type": "string", "minLength": 1},
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*\\\\).+$"},
+    "ownedPath": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "owners"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "owners": {"type": "array", "minItems": 1, "uniqueItems": true,
+                   "items": {"$ref": "#/$defs/componentId"}}
+      }
+    },
+    "targetClassification": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "target", "type", "sourceDirectory", "owners", "ownedPaths",
+        "unownedPaths", "excluded"
+      ],
+      "properties": {
+        "target": {"$ref": "#/$defs/targetName"},
+        "type": {"type": "string", "minLength": 1},
+        "sourceDirectory": {"type": "string", "minLength": 1},
+        "owners": {"type": "array", "uniqueItems": true,
+                   "items": {"$ref": "#/$defs/componentId"}},
+        "ownedPaths": {"type": "array", "items": {"$ref": "#/$defs/ownedPath"}},
+        "unownedPaths": {"type": "array", "uniqueItems": true,
+                         "items": {"$ref": "#/$defs/path"}},
+        "excluded": {"type": "boolean"}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "consumerTarget", "providerTarget", "consumerSourceDirectory",
+        "providerSourceDirectory"
+      ],
+      "properties": {
+        "consumerTarget": {"$ref": "#/$defs/targetName"},
+        "providerTarget": {"$ref": "#/$defs/targetName"},
+        "consumerSourceDirectory": {"type": "string", "minLength": 1},
+        "providerSourceDirectory": {"type": "string", "minLength": 1}
+      }
+    },
+    "edge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["consumer", "provider", "declared", "evidence"],
+      "properties": {
+        "consumer": {"$ref": "#/$defs/componentId"},
+        "provider": {"$ref": "#/$defs/componentId"},
+        "declared": {"type": "boolean"},
+        "evidence": {"type": "array", "minItems": 1,
+                     "items": {"$ref": "#/$defs/evidence"}}
+      }
+    }
+  }
+}

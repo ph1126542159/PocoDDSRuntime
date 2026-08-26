@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "participants": [
+    {
+      "id": "participant-consumer",
+      "serviceName": "pdr.configuration.participant.participantConsumer",
+      "ownedPrefixes": ["pdr.test.participantConsumer"],
+      "after": []
+    }
+  ]
+}

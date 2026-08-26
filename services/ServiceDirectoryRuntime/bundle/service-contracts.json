@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "provides": [
+    {
+      "contract": "pdr.service-directory-runtime",
+      "version": "1.0.0",
+      "serviceName": "pdr.service.serviceDirectoryRuntime"
+    }
+  ],
+  "requires": [
+    {
+      "contract": "pdr.runtime-membership",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": true,
+      "minimumProviders": 1
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Service Dependency Runtime</name>
+    <symbolicName>pdr.service.serviceDependencyRuntime</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::ServiceDependency::ServiceDependencyRuntimeBundleActivator</class>
+      <library>pdr.service.serviceDependencyRuntime</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>107</runLevel>
+    <requiredBundles>
+      <bundle><symbolicName>osp.core</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+      <bundle><symbolicName>osp.web</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+      <bundle><symbolicName>pdr.platform.managementAuth</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+  <files>bundle/*</files>
+</bundlespec>

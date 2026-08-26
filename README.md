@@ -215,6 +215,11 @@ Use the developer command to check the environment or create a standard module:
   --current E:/Products/WarehouseRobot/build/active-config.json `
   --candidate E:/Products/WarehouseRobot/build/candidate-config.json `
   --output E:/Products/WarehouseRobot/build/config-plan.json
+./tools/pdr.ps1 project config preflight E:/Products/WarehouseRobot/pdr-project.yaml `
+  --plan E:/Products/WarehouseRobot/build/config-plan.json `
+  --current E:/Products/WarehouseRobot/build/active-config.json `
+  --candidate E:/Products/WarehouseRobot/build/candidate-config.json `
+  --output E:/Products/WarehouseRobot/build/config-preflight.json
 ./tools/pdr.ps1 new module TemperatureModel --output modules
 ./tools/pdr.ps1 new service TemperatureService --output services
 ./tools/pdr.ps1 new device CanTemperatureSensor --output platform/devices
@@ -367,21 +372,37 @@ the complete OSP lifecycle: stop, unload, repository reload, dependency
 resolution and start. This handles added, atomically replaced and deleted
 Bundle packages without loading partially copied files.
 
-`pdr-runtime` reads `pdr-subprocesses.properties` after its own initialization
-and starts enabled subprocess entries in ascending numeric order. Executable
-paths and optional working directories are relative to `build/bin/`. On startup
-failure, already-started children are stopped. Normal shutdown stops children in
-reverse order.
+`pdr-runtime` reads `pdr-subprocesses.properties` after its own initialization.
+Enabled entries may be declared in any numeric order: explicit dependency edges
+form an acyclic graph, startup waits for dependency readiness, and shutdown uses
+reverse topological order. Executable paths and optional working directories are
+relative to `build/bin/`. Invalid graphs fail before any child is launched.
 
 ```properties
 subprocess.count = 1
+subprocess.supervisionIntervalMilliseconds = 100
 subprocess.0.enabled = true
 subprocess.0.name = worker
+subprocess.0.dependency.count = 0
 subprocess.0.path = processes/worker/worker.exe
 subprocess.0.workingDirectory = processes/worker
+subprocess.0.restartPolicy = on-failure
+subprocess.0.restartMaximumAttempts = 5
+subprocess.0.restartInitialBackoffMilliseconds = 250
+subprocess.0.restartMaximumBackoffMilliseconds = 30000
+subprocess.0.readinessFile = processes/worker/pdr-subprocess.heartbeat
+subprocess.0.readinessTimeoutMilliseconds = 10000
+subprocess.0.heartbeatTimeoutMilliseconds = 5000
 subprocess.0.argument.count = 1
-subprocess.0.argument.0 = --config=worker.properties
+subprocess.0.argument.0 = --health-file=pdr-subprocess.heartbeat
 ```
+
+`on-failure` 只在异常退出时按有限预算和有界指数退避恢复；预算耗尽后状态为 `failed`，不会无限重启。配置 Readiness 文件后，新 PID 必须主动改写该文件才能从 `starting` 进入 `running`；后续停止更新超过 heartbeat TTL 同样进入恢复路径。人工停止和 Runtime 正常关闭会抑制自动恢复。
+
+依赖项使用 `subprocess.N.dependency.count` 与连续的
+`subprocess.N.dependency.M = <process-name>` 声明。依赖未 Ready 时进程保持
+`waiting-dependency`；依赖永久停止或失败时进入 `dependency-failed`，已经运行的下游会先被停止。修复并重新启动依赖后，下游按照原有期望状态自动恢复。
+`GET /api/v1/process-dependencies` 提供 schema v1 的权威依赖图、阻塞原因和正反拓扑顺序，调用方无需读取部署配置文件。
 
 `pdr-launcher` remains available below `processes/`, but it is not enabled in
 the default child-process configuration because its watchdog role is to launch

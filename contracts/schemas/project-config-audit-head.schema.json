@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-audit-head.schema.json",
+  "title": "PocoDDSRuntime project configuration audit head",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "sequence", "recordSha256",
+    "auditFileSha256", "updatedAt", "headSha256"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeProjectConfigurationAudit"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "recordSha256": {"$ref": "#/$defs/sha256"},
+    "auditFileSha256": {"$ref": "#/$defs/sha256"},
+    "updatedAt": {"type": "string", "format": "date-time"},
+    "headSha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

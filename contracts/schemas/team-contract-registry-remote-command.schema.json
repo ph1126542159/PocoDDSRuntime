@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-command.schema.json",
+  "title": "Path-free remote team contract Registry command",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "operation", "registryId", "expectedRevision", "parameters", "artifacts"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteCommand"},
+    "operation": {"enum": ["publish", "promote", "rollback", "verify", "resolve"]},
+    "registryId": {"$ref": "#/$defs/id"},
+    "expectedRevision": {"type": ["integer", "null"], "minimum": 0},
+    "parameters": {"type": "object"},
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/artifact"},
+      "maxProperties": 8
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sha256", "dataBase64"],
+      "properties": {
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "dataBase64": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

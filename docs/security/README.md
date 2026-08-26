@@ -1,5 +1,9 @@
 # 安全基线
 
+Bundle/组件内部资源访问使用独立的[Runtime Bundle 能力权限](runtime-capabilities.md)。管理 HTTP
+权限回答“哪个已认证运维身份可以调用管理接口”，能力策略回答“哪个 Runtime 主体可以对哪个
+Service/Topic/配置/设备/Schema 执行什么动作”，两者不能互相替代。
+
 ## 部署 Profile
 
 `security.profile` 支持：
@@ -43,8 +47,9 @@ Builtin Users 和 Guests 的有效权限；在 Unix 上要求 group/other 权限
 需要最小权限时，使用 `pdr.management.authentication.principals.count` 和索引 Principal
 配置。每个 Principal 包含非敏感 `id`、二选一的 `tokenEnvironment`/`tokenFile`，以及由
 `protocol.manage`、`process.manage`、`bundle.manage`、`configuration.manage` 组成的
-权限列表，并可用 `identity.manage`、`audit.read`、`task.read`、`task.cancel`、`diagnostics.read`
-分别授予身份轮换、审计查询、任务查询、排队取消和受控诊断终端读取能力；`*` 表示全部九项权限。旧
+权限列表，并可用 `identity.manage`、`audit.read`、`task.read`、`task.cancel`、
+`diagnostics.read`、`diagnostics.execute`、`capability.read`、`capability.manage`、`resource.read` 分别授予
+身份轮换、审计查询、任务查询/取消、受控诊断、能力策略读取/换代以及资源治理状态读取；`*` 表示全部十三项权限。旧
 `tokenEnvironment` 继续映射为 `legacy-admin` 全权限
 身份，便于兼容已有部署，但新生产部署应优先使用职责分离的 Principal。认证成功但权限
 不足返回 403，认证失败仍返回 401。Principal ID 会进入配置事务审计，令牌不会进入响应、
@@ -144,3 +149,48 @@ SHA-256，并检查允许密钥、有效期及吊销列表。策略和验签器�
 `publisherId + keyId` 限制可签署的 `pdr.plugin.*` 命名范围，并固定公钥 SHA-256、有效期与
 吊销状态。预检和安装默认要求该证据，同时把发布者、密钥和策略 ID 写入事务报告及追加审计。
 诊断用 `--allow-unsigned-plugin` 会留下明确 bypass 证据，不能作为生产验收。
+
+原生 Bundle 仓库再使用第三个、相互独立的信任域 `PocoDDSBundleRepository`。发布流水线通过
+`bundle_repository_publisher.py` 对原生 `pdr-bundle-repository-check` 计算的确定性仓库摘要生成
+Ed25519 分离证明；`bundle-repository-trust-policy.schema.json` 按
+`publisherId + keyId + repositoryPatterns` 授权并固定公钥摘要、有效期和吊销状态。证明、策略和
+公钥都位于候选仓库外，Runtime 在 OSP 初始化前验证，BundleManager 与 Launcher 在预检、激活和
+probation 边界重复核对。生产配置必须启用该门禁；发布私钥只能由受保护流水线通过命名环境变量
+提供。Release、Plugin、Bundle Repository 三种产品标识和策略不得共用授权权限。
+
+仓库证明 schema v2 还签署正 63 位 `rolloutSequence`。BundleManagement 在候选解析前将其与仓库
+专属耐久高水位比较：低序号拒绝、同序号仅允许同一摘要幂等重试；只有 Launcher probation 或人工
+启动的完整 Runtime 门禁提交后才推进。高水位使用独立跨进程锁和 flush/原子替换，不来自候选仓库。
+自动回退只发生在高水位推进前；`committing` 崩溃恢复必须继续提交。受控降级使用第四个独立信任域
+`PocoDDSBundleRepositoryBreakGlass`：请求同时绑定源高水位文件摘要、完整源/目标授权、原因、工单、
+UUID 和最长 24 小时有效期，审批策略按 approver/key/repository/action 授权，通过
+`minimumApprovals` 设置最多 16 人的 M-of-N 门槛，并可设置更短 TTL、有效期和吊销。同一审批人或
+同一密钥不能重复计数。执行端在同一高水位 OS 锁内重新验证发布者与全部审批者的 Ed25519 信任链、
+原子切换并记录一次性消费。追加审计使用递增序号和 previous/self SHA-256 形成可离线验证的哈希链；
+审批密钥不能复用 Bundle 发布密钥，生产运维仍不得删除或手工改写高水位。
+执行前的 `preflight` 还要求当前实际 Bundle 仓库摘要等于审批绑定的源高水位，并在同一文件系统真实
+复制和重新授权 staging、检查空间与审计链，但不切换仓库或消费审批；停机确认必须单独进入证据。
+正式执行的每个持久边界写入带自身 SHA-256 的事务 journal。中断恢复重新读取实际高水位和目录摘要：
+提交前只能回滚到 exact source，提交后只能前向补齐消费与审计，不能相信可编辑的状态名称反向降级。
+
+项目配置审批使用第五个独立产品标识 `PocoDDSRuntimeProjectConfiguration`，不能复用 Release、
+Plugin、Bundle Repository 或 BreakGlass 的授权策略。策略按 JSON Pointer 高风险路径分别要求
+M-of-N、必需角色和发起人分离；请求精确绑定事务计划、策略、工单和短期有效期。应用端从受保护
+来源固定策略 ID/SHA-256，使用项目外公钥目录和安装侧原生验签器，并在全局配置事务锁内再次验证。
+未命中规则的普通配置不要求多人签名；配置了高风险规则后，缺少任何审批参数必须 fail-closed。
+生产部署必须同时启用 `--require-approval-policy`，防止删除策略引用后重新规划造成降级绕过。
+配置事务 journal v3 将计划和候选配置复制到事务私有状态文件，并把每个终态写入带强制 actor、
+previous-record SHA-256 和持久 head 的审计链。离线验证同时检查链、head、尾部截断和 journal
+双向绑定。独立审计身份应周期性生成 Ed25519 签名检查点，绑定 sequence、末记录、完整日志和
+head 摘要；部署门禁固定 key ID 与公钥 SHA-256，并验证签名序列是当前日志的精确前缀。签名私钥、
+检查点和信任 pin 必须位于配置事务状态之外，检查点还应上传 WORM 或远端审计系统。只有保存在
+独立信任域中的检查点才能在本地日志与 head 一并删除或回滚后提供外部存在性证明。
+新的事务 journal 和活动锁还记录发起人；只读 `project config status --check` 聚合锁、待恢复事务
+与审计健康，供 CI 或接手人员在恢复/提交前 fail-closed。该状态报告不替代 journal、审计验签或
+操作系统 ACL，也不会自动执行恢复。Windows 进程存活探测使用只读进程查询，不发送 signal；新锁
+还绑定进程创建身份，以免 PID 复用造成错误的活动锁判断。
+
+同一证明还必须绑定已签名发布清单和 SPDX 2.3 SBOM 的 SHA-256，以及 Runtime 版本、干净 Git
+commit、Builder、构建 Profile 和完整 artifact-set 摘要。发布器逐文件确认 Bundle 仓库被发布清单
+覆盖；Runtime 从候选仓库外重新读取并计算发布清单/SBOM 摘要，在 OSP 解析前复核版本和来源。
+这些字段随高水位及 LKG 持久化，恢复时不允许把相同仓库摘要关联到不同来源证据。

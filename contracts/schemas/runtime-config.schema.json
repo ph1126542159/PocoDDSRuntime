@@ -18,7 +18,90 @@
     "auth.simple.enable": { "type": "boolean" },
     "osp.web.server.port": { "type": "integer", "minimum": 1, "maximum": 65535 },
     "pdr.fastdds.domainId": { "type": "integer", "minimum": 0, "maximum": 232 },
+    "pdr.membership.instanceId": { "type": "string", "pattern": "^[!-~]{1,128}$" },
+    "pdr.membership.role": { "type": "string", "pattern": "^[!-~]{0,64}$" },
+    "pdr.membership.endpoint": { "type": "string", "pattern": "^[!-~]{0,512}$" },
+    "pdr.membership.capabilities": { "type": "string", "maxLength": 16511 },
+    "pdr.membership.topic": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "pdr.membership.database": { "type": "string", "minLength": 1 },
+    "pdr.membership.heartbeatIntervalMilliseconds": { "type": "integer", "minimum": 100, "maximum": 60000 },
+    "pdr.membership.heartbeatTtlMilliseconds": { "type": "integer", "minimum": 200, "maximum": 3600000 },
+    "pdr.membership.tombstoneRetentionMilliseconds": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+    "pdr.membership.maximumMembers": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.serviceDirectory.topic": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "pdr.serviceDirectory.publishIntervalMilliseconds": { "type": "integer", "minimum": 100, "maximum": 60000 },
+    "pdr.serviceDirectory.ttlMilliseconds": { "type": "integer", "minimum": 200, "maximum": 3600000 },
+    "pdr.serviceDirectory.tombstoneRetentionMilliseconds": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+    "pdr.serviceDirectory.maximumInstances": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.serviceDirectory.maximumInstancesPerService": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.serviceDirectory.advertisements.count": { "type": "integer", "minimum": 0, "maximum": 64 },
+    "pdr.serviceClient.maximumProviders": { "type": "integer", "minimum": 1, "maximum": 4096 },
+    "pdr.serviceClient.maximumAttempts": { "type": "integer", "minimum": 1, "maximum": 16 },
+    "pdr.serviceClient.timeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+    "pdr.serviceClient.initialBackoffMilliseconds": { "type": "integer", "minimum": 0, "maximum": 600000 },
+    "pdr.serviceClient.maximumBackoffMilliseconds": { "type": "integer", "minimum": 0, "maximum": 600000 },
+    "pdr.serviceClient.backoffMultiplier": { "type": "number", "minimum": 1.0, "maximum": 10.0 },
+    "pdr.serviceClient.circuitFailureThreshold": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.serviceClient.circuitResetMilliseconds": { "type": "integer", "minimum": 1, "maximum": 86400000 },
+    "pdr.serviceClient.maximumCircuitEntries": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.serviceClient.circuitIdleRetentionMilliseconds": { "type": "integer", "minimum": 1, "maximum": 2592000000 },
+    "pdr.serviceClient.maximumPayloadBytes": { "type": "integer", "minimum": 1, "maximum": 16777216 },
+    "pdr.serviceClient.maximumMetadataEntries": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "pdr.serviceClient.maximumMetadataBytes": { "type": "integer", "minimum": 1, "maximum": 1048576 },
+    "pdr.serviceClient.authorizationRequired": { "type": "boolean" },
+    "pdr.serviceClient.audit.enabled": { "type": "boolean" },
+    "pdr.serviceClient.audit.maximumActiveTraces": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.serviceClient.idempotency.enabled": { "type": "boolean" },
+    "pdr.serviceClient.idempotency.maximumEntries": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.serviceClient.idempotency.retentionMilliseconds": { "type": "integer", "minimum": 1000, "maximum": 2147483647 },
+    "pdr.serviceClient.idempotency.database": { "type": "string", "minLength": 1 },
+    "pdr.serviceClient.httpProvider.enabled": { "type": "boolean" },
+    "pdr.serviceClient.httpProvider.allowedHosts": { "type": "string", "maxLength": 16384 },
+    "pdr.serviceClient.httpProvider.allowedPorts": { "type": "string", "pattern": "^[0-9, ]{0,1024}$" },
+    "pdr.serviceClient.httpProvider.allowPlainHttp": { "type": "boolean" },
+    "pdr.serviceClient.httpProvider.allowLoopback": { "type": "boolean" },
+    "pdr.serviceClient.httpProvider.allowPrivateNetworks": { "type": "boolean" },
+    "pdr.serviceClient.httpProvider.allowLinkLocal": { "type": "boolean" },
+    "pdr.serviceClient.httpProvider.maximumRequestBytes": { "type": "integer", "minimum": 1, "maximum": 16777216 },
+    "pdr.serviceClient.httpProvider.maximumResponseBytes": { "type": "integer", "minimum": 1, "maximum": 16777216 },
+    "pdr.serviceClient.httpProvider.maximumTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+    "pdr.serviceClient.httpProvider.caCertificate": { "type": "string" },
+    "pdr.serviceClient.httpProvider.authorizationEnvironment": { "type": "string", "pattern": "^$|^[A-Za-z_][A-Za-z0-9_]*$" },
+    "pdr.serviceClient.httpProvider.credentials.required": { "type": "boolean" },
+    "pdr.serviceClient.httpProvider.credentials.count": { "type": "integer", "minimum": 0, "maximum": 256 },
+    "pdr.serviceClient.httpProvider.credentials.requireRestrictedFiles": { "type": "boolean" },
+    "pdr.serviceClient.httpProvider.credentials.reloadIntervalMilliseconds": { "type": "integer", "minimum": 0, "maximum": 3600000 },
     "pdr.subprocess.shutdownTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+    "osp.bundleMonitor.authorization.required": { "type": "boolean" },
+    "osp.bundleMonitor.authorization.repositoryId": { "type": "string" },
+    "osp.bundleMonitor.authorization.evidenceDirectory": { "type": "string" },
+    "osp.bundleMonitor.authorization.trustPolicyFile": { "type": "string" },
+    "osp.bundleMonitor.authorization.expectedTrustPolicyId": { "type": "string" },
+    "osp.bundleMonitor.authorization.expectedTrustPolicySha256": { "type": "string", "pattern": "^$|^[0-9a-f]{64}$" },
+    "osp.bundleMonitor.authorization.trustedKeysDirectory": { "type": "string" },
+    "pdr.capabilityRuntime.policy": { "type": "string", "minLength": 1 },
+    "pdr.capabilityRuntime.database": { "type": "string", "minLength": 1 },
+    "pdr.capabilityRuntime.auditMaximumRecords": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+    "pdr.capabilityRuntime.memoryAuditCapacity": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+    "pdr.capabilityRuntime.leaseEnabled": { "type": "boolean" },
+    "pdr.capabilityRuntime.leaseDurationMilliseconds": { "type": "integer", "minimum": 1, "maximum": 60000 },
+    "pdr.capabilityRuntime.leaseMaximumUses": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+    "pdr.capabilityRuntime.leaseCapacity": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+    "pdr.resourceGovernor.default.maximumConcurrency": { "type": "integer", "minimum": 1, "maximum": 64 },
+    "pdr.resourceGovernor.default.queueCapacity": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.resourceGovernor.default.queueTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+    "pdr.resourceGovernor.default.executionTimeoutMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+    "pdr.resourceGovernor.default.failureThreshold": { "type": "integer", "minimum": 1, "maximum": 100000 },
+    "pdr.resourceGovernor.default.circuitResetMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 },
+    "pdr.resourceGovernor.overrides.count": { "type": "integer", "minimum": 0, "maximum": 128 },
+    "pdr.workflow.schedulerEnabled": { "type": "boolean" },
+    "pdr.workflow.schedulerIntervalMilliseconds": { "type": "integer", "minimum": 1, "maximum": 86400000 },
+    "pdr.workflow.schedulerJitterMilliseconds": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+    "pdr.outbox.schedulerEnabled": { "type": "boolean" },
+    "pdr.outbox.schedulerIntervalMilliseconds": { "type": "integer", "minimum": 1, "maximum": 86400000 },
+    "pdr.outbox.schedulerJitterMilliseconds": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+    "pdr.outbox.maintenanceIntervalSeconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+    "pdr.lifecycleRuntime.database": { "type": "string", "minLength": 1 },
     "pdr.management.manageableBundles": { "type": "string" },
     "pdr.management.authentication.required": { "type": "boolean" },
     "pdr.management.authentication.tokenEnvironment": { "type": "string", "pattern": "^$|^[A-Za-z_][A-Za-z0-9_]*$" },
@@ -108,6 +191,33 @@
     "pdr.gnss.staleAfterMilliseconds": { "type": "integer", "minimum": 1, "maximum": 3600000 }
   },
   "patternProperties": {
+    "^pdr\\.serviceClient\\.httpProvider\\.credentials\\.[0-9]+\\.(service|operation)$": {
+      "type": "string", "pattern": "^[A-Za-z0-9._:/-]+\\*?$", "maxLength": 128
+    },
+    "^pdr\\.serviceClient\\.httpProvider\\.credentials\\.[0-9]+\\.host$": {
+      "type": "string", "minLength": 1, "maxLength": 253
+    },
+    "^pdr\\.serviceClient\\.httpProvider\\.credentials\\.[0-9]+\\.port$": {
+      "type": "integer", "minimum": 0, "maximum": 65535
+    },
+    "^pdr\\.serviceClient\\.httpProvider\\.credentials\\.[0-9]+\\.authorizationEnvironment$": {
+      "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "^pdr\\.serviceClient\\.httpProvider\\.credentials\\.[0-9]+\\.authorizationFile$": {
+      "type": "string", "minLength": 1
+    },
+    "^pdr\\.serviceDirectory\\.advertisements\\.[0-9]+\\.(serviceName|instanceId|endpoint|protocol)$": {
+      "type": "string", "minLength": 1, "maxLength": 512
+    },
+    "^pdr\\.serviceDirectory\\.advertisements\\.[0-9]+\\.zone$": {
+      "type": "string", "maxLength": 64
+    },
+    "^pdr\\.serviceDirectory\\.advertisements\\.[0-9]+\\.tags$": {
+      "type": "string", "maxLength": 4159
+    },
+    "^pdr\\.serviceDirectory\\.advertisements\\.[0-9]+\\.state$": {
+      "type": "string", "enum": ["ready", "draining"]
+    },
     "^pdr\\.management\\.authentication\\.principals\\.[0-9]+\\.id$": {
       "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
     },
@@ -119,6 +229,21 @@
     },
     "^pdr\\.management\\.authentication\\.principals\\.[0-9]+\\.permissions$": {
       "type": "string", "minLength": 1
+    },
+    "^pdr\\.resourceGovernor\\.overrides\\.[0-9]+\\.owner$": {
+      "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    },
+    "^pdr\\.resourceGovernor\\.overrides\\.[0-9]+\\.maximumConcurrency$": {
+      "type": "integer", "minimum": 1, "maximum": 64
+    },
+    "^pdr\\.resourceGovernor\\.overrides\\.[0-9]+\\.queueCapacity$": {
+      "type": "integer", "minimum": 1, "maximum": 100000
+    },
+    "^pdr\\.resourceGovernor\\.overrides\\.[0-9]+\\.(queueTimeoutMilliseconds|executionTimeoutMilliseconds|circuitResetMilliseconds)$": {
+      "type": "integer", "minimum": 1, "maximum": 3600000
+    },
+    "^pdr\\.resourceGovernor\\.overrides\\.[0-9]+\\.failureThreshold$": {
+      "type": "integer", "minimum": 1, "maximum": 100000
     },
     "^pdr\\.alerts\\.webhook\\.[0-9]+\\.id$": {
       "type": "string", "minLength": 1

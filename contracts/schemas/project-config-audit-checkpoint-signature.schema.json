@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-audit-checkpoint-signature.schema.json",
+  "title": "PocoDDSRuntime project configuration audit checkpoint signature",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "algorithm", "keyId", "manifestSha256", "signature"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeProjectConfigurationAuditCheckpoint"},
+    "algorithm": {"const": "Ed25519"},
+    "keyId": {"type": "string", "minLength": 1},
+    "manifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "signature": {"type": "string", "minLength": 1}
+  }
+}

@@ -1,12 +1,10 @@
 #include "PocoDDS/Configuration/IndexedConfiguration.h"
-#include "PocoDDS/Protocols/MQTT/MqttClient.h"
+#include "PocoDDS/Gateways/FactoryService.h"
 #include "PocoDDS/Protocols/ProtocolService.h"
-#include "PocoDDS/Protocols/ROS/BridgeClient.h"
-#include "PocoDDS/Protocols/UDP/UdpChannel.h"
 
 #include <Poco/ClassLibrary.h>
-#include <Poco/Environment.h>
-#include <Poco/Net/SocketAddress.h>
+#include <Poco/Delegate.h>
+#include <Poco/Exception.h>
 #include <Poco/OSP/Bundle.h>
 #include <Poco/OSP/BundleActivator.h>
 #include <Poco/OSP/BundleContext.h>
@@ -15,7 +13,8 @@
 #include <Poco/OSP/ServiceFinder.h>
 #include <Poco/OSP/ServiceRef.h>
 #include <Poco/OSP/ServiceRegistry.h>
-#include <Poco/URI.h>
+#include <Poco/OSP/ServiceListener.h>
+#include <Poco/Util/AbstractConfiguration.h>
 
 #include <cstddef>
 #include <algorithm>
@@ -32,32 +31,6 @@
 
 namespace PocoDDS::Services
 {
-namespace
-{
-std::string environmentBackedValue(
-    const Poco::Util::AbstractConfiguration& configuration,
-    const std::string& prefix,
-    const char* name)
-{
-    const std::string directKey = prefix + "." + name;
-    const std::string environmentKey = directKey + "Environment";
-    const std::string direct = configuration.getString(directKey, "");
-    const std::string variable = configuration.getString(environmentKey, "");
-    if (!direct.empty() && !variable.empty())
-        throw Poco::InvalidArgumentException(
-            directKey + " and " + environmentKey + " are mutually exclusive");
-    if (variable.empty()) return direct;
-    if (!Poco::Environment::has(variable))
-        throw Poco::NotFoundException(
-            "Environment variable configured by " + environmentKey + " is not set", variable);
-    const std::string value = Poco::Environment::get(variable);
-    if (value.empty())
-        throw Poco::InvalidArgumentException(
-            "Environment variable configured by " + environmentKey + " is empty", variable);
-    return value;
-}
-}
-
 class ProtocolGatewayActivator final : public Poco::OSP::BundleActivator
 {
 public:
@@ -66,104 +39,19 @@ public:
         auto preferences =
             Poco::OSP::ServiceFinder::find<Poco::OSP::PreferencesService>(context);
         auto configuration = preferences->configuration();
-        const auto instances = [&](const std::string& base, const std::string& idPrefix) {
-            return PocoDDS::Configuration::indexedInstances(
-                *configuration, base, false, 0, idPrefix);
-        };
-        const auto key = [](const auto& instance, const char* name) {
-            return instance.prefix + "." + name;
-        };
-
         try
         {
-            for (const auto& instance : instances("pdr.mqtt", "mqtt"))
-            {
-                if (!instance.enabled) continue;
-                PocoDDS::Protocols::MQTT::MqttClient::Options options;
-                options.serverUri = configuration->getString(key(instance, "serverUri"));
-                options.clientId = configuration->getString(key(instance, "clientId"), instance.id);
-                options.username = environmentBackedValue(
-                    *configuration, instance.prefix, "username");
-                options.password = environmentBackedValue(
-                    *configuration, instance.prefix, "password");
-                options.trustStore = configuration->getString(key(instance, "trustStore"), "");
-                options.keyStore = configuration->getString(key(instance, "keyStore"), "");
-                options.privateKey = configuration->getString(key(instance, "privateKey"), "");
-                options.privateKeyPassword = environmentBackedValue(
-                    *configuration, instance.prefix, "privateKeyPassword");
-                options.enabledCipherSuites =
-                    configuration->getString(key(instance, "enabledCipherSuites"), "");
-                options.verifyServerCertificate =
-                    configuration->getBool(key(instance, "verifyServerCertificate"), true);
-                options.verifyHostname =
-                    configuration->getBool(key(instance, "verifyHostname"), true);
-                options.keepAliveSeconds = configuration->getInt(key(instance, "keepAliveSeconds"), 30);
-                options.cleanSession = configuration->getBool(key(instance, "cleanSession"), true);
-                options.connectTimeoutSeconds =
-                    configuration->getInt(key(instance, "connectTimeoutSeconds"), 10);
-                add(context, instance.id, "mqtt",
-                    configuration->getBool(key(instance, "required"), false),
-                    configuration->getBool(key(instance, "autoReconnect"), true),
-                    configuration->getUInt(key(instance, "reconnectDelayMilliseconds"), 1000),
-                    configuration->getUInt(key(instance, "reconnectMaximumDelayMilliseconds"), 30000),
-                    std::make_unique<PocoDDS::Protocols::MQTT::MqttClient>(std::move(options)));
-            }
-
-            for (const auto& instance : instances("pdr.ros", "ros"))
-            {
-                if (!instance.enabled) continue;
-                PocoDDS::Protocols::ROS::BridgeClient::Options options;
-                options.uri = Poco::URI(configuration->getString(key(instance, "uri")));
-                options.maximumMessageSize = static_cast<std::size_t>(
-                    configuration->getUInt(key(instance, "maximumMessageSize"), 1024 * 1024));
-                options.connectTimeoutSeconds =
-                    configuration->getInt(key(instance, "connectTimeoutSeconds"), 10);
-                options.authorization = environmentBackedValue(
-                    *configuration, instance.prefix, "authorization");
-                options.trustStore = configuration->getString(key(instance, "trustStore"), "");
-                options.clientCertificate =
-                    configuration->getString(key(instance, "clientCertificate"), "");
-                options.privateKey =
-                    configuration->getString(key(instance, "privateKey"), "");
-                options.verifyServerCertificate =
-                    configuration->getBool(key(instance, "verifyServerCertificate"), true);
-                options.verifyHostname =
-                    configuration->getBool(key(instance, "verifyHostname"), true);
-                add(context, instance.id, "rosbridge",
-                    configuration->getBool(key(instance, "required"), false),
-                    configuration->getBool(key(instance, "autoReconnect"), true),
-                    configuration->getUInt(key(instance, "reconnectDelayMilliseconds"), 1000),
-                    configuration->getUInt(key(instance, "reconnectMaximumDelayMilliseconds"), 30000),
-                    std::make_unique<PocoDDS::Protocols::ROS::BridgeClient>(std::move(options)));
-            }
-
-            for (const auto& instance : instances("pdr.udp", "udp"))
-            {
-                if (!instance.enabled) continue;
-                PocoDDS::Protocols::UDP::UdpChannel::Options options{
-                    Poco::Net::SocketAddress(
-                        configuration->getString(key(instance, "localHost"), "127.0.0.1"),
-                        static_cast<Poco::UInt16>(configuration->getUInt(key(instance, "localPort"), 0))),
-                    Poco::Net::SocketAddress(
-                        configuration->getString(key(instance, "remoteHost"), "127.0.0.1"),
-                        static_cast<Poco::UInt16>(configuration->getUInt(key(instance, "remotePort"), 9)))};
-                add(context, instance.id, "udp",
-                    configuration->getBool(key(instance, "required"), false),
-                    configuration->getBool(key(instance, "autoReconnect"), true),
-                    configuration->getUInt(key(instance, "reconnectDelayMilliseconds"), 1000),
-                    configuration->getUInt(key(instance, "reconnectMaximumDelayMilliseconds"), 30000),
-                    std::make_unique<PocoDDS::Protocols::UDP::UdpChannel>(std::move(options)));
-            }
+            _context = context;
+            _configuration = configuration;
+            _factoryListener = context->registry().createListener(
+                "pdr.gateway.factory.kind == \"protocol\"",
+                Poco::delegate(this, &ProtocolGatewayActivator::onFactoryRegistered),
+                Poco::delegate(this, &ProtocolGatewayActivator::onFactoryUnregistered));
 
             context->logger().information(
                 "Protocol gateway started with " + std::to_string(_protocols.size()) +
                 " protocol instance(s).");
-            if (std::any_of(_recoveries.begin(), _recoveries.end(),
-                            [](const auto& recovery) { return recovery.enabled; }))
-            {
-                _stopping = false;
-                _recoveryThread = std::thread([this, context] { recoveryLoop(context); });
-            }
+            ensureRecoveryThread();
         }
         catch (...)
         {
@@ -174,9 +62,11 @@ public:
 
     void stop(Poco::OSP::BundleContext::Ptr context) override
     {
+        _factoryListener = nullptr;
         _stopping = true;
         _recoveryChanged.notify_all();
         if (_recoveryThread.joinable()) _recoveryThread.join();
+        std::lock_guard<std::mutex> lock(_protocolMutex);
         for (auto iterator = _services.rbegin(); iterator != _services.rend(); ++iterator)
             context->registry().unregisterService(*iterator);
         for (auto iterator = _services.rbegin(); iterator != _services.rend(); ++iterator)
@@ -189,11 +79,117 @@ public:
         }
         _services.clear();
         _protocols.clear();
+        _factoryServices.clear();
+        _factoryTypes.clear();
         _recoveries.clear();
         _ids.clear();
+        _configuration = nullptr;
+        _context = nullptr;
     }
 
 private:
+    void ensureRecoveryThread()
+    {
+        if (_recoveryThread.joinable() || !_context) return;
+        if (!std::any_of(_recoveries.begin(), _recoveries.end(),
+                         [](const auto& recovery) { return recovery.enabled; })) return;
+        _stopping = false;
+        const auto context = _context;
+        _recoveryThread = std::thread([this, context] { recoveryLoop(context); });
+    }
+
+    void onFactoryRegistered(const Poco::OSP::ServiceRef::Ptr& reference)
+    {
+        std::lock_guard<std::mutex> lock(_protocolMutex);
+        if (!_context || !_configuration) return;
+        if (std::any_of(_factoryServices.begin(), _factoryServices.end(),
+                        [&](const auto& current) {
+                            return current->name() == reference->name();
+                        })) return;
+
+        auto factory = reference->castedInstance<
+            PocoDDS::Gateways::ProtocolFactoryService>();
+        const auto descriptor = factory->descriptor();
+        if (descriptor.type.empty() || descriptor.configurationBase.empty() ||
+            descriptor.defaultIdPrefix.empty())
+            throw Poco::InvalidArgumentException(
+                "Incomplete protocol factory descriptor", reference->name());
+        const auto registeredType = reference->properties().get(
+            PocoDDS::Gateways::ProtocolFactoryService::PROPERTY_TYPE, "");
+        if (registeredType != descriptor.type)
+            throw Poco::InvalidArgumentException(
+                "Protocol factory property/type mismatch", reference->name());
+        if (!_factoryTypes.insert(descriptor.type).second)
+            throw Poco::ExistsException(
+                "Duplicate protocol factory type", descriptor.type);
+
+        const auto serviceBase = _services.size();
+        const auto protocolBase = _protocols.size();
+        const auto recoveryBase = _recoveries.size();
+        try
+        {
+            const auto configured = PocoDDS::Configuration::indexedInstances(
+                *_configuration, descriptor.configurationBase,
+                descriptor.legacyEnabledDefault, descriptor.indexedDefaultCount,
+                descriptor.defaultIdPrefix);
+            for (const auto& instance : configured)
+            {
+                if (!instance.enabled) continue;
+                PocoDDS::Gateways::FactoryInstance request{
+                    instance.index, instance.prefix, instance.id, instance.legacy};
+                auto protocol = factory->create(*_configuration, request);
+                if (!protocol)
+                    throw Poco::NullPointerException(
+                        "Protocol factory returned null", descriptor.type);
+                add(_context, instance.id, descriptor.type,
+                    _configuration->getBool(instance.prefix + ".required", false),
+                    _configuration->getBool(instance.prefix + ".autoReconnect", true),
+                    _configuration->getUInt(
+                        instance.prefix + ".reconnectDelayMilliseconds", 1000),
+                    _configuration->getUInt(
+                        instance.prefix + ".reconnectMaximumDelayMilliseconds", 30000),
+                    std::move(protocol));
+            }
+            _factoryServices.push_back(reference);
+            ensureRecoveryThread();
+            _context->logger().information(
+                "Protocol factory " + descriptor.type + " attached through registry.");
+        }
+        catch (...)
+        {
+            for (std::size_t index = _services.size(); index > serviceBase; --index)
+            {
+                const auto& service = _services[index - 1];
+                try
+                {
+                    service->castedInstance<PocoDDS::Protocols::ProtocolService>()->close();
+                }
+                catch (...) {}
+                _context->registry().unregisterService(service);
+            }
+            for (std::size_t index = recoveryBase; index < _recoveries.size(); ++index)
+                _ids.erase(_recoveries[index].id);
+            _services.resize(serviceBase);
+            _protocols.resize(protocolBase);
+            _recoveries.resize(recoveryBase);
+            _factoryTypes.erase(descriptor.type);
+            throw;
+        }
+    }
+
+    void onFactoryUnregistered(const Poco::OSP::ServiceRef::Ptr& reference)
+    {
+        std::lock_guard<std::mutex> lock(_protocolMutex);
+        if (!_context) return;
+        const auto found = std::find_if(
+            _factoryServices.begin(), _factoryServices.end(),
+            [&](const auto& current) { return current->name() == reference->name(); });
+        if (found != _factoryServices.end())
+            _context->logger().critical(
+                "Protocol factory unregistered while created protocols are active: " +
+                reference->name());
+    }
+
     void add(Poco::OSP::BundleContext::Ptr context,
              const std::string& id,
              const std::string& type,
@@ -288,6 +284,7 @@ private:
             if (_stopping) break;
             waitLock.unlock();
             const auto now = std::chrono::steady_clock::now();
+            std::lock_guard<std::mutex> protocolLock(_protocolMutex);
             for (auto& recovery : _recoveries)
             {
                 if (!recovery.enabled || now < recovery.nextAttempt) continue;
@@ -321,10 +318,16 @@ private:
     std::vector<std::unique_ptr<PocoDDS::Protocols::DiagnosticProtocol>> _protocols;
     std::vector<Poco::OSP::ServiceRef::Ptr> _services;
     std::vector<Recovery> _recoveries;
+    Poco::OSP::BundleContext::Ptr _context;
+    Poco::AutoPtr<Poco::Util::AbstractConfiguration> _configuration;
+    Poco::OSP::ServiceListener::Ptr _factoryListener;
+    std::vector<Poco::OSP::ServiceRef::Ptr> _factoryServices;
+    std::unordered_set<std::string> _factoryTypes;
     std::atomic<bool> _stopping{false};
     std::mutex _recoveryMutex;
     std::condition_variable _recoveryChanged;
     std::thread _recoveryThread;
+    std::mutex _protocolMutex;
 };
 }
 

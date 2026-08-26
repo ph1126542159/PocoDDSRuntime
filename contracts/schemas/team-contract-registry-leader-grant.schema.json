@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-grant.schema.json",
+  "title": "Externally signed Team Contract Registry leader grant",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "authorityId", "registryId", "purpose", "leaderId", "fencingToken", "previousGrantSha256", "baselineRevision", "baselineStateSha256", "handoffEvidenceSha256", "issuedAt", "notBefore", "expiresAt", "trustPolicy", "signer"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderGrant"},
+    "authorityId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "purpose": {"enum": ["leadership", "fence"]},
+    "leaderId": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+    "fencingToken": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "previousGrantSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "baselineRevision": {"type": "integer", "minimum": 0},
+    "baselineStateSha256": {"$ref": "#/$defs/sha256"},
+    "handoffEvidenceSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "notBefore": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"},
+    "trustPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policyId", "policySha256"],
+      "properties": {"policyId": {"$ref": "#/$defs/id"}, "policySha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "signer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["keyId", "algorithm", "signature"],
+      "properties": {"keyId": {"$ref": "#/$defs/id"}, "algorithm": {"const": "Ed25519"}, "signature": {"type": "string", "minLength": 88, "maxLength": 88}}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

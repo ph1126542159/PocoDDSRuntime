@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/framework-link-dependency-matrix.schema.json",
+  "title": "PocoDDSRuntime CMake Profile link dependency matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "passed", "requiredProfiles", "profiles",
+    "missingProfiles", "unexpectedProfiles", "duplicateProfiles"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "framework-link-dependency-matrix"},
+    "passed": {"type": "boolean"},
+    "requiredProfiles": {"$ref": "#/$defs/profiles"},
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": [
+          "profile", "passed", "componentCount", "manifestTargetCount",
+          "analyzedProductionTargets", "resolvedProjectTargetLinks", "observedEdges",
+          "resolvedProjectIncludeDirectories", "unclassifiedTargets", "ambiguousTargets",
+          "unresolvedLinkItems", "unresolvedIncludeItems",
+          "privateIncludeDirectoryViolations", "violations"
+        ],
+        "properties": {
+          "profile": {"$ref": "#/$defs/profile"},
+          "passed": {"type": "boolean"},
+          "componentCount": {"type": "integer", "minimum": 1},
+          "manifestTargetCount": {"type": "integer", "minimum": 0},
+          "analyzedProductionTargets": {"type": "integer", "minimum": 0},
+          "resolvedProjectTargetLinks": {"type": "integer", "minimum": 0},
+          "resolvedProjectIncludeDirectories": {"type": "integer", "minimum": 0},
+          "observedEdges": {"type": "integer", "minimum": 0},
+          "unclassifiedTargets": {"type": "integer", "minimum": 0},
+          "ambiguousTargets": {"type": "integer", "minimum": 0},
+          "unresolvedLinkItems": {"type": "integer", "minimum": 0},
+          "unresolvedIncludeItems": {"type": "integer", "minimum": 0},
+          "privateIncludeDirectoryViolations": {"type": "integer", "minimum": 0},
+          "violations": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "missingProfiles": {"$ref": "#/$defs/profiles"},
+    "unexpectedProfiles": {"$ref": "#/$defs/profiles"},
+    "duplicateProfiles": {"$ref": "#/$defs/profiles"}
+  },
+  "$defs": {
+    "profile": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "profiles": {
+      "type": "array", "uniqueItems": true,
+      "items": {"$ref": "#/$defs/profile"}
+    }
+  }
+}

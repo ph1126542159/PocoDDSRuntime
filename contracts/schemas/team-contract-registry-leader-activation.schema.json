@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-activation.schema.json",
+  "title": "Registry leader grant issue or activation evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "operation", "authorityId", "registryId", "leaderId", "purpose", "fencingToken", "grantSha256", "registry", "completedAt", "operator"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderActivation"},
+    "passed": {"const": true},
+    "operation": {"enum": ["issue", "enroll", "promote", "renew"]},
+    "authorityId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "leaderId": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+    "purpose": {"enum": ["leadership", "fence"]},
+    "fencingToken": {"type": "integer", "minimum": 1},
+    "grantSha256": {"$ref": "#/$defs/sha256"},
+    "registry": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
+    "completedAt": {"type": "string", "format": "date-time"},
+    "operator": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-lease-status.schema.json",
+  "title": "Remote Registry command and writer process lease status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "registryId", "acceptingCommands", "commandProcessor", "registryWriter", "observedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteLeaseStatus"},
+    "passed": {"type": "boolean"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "acceptingCommands": {"type": "boolean"},
+    "commandProcessor": {"$ref": "#/$defs/lease"},
+    "registryWriter": {"$ref": "#/$defs/lease"},
+    "observedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "product", "leaseName", "leaseId", "epoch", "pid", "host", "acquiredAt", "details"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "product": {"const": "PocoDDSRuntimeProcessFileLease"},
+        "leaseName": {"$ref": "#/$defs/name"},
+        "leaseId": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "epoch": {"type": "integer", "minimum": 1},
+        "pid": {"type": "integer", "minimum": 1},
+        "host": {"type": "string", "minLength": 1, "maxLength": 255},
+        "acquiredAt": {"type": "string", "format": "date-time"},
+        "details": {"type": "object", "maxProperties": 16, "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 256}}
+      }
+    },
+    "lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "product", "leaseName", "active", "healthy", "epoch", "owner", "error", "observedAt"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "product": {"const": "PocoDDSRuntimeProcessFileLeaseStatus"},
+        "leaseName": {"$ref": "#/$defs/name"},
+        "active": {"type": "boolean"},
+        "healthy": {"type": "boolean"},
+        "epoch": {"type": "integer", "minimum": 0},
+        "owner": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/owner"}]},
+        "error": {"type": ["string", "null"], "maxLength": 2048},
+        "observedAt": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

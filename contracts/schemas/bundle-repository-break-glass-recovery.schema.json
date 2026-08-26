@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/bundle-repository-break-glass-recovery.schema.json",
+  "title": "PocoDDSRuntime Bundle Repository Break-Glass Recovery Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "result", "approvalId", "transactionState", "repository",
+    "highWaterSequence", "runtimeRestartRequired"
+  ],
+  "properties": {
+    "result": {
+      "enum": [
+        "BUNDLE_BREAK_GLASS_RECOVERY_FORWARD_COMPLETED",
+        "BUNDLE_BREAK_GLASS_RECOVERY_ROLLED_BACK",
+        "BUNDLE_BREAK_GLASS_RECOVERY_ALREADY_COMPLETED",
+        "BUNDLE_BREAK_GLASS_RECOVERY_ALREADY_ROLLED_BACK"
+      ]
+    },
+    "approvalId": { "type": "string", "format": "uuid" },
+    "transactionState": { "enum": ["completed", "rolledBack"] },
+    "repository": { "type": "string", "minLength": 1 },
+    "highWaterSequence": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+    "runtimeRestartRequired": { "type": "boolean" }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/bundle-repository-break-glass-request.schema.json",
+  "title": "PocoDDSRuntime Bundle Repository Break-Glass Downgrade Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "action", "approvalId", "issuedAt", "expiresAt",
+    "reason", "ticket", "sourceStateSha256", "source", "target"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "product": { "const": "PocoDDSBundleRepositoryBreakGlass" },
+    "action": { "const": "downgrade-high-water" },
+    "approvalId": { "type": "string", "format": "uuid" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "reason": { "type": "string", "minLength": 10 },
+    "ticket": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$" },
+    "sourceStateSha256": { "$ref": "#/$defs/sha256" },
+    "source": { "$ref": "#/$defs/rolloutState" },
+    "target": { "$ref": "#/$defs/rolloutState" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "rolloutState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repositoryId", "rolloutSequence", "candidateDigest", "publisherId", "signingKeyId",
+        "trustPolicyId", "trustPolicySha256", "attestationSha256",
+        "releaseManifestSha256", "sbomSha256", "artifactSetSha256", "releaseVersion",
+        "gitCommit", "builderId", "buildProfile"
+      ],
+      "properties": {
+        "repositoryId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+        "rolloutSequence": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "candidateDigest": { "$ref": "#/$defs/sha256" },
+        "publisherId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+        "signingKeyId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "trustPolicyId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+        "trustPolicySha256": { "$ref": "#/$defs/sha256" },
+        "attestationSha256": { "$ref": "#/$defs/sha256" },
+        "releaseManifestSha256": { "$ref": "#/$defs/sha256" },
+        "sbomSha256": { "$ref": "#/$defs/sha256" },
+        "artifactSetSha256": { "$ref": "#/$defs/sha256" },
+        "releaseVersion": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+        "gitCommit": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+        "builderId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+        "buildProfile": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" }
+      }
+    }
+  }
+}

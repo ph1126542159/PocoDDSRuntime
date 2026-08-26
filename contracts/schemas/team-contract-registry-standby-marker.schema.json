@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-standby-marker.schema.json",
+  "title": "Read-only Team Contract Registry standby marker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "standbyId", "registryId", "sourceRecoveryPointSha256", "appliedRevision", "appliedStateSha256", "syncGeneration", "previousMarkerSha256", "updatedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryStandby"},
+    "standbyId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "sourceRecoveryPointSha256": {"$ref": "#/$defs/sha256"},
+    "appliedRevision": {"type": "integer", "minimum": 0},
+    "appliedStateSha256": {"$ref": "#/$defs/sha256"},
+    "syncGeneration": {"type": "integer", "minimum": 1},
+    "previousMarkerSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "updatedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

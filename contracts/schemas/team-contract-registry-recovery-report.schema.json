@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-recovery-report.schema.json",
+  "title": "Team Contract Registry recovery operation report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "operation", "recoveryPointId", "registryId", "registryRevision", "registryStateSha256", "recoveryPoint", "recoveryPointSha256", "fileCount", "expandedBytes", "completedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRecoveryReport"},
+    "passed": {"const": true},
+    "operation": {"enum": ["create", "verify", "restore"]},
+    "recoveryPointId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "registryRevision": {"type": "integer", "minimum": 0},
+    "registryStateSha256": {"$ref": "#/$defs/sha256"},
+    "recoveryPoint": {"type": "string", "minLength": 1},
+    "recoveryPointSha256": {"$ref": "#/$defs/sha256"},
+    "fileCount": {"type": "integer", "minimum": 2},
+    "expandedBytes": {"type": "integer", "minimum": 1},
+    "completedAt": {"type": "string", "format": "date-time"},
+    "restoreId": {"$ref": "#/$defs/id"},
+    "operator": {"$ref": "#/$defs/id"},
+    "destination": {"type": "string", "minLength": 1},
+    "sourceUnavailableConfirmed": {"const": true}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"operation": {"const": "restore"}}},
+      "then": {"required": ["restoreId", "operator", "destination", "sourceUnavailableConfirmed"]}
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

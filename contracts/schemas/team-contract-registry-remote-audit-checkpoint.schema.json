@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-audit-checkpoint.schema.json",
+  "title": "Externally stored signed checkpoint for a remote Registry request audit chain",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "checkpointId", "auditorId", "registryId", "auditSequence", "auditRecordSha256", "auditHeadSha256", "issuedAt", "keyId", "signature"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteAuditCheckpoint"},
+    "checkpointId": {"$ref": "#/$defs/id"},
+    "auditorId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "auditSequence": {"type": "integer", "minimum": 1},
+    "auditRecordSha256": {"$ref": "#/$defs/sha256"},
+    "auditHeadSha256": {"$ref": "#/$defs/sha256"},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "keyId": {"$ref": "#/$defs/id"},
+    "signature": {"type": "string", "minLength": 88, "maxLength": 88}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

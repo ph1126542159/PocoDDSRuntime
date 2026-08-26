@@ -143,7 +143,62 @@ class PdrToolTests(unittest.TestCase):
                     specification = (module / f"{name}.bndlspec").read_text(encoding="utf-8")
                     self.assertIn("COMPONENTS Plugins", cmake)
                     self.assertIn("pdr_add_osp_bundle", cmake)
+                    self.assertIn("pdr_add_configuration_participant_contract_test", cmake)
+                    self.assertIn(
+                        "pdr_add_configuration_key_lifecycle_contract_test", cmake
+                    )
                     self.assertIn(f"pdr.plugin.{name.lower()}", specification)
+                    declaration = json.loads(
+                        (module / "bundle/configuration-participants.json").read_text(
+                            encoding="utf-8")
+                    )
+                    self.assertEqual(len(declaration["participants"]), 1)
+                    self.assertEqual(
+                        declaration["participants"][0]["ownedPrefixes"],
+                        [f"pdr.plugin.{name.lower()}"],
+                    )
+                    activator = (module / "src/BundleActivator.cpp").read_text(
+                        encoding="utf-8"
+                    )
+                    self.assertIn("PARTICIPANT_KIND", activator)
+                    participant_report = module / "participant-contract-report.json"
+                    participant_check = subprocess.run(
+                        [sys.executable, str(TOOL), "component",
+                         "participant-contract-test",
+                         str(module / "bundle/configuration-participants.json"),
+                         "--report", str(participant_report)],
+                        check=False, capture_output=True, text=True,
+                    )
+                    self.assertEqual(
+                        participant_check.returncode, 0,
+                        participant_check.stdout + participant_check.stderr,
+                    )
+                    self.assertTrue(
+                        json.loads(participant_report.read_text(encoding="utf-8"))["passed"]
+                    )
+                    lifecycle = json.loads(
+                        (module / "bundle/configuration-key-lifecycle.json").read_text(
+                            encoding="utf-8")
+                    )
+                    self.assertEqual(lifecycle["entries"], [])
+                    lifecycle_report = module / "key-lifecycle-report.json"
+                    lifecycle_check = subprocess.run(
+                        [sys.executable, str(TOOL), "component",
+                         "key-lifecycle-test",
+                         str(module / "bundle/configuration-key-lifecycle.json"),
+                         "--participant-declaration",
+                         str(module / "bundle/configuration-participants.json"),
+                         "--runtime-version", "0.1.0",
+                         "--report", str(lifecycle_report)],
+                        check=False, capture_output=True, text=True,
+                    )
+                    self.assertEqual(
+                        lifecycle_check.returncode, 0,
+                        lifecycle_check.stdout + lifecycle_check.stderr,
+                    )
+                    self.assertTrue(
+                        json.loads(lifecycle_report.read_text(encoding="utf-8"))["passed"]
+                    )
                 if kind == "device":
                     header = (module / f"include/PocoDDS/Generated/{name}/{name}.h").read_text(
                         encoding="utf-8"
@@ -156,6 +211,19 @@ class PdrToolTests(unittest.TestCase):
                     self.assertIn('operation != "ping"', source)
                     self.assertIn("successfulOperations", source)
                     self.assertIn(f"pdr.{name.lower()}.count = 1", readme)
+                if kind == "workflow":
+                    cmake = (module / "CMakeLists.txt").read_text(encoding="utf-8")
+                    provider = (module / "src/WorkflowBundleActivator.cpp").read_text(
+                        encoding="utf-8"
+                    )
+                    specification = (module / f"{name}Workflow.bndlspec").read_text(
+                        encoding="utf-8"
+                    )
+                    self.assertIn("COMPONENTS SDK Plugins WorkflowAPI", cmake)
+                    self.assertIn("pdr_add_osp_bundle", cmake)
+                    self.assertIn("WorkflowDefinitionService", provider)
+                    self.assertIn("PROPERTY_KIND", provider)
+                    self.assertIn("<runLevel>110</runLevel>", specification)
                 if kind == "subprocess":
                     cmake = (module / "CMakeLists.txt").read_text(encoding="utf-8")
                     entry = (module / "config/pdr-subprocess-entry.properties").read_text(
@@ -163,6 +231,32 @@ class PdrToolTests(unittest.TestCase):
                     )
                     self.assertIn("RUNTIME_OUTPUT_DIRECTORY", cmake)
                     self.assertIn("subprocess.N.name", entry)
+                    self.assertIn("subprocess.N.restartPolicy = on-failure", entry)
+                    self.assertIn("subprocess.N.readinessFile", entry)
+                    self.assertIn("subprocess.N.heartbeatTimeoutMilliseconds", entry)
+                    self.assertIn("subprocess.N.dependency.count = 0", entry)
+                    source = (module / "src/main.cpp").read_text(encoding="utf-8")
+                    self.assertIn("--health-file=", source)
+                    self.assertIn("writeHealth(\"running\")", source)
+
+    def test_schema_scaffold_is_provider_owned_and_non_destructive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "schemas" / "telemetry.json"
+            command = [
+                sys.executable, str(TOOL), "schema", "scaffold", "example.telemetry",
+                "--owner", "example.provider", "--kind", "event",
+                "--compatibility", "full", "--output", str(output),
+            ]
+            created = subprocess.run(command, check=False, capture_output=True, text=True)
+            self.assertEqual(created.returncode, 0, created.stderr)
+            document = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(document["subject"], "example.telemetry")
+            self.assertEqual(document["owner"], "example.provider")
+            self.assertEqual(document["compatibility"], "full")
+            self.assertEqual(document["definition"]["type"], "object")
+            refused = subprocess.run(command, check=False, capture_output=True, text=True)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("refusing to overwrite", refused.stderr)
 
     def test_generates_robotics_specific_extensions(self):
         with tempfile.TemporaryDirectory() as directory:

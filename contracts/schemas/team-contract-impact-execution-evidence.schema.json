@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-impact-execution-evidence.schema.json",
+  "title": "Executed CTest evidence bound to a team contract impact report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "operation", "passed", "impactReportSha256",
+    "impactInputSetSha256", "candidateLockSha256", "requiredTestLabels",
+    "ctestLabelRegex", "ctestConfig", "ctestExecutableSha256",
+    "ctestCatalogSha256", "ctestCommandSha256", "executedTestCount",
+    "executedTests", "passedLabels", "junitSha256"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractImpactExecutionEvidence"},
+    "operation": {"const": "team-contract-impact-execute"},
+    "passed": {"const": true},
+    "impactReportSha256": {"$ref": "#/$defs/sha256"},
+    "impactInputSetSha256": {"$ref": "#/$defs/sha256"},
+    "candidateLockSha256": {"$ref": "#/$defs/sha256"},
+    "requiredTestLabels": {"$ref": "#/$defs/labels"},
+    "ctestLabelRegex": {"type": ["string", "null"]},
+    "ctestConfig": {"type": "string", "minLength": 1, "maxLength": 64},
+    "ctestExecutableSha256": {"$ref": "#/$defs/sha256"},
+    "ctestCatalogSha256": {"$ref": "#/$defs/sha256"},
+    "ctestCommandSha256": {"$ref": "#/$defs/sha256"},
+    "executedTestCount": {"type": "integer", "minimum": 0, "maximum": 512},
+    "executedTests": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "labels", "disabled", "commandSha256"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 256},
+          "labels": {"$ref": "#/$defs/labels"},
+          "disabled": {"const": false},
+          "commandSha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "passedLabels": {"$ref": "#/$defs/labels"},
+    "junitSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "label": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"},
+    "labels": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/label"}}
+  }
+}

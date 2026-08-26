@@ -1,0 +1,9 @@
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/capabilities"
+             class="PocoDDS::CapabilityManagement::HandlerFactory"
+             library="pdr.service.capabilityManagement"
+             allowSpecialization="all"
+             hidden="true"/>
+</extensions>
+

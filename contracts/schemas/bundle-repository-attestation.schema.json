@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/bundle-repository-attestation.schema.json",
+  "title": "PocoDDSRuntime Bundle Repository Publisher Attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "product",
+    "publisherId",
+    "repositoryId",
+    "rolloutSequence",
+    "candidateDigest",
+    "provenance",
+    "issuedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "product": { "const": "PocoDDSBundleRepository" },
+    "publisherId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+    "repositoryId": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" },
+    "rolloutSequence": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+    "candidateDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "releaseManifestSha256", "sbomSha256", "version", "gitCommit",
+        "builderId", "buildProfile", "artifactSetSha256"
+      ],
+      "properties": {
+        "releaseManifestSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "sbomSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "version": { "type": "string", "minLength": 1 },
+        "gitCommit": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+        "builderId": { "type": "string", "minLength": 1 },
+        "buildProfile": { "type": "string", "minLength": 1 },
+        "artifactSetSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "issuedAt": { "type": "string", "format": "date-time" }
+  }
+}

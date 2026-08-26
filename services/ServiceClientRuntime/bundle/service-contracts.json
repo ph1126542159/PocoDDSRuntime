@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "provides": [
+    {
+      "contract": "pdr.service-client-runtime",
+      "version": "1.0.0",
+      "serviceName": "pdr.service.serviceClientRuntime"
+    }
+  ],
+  "requires": [
+    {
+      "contract": "pdr.resource-governance",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": true,
+      "minimumProviders": 1
+    },
+    {
+      "contract": "pdr.service-directory-runtime",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": true,
+      "minimumProviders": 1
+    },
+    {
+      "contract": "pdr.capability-runtime",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": false,
+      "minimumProviders": 1
+    }
+  ]
+}

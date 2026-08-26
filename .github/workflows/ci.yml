@@ -16,6 +16,24 @@ jobs:
       - uses: lukka/get-cmake@latest
       - name: Validate contracts
         run: cmake -DSOURCE_DIR=${{ github.workspace }} -P cmake/ValidateContracts.cmake
+      - name: Enforce production Service contract graph
+        run: >-
+          python3 tools/service_contract_graph.py check
+          --root .
+          --scan-root services
+          --baseline contracts/service-contract-baseline.json
+          --report build/reports/service-contract-graph.json
+      - name: Validate fault-recovery ownership matrix
+        run: >-
+          python3 tools/framework_recovery_matrix.py validate
+          --matrix contracts/framework-recovery-matrix.json
+          --catalog contracts/framework-components.json
+      - name: Enforce repository ownership mapping
+        run: >-
+          python3 tools/repository_ownership.py verify
+          --catalog contracts/framework-components.json
+          --registry contracts/repository-owners.json
+          --codeowners .github/CODEOWNERS
       - name: Reject unversioned breaking changes
         run: python3 tools/check_compatibility.py
       - name: Validate default security boundary
@@ -36,10 +54,51 @@ jobs:
           tools.tests.test_project_config_transaction
           tools.tests.test_project_template
           tools.tests.test_component_template
+          tools.tests.test_service_contract_graph
           tools.tests.test_project_pipeline
           tools.tests.test_project_package
+          tools.tests.test_release_manifest
+          tools.tests.test_framework_change_impact
+          tools.tests.test_framework_dependency_boundary
+          tools.tests.test_framework_link_dependency_boundary
+          tools.tests.test_framework_component_build_groups
+          tools.tests.test_framework_build_evidence
+          tools.tests.test_framework_recovery_matrix
+          tools.tests.test_sdk_surface_guard
+          tools.tests.test_sdk_deprecation_guard
+          tools.tests.test_sdk_header_self_containment
+          tools.tests.test_repository_ownership
           tools.tests.test_architecture_policy
           tools.tests.test_pdr
+      - name: Enforce declared framework source dependencies
+        run: >-
+          python3 tools/framework_dependency_boundary.py validate
+          --root .
+          --catalog contracts/framework-components.json
+          --report build/reports/framework-dependency-boundary.json
+      - name: Plan fail-closed framework change impact
+        shell: bash
+        run: |
+          mkdir -p build/reports
+          base_ref="${{ github.base_ref }}"
+          base_ref="${base_ref:-main}"
+          base_sha="$(git merge-base HEAD "origin/${base_ref}")"
+          mapfile -d '' changed < <(git diff --name-only -z "${base_sha}" HEAD)
+          if (( ${#changed[@]} == 0 )); then
+            changed=(CMakeLists.txt)
+          fi
+          python3 tools/framework_change_impact.py analyze \
+            --catalog contracts/framework-components.json \
+            --output build/reports/framework-change-impact.json \
+            "${changed[@]}"
+      - name: Upload framework change-impact plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: framework-change-impact
+          path: |
+            build/reports/framework-change-impact.json
+            build/reports/framework-dependency-boundary.json
+            build/reports/service-contract-graph.json
       - name: Validate CMake profiles
         run: cmake --list-presets
       - name: Validate profile feature declarations
@@ -67,6 +126,19 @@ jobs:
       - uses: lukka/get-cmake@latest
       - name: Configure desktop distributed core
         run: cmake --preset desktop-distributed -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Enforce desktop distributed target dependencies
+        run: >-
+          ctest --test-dir build/profiles/desktop-distributed -C Release
+          -R ^framework-link-dependency-boundary$ --output-on-failure
+      - name: Upload desktop distributed dependency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: framework-link-dependency-desktop-distributed-${{ runner.os }}
+          path: |
+            build/profiles/desktop-distributed/reports/framework-link-manifest.json
+            build/profiles/desktop-distributed/reports/framework-link-dependency-boundary.json
+          if-no-files-found: error
       - name: Build desktop distributed core
         run: cmake --build --preset desktop-distributed
       - name: Analyze RuntimeCore and LocalIpc
@@ -105,6 +177,19 @@ jobs:
           python-version: '3.11'
       - name: Configure robotics core
         run: cmake --preset robotics -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Enforce robotics target dependencies
+        run: >-
+          ctest --test-dir build/robotics -C Release
+          -R ^framework-link-dependency-boundary$ --output-on-failure
+      - name: Upload robotics dependency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: framework-link-dependency-robotics-${{ runner.os }}
+          path: |
+            build/robotics/reports/framework-link-manifest.json
+            build/robotics/reports/framework-link-dependency-boundary.json
+          if-no-files-found: error
       - name: Build robotics core
         run: cmake --build --preset robotics
       - name: Analyze robotics core
@@ -293,6 +378,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: lukka/get-cmake@latest
       - uses: actions/cache@v4
         id: native-dependencies
@@ -313,20 +400,106 @@ jobs:
       - name: Configure full stack
         run: >-
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          -DPDR_PROFILE=server
           -DPDR_INSTALL_PREFIX=${{ github.workspace }}/build/install
           -DPDR_ENABLE_OBSERVABILITY=ON
           -DPDR_BUILD_QT3D=OFF
           -DMYIOT_ENABLE_DATA_MODULES=OFF
-      - name: Build full stack
-        run: cmake --build build --config Release --parallel 2
-      - name: Run full acceptance suite
-        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Enforce configured CMake target dependencies
+        run: >-
+          python3 tools/framework_link_dependency_boundary.py validate
+          --root .
+          --catalog contracts/framework-components.json
+          --manifest build/reports/framework-link-manifest.json
+          --expect-profile server
+          --report build/reports/framework-link-dependency-boundary.json
+      - name: Validate named Profile dependency matrix
+        shell: bash
+        run: |
+          profiles=(desktop-lite desktop-distributed robotics embedded edge-industrial edge-test)
+          matrix_args=(
+            --required-profile server
+            --profile-report build/reports/framework-link-dependency-boundary.json
+          )
+          for profile in "${profiles[@]}"; do
+            cmake --preset "${profile}"
+            if [[ "${profile}" == robotics ]]; then
+              profile_dir=build/robotics
+            else
+              profile_dir="build/profiles/${profile}"
+            fi
+            ctest --test-dir "${profile_dir}" -C Release \
+              -R '^framework-link-dependency-boundary$' --output-on-failure
+            matrix_args+=(
+              --required-profile "${profile}"
+              --profile-report "${profile_dir}/reports/framework-link-dependency-boundary.json"
+            )
+          done
+          python3 tools/framework_link_dependency_boundary.py matrix \
+            "${matrix_args[@]}" \
+            --output build/reports/framework-link-dependency-matrix.json
+      - name: Plan full-stack framework change impact
+        shell: bash
+        run: |
+          base_ref="${{ github.base_ref }}"
+          base_ref="${base_ref:-main}"
+          base_sha="$(git merge-base HEAD "origin/${base_ref}")"
+          mapfile -d '' changed < <(git diff --name-only -z "${base_sha}" HEAD)
+          if (( ${#changed[@]} == 0 )); then
+            changed=(CMakeLists.txt)
+          fi
+          python3 tools/framework_change_impact.py analyze \
+            --catalog contracts/framework-components.json \
+            --output build/reports/framework-change-impact-full-stack.json \
+            "${changed[@]}"
+      - name: Build full stack and bind execution evidence
+        shell: bash
+        run: |
+          python3 tools/framework_build_evidence.py execute \
+            --root . \
+            --report build/reports/framework-change-impact-full-stack.json \
+            --build-dir build \
+            --links build/reports/framework-link-manifest.json \
+            --groups build/reports/framework-component-build-groups.json \
+            --dependencies release/dependencies.json \
+            --source-revision "${{ github.sha }}" \
+            --cmake "$(command -v cmake)" \
+            --configuration Release \
+            --parallelism 2 \
+            --force-full-build \
+            --evidence build/reports/framework-build-execution-evidence.json
+          python3 tools/framework_build_evidence.py gate \
+            --root . \
+            --report build/reports/framework-change-impact-full-stack.json \
+            --build-dir build \
+            --links build/reports/framework-link-manifest.json \
+            --groups build/reports/framework-component-build-groups.json \
+            --dependencies release/dependencies.json \
+            --source-revision "${{ github.sha }}" \
+            --cmake "$(command -v cmake)" \
+            --evidence build/reports/framework-build-execution-evidence.json
+      - name: Run full acceptance suite and bind execution evidence
+        shell: bash
+        run: |
+          python3 tools/framework_change_impact.py execute \
+            --report build/reports/framework-change-impact-full-stack.json \
+            --ctest "$(command -v ctest)" \
+            --test-dir build \
+            --config Release \
+            --force-full-suite \
+            --evidence build/reports/framework-ci-execution-evidence.json
+          python3 tools/framework_change_impact.py gate \
+            --report build/reports/framework-change-impact-full-stack.json \
+            --evidence build/reports/framework-ci-execution-evidence.json
       - name: Upload full-stack acceptance reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: linux-non-qt-full-stack-reports
-          path: build/reports/*.json
+          path: |
+            build/reports/*.json
+            build/profiles/*/reports/framework-link-*.json
+            build/robotics/reports/framework-link-*.json
           if-no-files-found: warn
       - name: Install reusable SDK
         run: cmake --install build --prefix ${{ github.workspace }}/build/sdk
@@ -334,6 +507,8 @@ jobs:
         run: >-
           python3 tools/release_manifest.py generate
           --artifacts build/sdk --output build/release --version 0.1.0 --require-clean
+          --builder-id github.com/${{ github.repository }}/actions
+          --build-profile server
       - name: Verify release artifacts
         run: >-
           python3 tools/release_manifest.py verify

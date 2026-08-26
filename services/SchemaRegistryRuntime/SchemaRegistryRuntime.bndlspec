@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Runtime Schema Registry</name>
+    <symbolicName>pdr.service.schemaRegistry</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::SchemaRegistry::SchemaRegistryBundleActivator</class>
+      <library>pdr.service.schemaRegistry</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>111</runLevel>
+    <requiredBundles>
+      <bundle><symbolicName>osp.core</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+</bundlespec>
+

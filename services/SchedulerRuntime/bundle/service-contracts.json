@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "provides": [
+    {
+      "contract": "pdr.scheduling",
+      "version": "1.0.0",
+      "serviceName": "pdr.service.schedulerRuntime"
+    }
+  ],
+  "requires": [
+    {
+      "contract": "pdr.resource-governance",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": true,
+      "minimumProviders": 1
+    }
+  ]
+}

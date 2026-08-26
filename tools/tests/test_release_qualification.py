@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 import os
 import tempfile
@@ -59,10 +60,32 @@ class ReleaseQualificationTests(unittest.TestCase):
             external = root / "target.json"
             artifacts = root / "artifacts"
             artifacts.mkdir()
+            binary = artifacts / "runtime.bin"
+            binary.write_bytes(b"qualified-release")
+            files = [{"path": "runtime.bin", "size": binary.stat().st_size,
+                      "sha256": hashlib.sha256(binary.read_bytes()).hexdigest()}]
+            artifact_set = hashlib.sha256(json.dumps(
+                files, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")).hexdigest()
+            sbom = root / "pocoddsruntime.spdx.json"
+            sbom_document = {
+                "spdxVersion": "SPDX-2.3",
+                "documentNamespace": "https://pocodds.local/spdx/qualification",
+                "packages": [{"name": "PocoDDSRuntime", "versionInfo": "1.2.3"}],
+            }
+            sbom.write_text(json.dumps(sbom_document), encoding="utf-8")
             manifest.write_text(json.dumps({
                 "schemaVersion": 1, "product": "PocoDDSRuntime", "version": "1.2.3",
                 "gitCommit": "abc", "dirty": False, "cleanRequired": True,
-                "artifactRoot": str(artifacts), "files": [],
+                "artifactRoot": str(artifacts), "files": files,
+                "sbom": {"path": sbom.name,
+                         "sha256": hashlib.sha256(sbom.read_bytes()).hexdigest(),
+                         "spdxVersion": "SPDX-2.3",
+                         "documentNamespace": sbom_document["documentNamespace"]},
+                "provenance": {"builderId": "qualification-test",
+                               "buildProfile": "server",
+                               "artifactSetSha256": artifact_set,
+                               "source": {"gitCommit": "abc", "dirty": False}},
             }), encoding="utf-8")
             external.write_text(json.dumps({"verdict": "APPROVED"}), encoding="utf-8")
             args = self.arguments(root, "--artifact-manifest", str(manifest),

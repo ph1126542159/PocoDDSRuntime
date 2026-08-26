@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "product": "PocoDDSRuntimeProjectConfiguration",
+  "policyId": "production-config-v1",
+  "maxApprovalLifetimeSeconds": 1800,
+  "rules": [
+    {
+      "id": "critical-runtime-config",
+      "pathPrefixes": [
+        "/robot/safety",
+        "/runtime/identity"
+      ],
+      "minimumApprovals": 2,
+      "requiredRoles": [
+        "safety",
+        "operations"
+      ],
+      "separateInitiator": true
+    }
+  ],
+  "allowedApprovers": [
+    {
+      "approverId": "safety-officer",
+      "keyId": "safety-officer-2026",
+      "role": "safety",
+      "algorithm": "Ed25519",
+      "publicKeySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "ruleIds": [
+        "critical-runtime-config"
+      ]
+    },
+    {
+      "approverId": "operations-manager",
+      "keyId": "operations-manager-2026",
+      "role": "operations",
+      "algorithm": "Ed25519",
+      "publicKeySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "ruleIds": [
+        "critical-runtime-config"
+      ]
+    }
+  ],
+  "revokedKeys": []
+}

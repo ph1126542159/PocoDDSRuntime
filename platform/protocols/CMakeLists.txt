@@ -1,3 +1,12 @@
+add_library(PDRProtocolCore INTERFACE)
+add_library(PocoDDS::ProtocolCore ALIAS PDRProtocolCore)
+set_target_properties(PDRProtocolCore PROPERTIES EXPORT_NAME ProtocolCore)
+target_include_directories(PDRProtocolCore
+    INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>)
+target_link_libraries(PDRProtocolCore INTERFACE PocoDDS::Reliability)
+
 add_library(PDRProtocols INTERFACE)
 add_library(PocoDDS::Protocols ALIAS PDRProtocols)
 set_target_properties(PDRProtocols PROPERTIES EXPORT_NAME Protocols)
@@ -18,7 +27,7 @@ target_include_directories(PDRProtocols
         $<INSTALL_INTERFACE:include>)
 target_link_libraries(PDRProtocols
     INTERFACE
-        PocoDDS::Reliability
+        PocoDDS::ProtocolCore
         PocoDDS::BtLE
         PocoDDS::CAN
         PocoDDS::Modbus
@@ -42,5 +51,5 @@ if(BUILD_TESTING)
     set_tests_properties(protocol-service-smoke PROPERTIES LABELS "protocol;release")
 endif()
 
-install(TARGETS PDRProtocols EXPORT PocoDDSRuntimeTargets)
+install(TARGETS PDRProtocolCore PDRProtocols EXPORT PocoDDSRuntimeTargets)
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

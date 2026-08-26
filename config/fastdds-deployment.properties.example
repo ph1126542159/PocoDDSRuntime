@@ -1,0 +1,8 @@
+# PocoDDSRuntime Fast DDS process deployment profile.
+# Point PDR_FASTDDS_PROFILE at a copied, deployment-owned file before process start.
+profileVersion=1
+interfaceWhitelist=
+initialPeers=
+avoidBuiltinMulticast=false
+sharedMemory=false
+maxInitialPeersRange=4

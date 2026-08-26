@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Runtime Membership</name>
+    <symbolicName>pdr.service.membershipRuntime</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::Membership::MembershipRuntimeBundleActivator</class>
+      <library>pdr.service.membershipRuntime</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>106</runLevel>
+    <requiredBundles>
+      <bundle><symbolicName>osp.core</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+      <bundle><symbolicName>poco.data.sqlite</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+  <files>bundle/*</files>
+</bundlespec>

@@ -1,0 +1,21 @@
+{
+  "$schema": "schemas/repository-owners.schema.json",
+  "schemaVersion": 1,
+  "product": "PocoDDSRuntimeRepositoryOwners",
+  "defaultReviewers": ["@ph1126542159"],
+  "logicalOwners": {
+    "team/configuration": ["@ph1126542159"],
+    "team/device-platform": ["@ph1126542159"],
+    "team/docs": ["@ph1126542159"],
+    "team/osp-runtime": ["@ph1126542159"],
+    "team/robotics": ["@ph1126542159"],
+    "team/runtime-core": ["@ph1126542159"],
+    "team/runtime-governance": ["@ph1126542159"],
+    "team/runtime-operations": ["@ph1126542159"],
+    "team/sdk": ["@ph1126542159"],
+    "team/security": ["@ph1126542159"],
+    "team/services": ["@ph1126542159"],
+    "team/transports": ["@ph1126542159"],
+    "team/webui": ["@ph1126542159"]
+  }
+}

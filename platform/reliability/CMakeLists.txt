@@ -14,7 +14,8 @@ if(BUILD_TESTING)
     target_link_libraries(pdr-reliability-fault-injection PRIVATE PocoDDS::Reliability)
     pdr_set_warnings(pdr-reliability-fault-injection)
     add_test(NAME reliability-fault-injection COMMAND pdr-reliability-fault-injection)
-    set_tests_properties(reliability-fault-injection PROPERTIES LABELS "fault-injection;nightly")
+    set_tests_properties(reliability-fault-injection PROPERTIES
+        LABELS "fault-injection;nightly;reliability")
 endif()
 
 install(TARGETS PDRReliability EXPORT PocoDDSRuntimeTargets)

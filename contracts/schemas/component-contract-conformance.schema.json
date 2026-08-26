@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/component-contract-conformance.schema.json",
+  "title": "Independent component service-contract conformance evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "passed", "component", "inputs",
+    "inputSetSha256", "providedContractCount", "requirementCount",
+    "requiredRequirementCount", "requiredSatisfiedCount",
+    "optionalUnsatisfiedCount", "requirements", "violations"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "operation": { "const": "component-contract-conformance" },
+    "passed": { "type": "boolean" },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "kind", "plane", "target", "owner", "isolation"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
+        "name": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$" },
+        "kind": { "type": "string", "minLength": 1 },
+        "plane": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "isolation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "path", "sha256"],
+        "properties": {
+          "role": {
+            "enum": [
+              "component", "consumer-service-contract", "provider-service-contract"
+            ]
+          },
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "inputSetSha256": { "$ref": "#/$defs/sha256" },
+    "providedContractCount": { "type": "integer", "minimum": 0 },
+    "requirementCount": { "type": "integer", "minimum": 0 },
+    "requiredRequirementCount": { "type": "integer", "minimum": 0 },
+    "requiredSatisfiedCount": { "type": "integer", "minimum": 0 },
+    "optionalUnsatisfiedCount": { "type": "integer", "minimum": 0 },
+    "requirements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/requirementResult" }
+    },
+    "violations": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "passed": { "const": true } } },
+      "then": { "properties": { "violations": { "maxItems": 0 } } },
+      "else": { "properties": { "violations": { "minItems": 1 } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "requirementResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract", "versionRange", "required", "minimumProviders", "status",
+        "declaredProviders", "matchingProviders", "availableVersions", "matchedServices"
+      ],
+      "properties": {
+        "contract": { "type": "string", "minLength": 1 },
+        "versionRange": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "minimumProviders": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "status": {
+          "enum": ["satisfied", "missing", "versionMismatch", "insufficientProviders"]
+        },
+        "declaredProviders": { "type": "integer", "minimum": 0 },
+        "matchingProviders": { "type": "integer", "minimum": 0 },
+        "availableVersions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+        },
+        "matchedServices": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

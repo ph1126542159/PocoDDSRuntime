@@ -113,7 +113,6 @@ install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
 set(MYIOT_OSP_BUNDLE_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 set(MYIOT_OSP_BUNDLE_OSNAME "${MYIOT_PLATFORM_OSNAME}")
@@ -133,6 +132,7 @@ add_subdirectory(ManagementAuth)
 add_subdirectory(BundleAdmin)
 add_subdirectory(WebEvent)
 add_subdirectory(HealthEndpoint)
+add_subdirectory(ProcessGraphEndpoint)
 if(PDR_ENABLE_OBSERVABILITY)
     add_subdirectory(DiagnosticTerminal)
     add_subdirectory(AlertWebhook)
@@ -140,6 +140,32 @@ if(PDR_ENABLE_OBSERVABILITY)
 endif()
 add_subdirectory(StripBundle)
 add_subdirectory(Unit)
+
+if(BUILD_TESTING)
+    add_executable(pdr-osp-bundle-repository-preflight-smoke
+        tests/BundleRepositoryPreflightSmoke.cpp)
+    target_link_libraries(pdr-osp-bundle-repository-preflight-smoke PRIVATE Poco::OSP)
+    pdr_set_warnings(pdr-osp-bundle-repository-preflight-smoke)
+    add_test(NAME osp-bundle-repository-preflight-smoke
+        COMMAND pdr-osp-bundle-repository-preflight-smoke
+            "${CMAKE_CURRENT_SOURCE_DIR}/testsuite/bundles/com.appinf.osp.bundle1_1.0.0"
+            "${CMAKE_CURRENT_BINARY_DIR}/bundle-preflight-code-cache"
+            "${CMAKE_CURRENT_BINARY_DIR}/bundle-preflight-valid"
+            "${CMAKE_CURRENT_BINARY_DIR}/bundle-preflight-invalid")
+    set_tests_properties(osp-bundle-repository-preflight-smoke PROPERTIES
+        LABELS "runtime;architecture;bundle;transaction;unit")
+
+    add_executable(pdr-osp-composite-guard-smoke
+        tests/CompositeLifecycleGuardSmoke.cpp)
+    target_link_libraries(pdr-osp-composite-guard-smoke PRIVATE Poco::OSP)
+    pdr_set_warnings(pdr-osp-composite-guard-smoke)
+    add_test(NAME osp-composite-lifecycle-guard-smoke
+        COMMAND pdr-osp-composite-guard-smoke
+            "${CMAKE_CURRENT_SOURCE_DIR}/testsuite/bundles/com.appinf.osp.bundle1_1.0.0"
+            "${CMAKE_CURRENT_BINARY_DIR}/composite-guard-code-cache")
+    set_tests_properties(osp-composite-lifecycle-guard-smoke PROPERTIES
+        LABELS "runtime;architecture;lifecycle;unit")
+endif()
 
 if(MYIOT_ENABLE_DATA_MODULES)
     add_subdirectory(ActiveRecord)

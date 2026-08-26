@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Bundle Capability Runtime</name>
+    <symbolicName>pdr.service.capabilityRuntime</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::Capabilities::CapabilityRuntimeBundleActivator</class>
+      <library>pdr.service.capabilityRuntime</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>109</runLevel>
+    <requiredBundles>
+      <bundle><symbolicName>osp.core</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+  <files>bundle/*</files>
+</bundlespec>

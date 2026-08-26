@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-audit-activation.schema.json",
+  "title": "Immutable marker that makes remote request-to-audit links mandatory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "registryId", "activatedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteAuditActivation"},
+    "registryId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "activatedAt": {"type": "string", "format": "date-time"}
+  }
+}

@@ -57,7 +57,7 @@ target_link_libraries(my_application PRIVATE PocoDDS::Protocols)
 
 ## 安装后消费验证
 
-`sdk-external-consumer` 测试执行三个步骤：
+`sdk-external-consumer` 测试执行以下步骤：
 
 1. 将当前构建安装到隔离目录；
 2. 分别执行只请求 `SDK` 和请求 `SDK Protocols` 的独立 `find_package`；
@@ -66,6 +66,15 @@ target_link_libraries(my_application PRIVATE PocoDDS::Protocols)
 5. 确认未知组件会被拒绝。
 
 这项测试用于防止出现“仓库内可以构建，但安装包无法被其他项目使用”的回归。
+
+完整 Server SDK 还执行 `sdk-public-headers-self-contained`：从隔离安装树自动发现全部
+`include/PocoDDS` 头文件，每个头文件生成一个只包含自身的独立 C++17 翻译单元，再通过安装后的
+`PocoDDSRuntimeConfig.cmake` 和全部导出 library target 编译。它用于发现缺失直接 include、依赖
+调用方 include 顺序、未导出的第三方 usage requirement 或宏泄漏。通过证据记录公共 surface、
+头文件数量、usage target 数量和计划 SHA-256；不能用仓库源码 include 路径替代安装树结果。
+
+安装包公开 `PocoDDSRuntime_KNOWN_COMPONENTS`，让外部验证工具可以先加载基础 SDK，再请求当前版本
+实际声明的全部组件及第三方依赖；业务项目仍应只请求自己使用的组件。
 
 ## 开发者命令
 
@@ -129,11 +138,19 @@ CMake Target、冒烟测试和集成说明；`subprocess` 生成独立可执行�
 中断恢复的完整规则见[组件模板升级](component-templates.md)。
 
 `new bundle` 是 `new plugin` 的用户侧别名，两者都生成 BundleActivator、Service、
-`.bndlspec` 和打包规则，并使用受治理的 `pdr.plugin.*` 命名。`verify` 会要求
+`.bndlspec` 和打包规则，并使用受治理的 `pdr.plugin.*` 命名。模板 v8 同时生成只拥有本插件
+前缀的事务配置 Participant、`bundle/configuration-participants.json` 和独立冲突检查 CTest；
+插件团队在 `preflight` 中加入业务校验，在 `PROVIDER_DECLARATIONS` 中固定协作团队契约，不修改
+中央注册表。已发布插件还应通过 CTest 的 `BASELINE` 参数固定 Participant 兼容面；这只约束旧承诺，
+不妨碍不同团队新增独立 Participant。`verify` 会要求
 插件实际产出 `.bndl`，并在 JSON 中记录文件名、大小和 SHA-256；`--artifact-output` 将验证过的
 Bundle 复制到发布目录。`generated-plugin-consumer` 回归测试还会把该 Bundle 放入隔离安装的
 Runtime，只有日志确认插件启动后才通过。部署到生产目录前应停止 Runtime、保留旧 Bundle，
 验证新包后再启动；加载失败时恢复旧包，而不是在线覆盖正在使用的文件。
+
+模板 v9 进一步生成空的 `bundle/configuration-key-lifecycle.json` 和
+`pdr_add_configuration_key_lifecycle_contract_test()`。插件第一次改名或删除已发布配置键时，由插件
+团队填写生命周期；产品团队只在 `MIGRATIONS` 中提供迁移文件，不能代替插件 Owner 宣布弃用。
 
 ## 插件发布事务
 
@@ -248,6 +265,47 @@ SDK 不能被客户模块消费”的问题。`--prefix` 可以重复传入框�
 前缀中的 `<prefix>/cmake/PocoConfig.cmake` 会自动识别，非标准 Poco 布局可再传
 `--poco-dir`。JSON 报告保存每一阶段的命令、退出码和完整输出，失败时
 停止后续阶段并返回退出码 2。
+
+跨仓库 Consumer 不应把 `PROVIDER_CONTRACTS` 指向另一位开发者的工作区。安装 SDK 提供
+`pdr_add_team_contract_package_test()` 和 `team_contract_package.py`，先按无路径锁文件解析经
+SHA-256 固定的 Provider 契约包；生产模式同时要求 Ed25519 签名和固定 SHA 的团队信任策略，并在
+每次解析时复核 Owner、包范围、有效期和撤销。解析报告中的内容寻址路径再交给 Service、Participant
+和配置键生命周期 CTest。完整流程见[团队契约包与锁文件](team-contract-packages.md)。
+候选锁合并前再使用 `pdr_add_team_contract_impact_test()` 比较当前/候选包，按产品维护的 Consumer
+目录输出受影响 Owner 和必跑标签；同版本内容漂移或已发布表面破坏会使 CTest 失败。
+兼容报告还需经过 `pdr_add_team_contract_impact_execution_test()` 的真实标签执行，以及
+`pdr_add_team_contract_impact_gate_test()` 对当前 CTest 目录、JUnit 和每个受影响 Owner 的短期
+Ed25519 批准复核；报告、测试命令或批准策略摘要任一漂移都会拒绝复用旧证据。
+跨仓库交付进一步可使用 `team_contract_registry.py` 和
+`pdr_add_team_contract_registry_test()`：Provider 只向内容寻址 Registry 发布一次签名包，产品锁按
+`dev → staging → production` 顺序晋级，后级必须绑定影响 Gate；Consumer 按通道解析，不再知道
+Provider 工作区或 cache 路径。通道 generation 防止多人并发覆盖，回滚创建新代次并保留历史锁。
+生产 Gate 还可通过 `pdr_add_team_contract_runner_attestation_test()` 绑定受信 CI Runner 的仓库、
+revision、workflow/job/run 和执行证据；Registry staging/production 强制携带该摘要。独立
+`pdr_add_team_contract_gate_authorization_test()` 会以单独发布服务密钥重放完整 Gate 并签发
+Registry/channel 限域的短期授权；Registry 后级通道独立验签并记录授权 SHA，阻断伪造 Owner
+汇总或把授权跨 Registry/通道复用。独立
+`registry-anchor/registry-anchor-verify` 将当前 state SHA 签名保存到 Registry 外部，用于发现整个
+本地 Registry 被替换成较旧但内部自洽副本。
+安装 SDK 还提供 `team_contract_registry_remote.py` 及 `pdr contract-package registry-remote-*`：
+Provider 上传摘要绑定包/锁/Gate 证据而不泄露服务端路径，Consumer 按通道下载解析结果；服务端
+根据独立访问策略执行 role、package/channel scope、token 撤销和有效期检查。写入同时要求 request ID、
+expected Registry revision 与原 channel generation，从而把跨机器多人并发冲突转为可审计的显式拒绝。
+`registry-remote-status` 允许 auditor/operator 查询不含制品内容的持久状态；中断请求由
+`registry-remote-recover` 精确绑定原请求 SHA、started/current revision 后标记为 `aborted` 或
+`uncertain`，不会自动猜测或重放。每次 started/completed/recovered 迁移进入不可变哈希链，
+`registry-remote-audit-checkpoint` 可由独立审计密钥把链头签名并保存到控制目录外。
+远程访问策略可通过独立 `team_contract_registry_access_policy.py` 或
+`registry-access-policy-sign/registry-access-policy-activate` 生成并原子启用签名后继 revision；服务端
+固定轮换信任策略后按请求热加载，策略回退、跳 revision、错误前驱 SHA 或撤销密钥都会 fail-closed。
+签名策略同时声明请求、恢复、审计记录和控制目录字节上限；`registry-remote-capacity` 提供安装 SDK
+可读取的准入状态。框架不会自动删除幂等记录或审计历史。
+安装 SDK 同时提供独立 `process_file_lease.py`（CMake 路径变量
+`PocoDDSRuntime_PROCESS_FILE_LEASE_MODULE`，CLI 别名变量
+`PocoDDSRuntime_PROCESS_FILE_LEASE_TOOL`）。Registry 的本地写入和远程控制事务都使用操作系统
+句柄/`flock` 判定所有权，租约文件只保存最近 Owner 证据；每次成功获取都会推进持久 epoch，原子
+发布前再次校验 epoch。`registry-lease-status` 与 `registry-remote-lease-status` 可供 CI/交接脚本查询，
+Owner 崩溃后新进程直接获取 OS 已释放的租约，禁止通过删除锁文件“强制接管”。
 
 ## 新模块接入
 

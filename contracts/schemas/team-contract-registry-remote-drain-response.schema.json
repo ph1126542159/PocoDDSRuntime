@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-drain-response.schema.json",
+  "title": "Remote Registry drain transition and portable evidence response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "registryId", "operation", "handoffId", "replayed", "state", "evidence", "evidenceSha256"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteDrainResponse"},
+    "passed": {"const": true},
+    "registryId": {"$ref": "#/$defs/id"},
+    "operation": {"enum": ["start", "finalize", "resume"]},
+    "handoffId": {"$ref": "#/$defs/id"},
+    "replayed": {"type": "boolean"},
+    "state": {"$ref": "team-contract-registry-drain-state.schema.json"},
+    "evidence": {"oneOf": [{"type": "null"}, {"$ref": "team-contract-registry-handoff-evidence.schema.json"}]},
+    "evidenceSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"operation": {"const": "finalize"}}},
+      "then": {
+        "properties": {
+          "evidence": {"$ref": "team-contract-registry-handoff-evidence.schema.json"},
+          "evidenceSha256": {"$ref": "#/$defs/sha256"}
+        }
+      },
+      "else": {
+        "properties": {
+          "evidence": {"type": "null"},
+          "evidenceSha256": {"type": "null"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

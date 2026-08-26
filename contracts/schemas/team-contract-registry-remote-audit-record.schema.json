@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-audit-record.schema.json",
+  "title": "Immutable hash-linked remote Registry request transition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "registryId", "sequence", "previousRecordSha256", "eventType", "requestId", "requestSha256", "principalId", "operation", "startedRevision", "finalRevision", "finalStateSha256", "outcome", "responseSha256", "recoveryId", "reason", "occurredAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteAuditRecord"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "previousRecordSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "eventType": {"enum": ["request-started", "request-completed", "request-recovered", "policy-reloaded", "handoff-draining", "handoff-completed", "handoff-resumed"]},
+    "requestId": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+    "requestSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "principalId": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+    "operation": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+    "startedRevision": {"type": ["integer", "null"], "minimum": 0},
+    "finalRevision": {"type": ["integer", "null"], "minimum": 0},
+    "finalStateSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "outcome": {"enum": ["pending", "completed", "aborted", "uncertain"]},
+    "responseSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "recoveryId": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+    "reason": {"type": ["string", "null"], "minLength": 1, "maxLength": 512},
+    "occurredAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

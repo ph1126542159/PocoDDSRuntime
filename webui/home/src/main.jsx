@@ -12,7 +12,10 @@ import "./flow-layout.css";
 import "./bright-theme.css";
 import "./business-summary.css";
 import "./typography.css";
+import "./process-dependency.css";
 import { DEFAULT_FRAMEWORK_MODEL, loadFrameworkModel, navigationEnabled } from "./framework-model.js";
+import ProcessDependencyView from "./ProcessDependencyView.jsx";
+import { formatProcessLifecycleImpact } from "./process-dependency-model.js";
 
 const pageMeta = {
   overview: ["运行态势", "实时掌握运行时状态与资源"],
@@ -846,6 +849,8 @@ function ProcessWorkbench({ mainProcess, activeSection, onSectionChange, onNotif
   const [managementIdempotency, setManagementIdempotency] = useState(null);
   const [managementTaskScheduler, setManagementTaskScheduler] = useState(null);
   const [identitySnapshot, setIdentitySnapshot] = useState(null);
+  const [dependencyGraph, setDependencyGraph] = useState(null);
+  const [dependencyError, setDependencyError] = useState("");
   const [collapsedSections, setCollapsedSections] = useState({});
   const toggleSection = section => setCollapsedSections(current => ({
     ...current, [section]: !current[section]
@@ -883,6 +888,24 @@ function ProcessWorkbench({ mainProcess, activeSection, onSectionChange, onNotif
   useEffect(() => {
     setDrafts(detail?.configuration || {});
   }, [detail?.process?.id, revision]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (governanceOnly || activeSection !== "dependencies") return undefined;
+    let active = true;
+    const load = async () => {
+      try {
+        const data = await request("/api/v1/process-dependencies");
+        if (!active) return;
+        setDependencyGraph(data);
+        setDependencyError("");
+      } catch (error) {
+        if (active) setDependencyError(error.message || "依赖快照请求失败");
+      }
+    };
+    load();
+    const timer = setInterval(load, 2000);
+    return () => { active = false; clearInterval(timer); };
+  }, [activeSection, revision, governanceOnly]);
 
   useEffect(() => {
     if (!selected || !(detail?.process?.main ?? selected.main)) {
@@ -952,6 +975,7 @@ function ProcessWorkbench({ mainProcess, activeSection, onSectionChange, onNotif
   const processServices = detail?.services || [];
   const processSections = [
     ["overview", Activity, "概览"],
+    ["dependencies", Network, "依赖关系", dependencyGraph?.summary?.blocked || undefined],
     ["services", Server, "服务", processServices.length],
     ["bundles", Boxes, "Bundles", bundles.length],
     ["logs", FileText, "日志"],
@@ -988,12 +1012,23 @@ function ProcessWorkbench({ mainProcess, activeSection, onSectionChange, onNotif
   };
   const operateProcess = async (process, action) => {
     const verb = action === "start" ? "启动" : action === "stop" ? "停止" : "重启";
-    if (action !== "start" && !window.confirm(`确认${verb} ${process.name}？`)) return;
-    setBusy(`process:${process.id}`);
+    const target = String(process.id || process.name || "");
+    setBusy(`process:${target}:preflight`);
     try {
+      const query = new URLSearchParams({ target, action });
+      const impact = await request(`/api/v1/process-dependencies/impact?${query}`);
+      if (!impact.allowed)
+        throw new Error(`${verb}预检被拒绝：${impact.detail || impact.code}`);
+      if (impact.noOp) {
+        onNotify?.(`${process.name || target} 已处于目标状态，无需执行。`);
+        return;
+      }
+      if (impact.requiresConfirmation &&
+          !window.confirm(formatProcessLifecycleImpact(impact))) return;
+      setBusy(`process:${target}`);
       const result = await request("/api/v1/process-lifecycle", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: process.id, action })
+        body: JSON.stringify({ id: target, action })
       });
       onNotify?.(result.message || `${verb}完成`);
       setRevision(value => value + 1);
@@ -1137,6 +1172,9 @@ function ProcessWorkbench({ mainProcess, activeSection, onSectionChange, onNotif
       </section>
     </div>
     </>}
+
+    {!governanceOnly && activeSection === "dependencies" && <ProcessDependencyView
+      graph={dependencyGraph} error={dependencyError} />}
 
     {activeSection === "bundles" &&
     <div className="workbench-detail-grid">

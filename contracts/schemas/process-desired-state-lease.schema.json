@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/process-desired-state-lease.schema.json",
+  "title": "Managed subprocess desired-state writer lease owner",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "ownerProcessId", "acquiredAtEpochMicroseconds"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "ownerProcessId": {"type": "integer", "minimum": 1},
+    "acquiredAtEpochMicroseconds": {"type": "integer", "minimum": 1}
+  }
+}

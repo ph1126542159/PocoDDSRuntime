@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-audit-archive-marker.schema.json",
+  "title": "Immutable registration marker for one remote Registry audit archive",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "archiveId", "registryId", "fromSequence", "throughSequence", "previousRecordSha256", "throughRecordSha256", "archiveFile", "archiveSha256", "manifestSha256", "checkpointId", "checkpointSha256", "auditPolicyId", "auditPolicySha256", "previousArchiveMarkerSha256", "createdAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteAuditArchiveMarker"},
+    "archiveId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "fromSequence": {"type": "integer", "minimum": 1},
+    "throughSequence": {"type": "integer", "minimum": 1},
+    "previousRecordSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "throughRecordSha256": {"$ref": "#/$defs/sha256"},
+    "archiveFile": {"type": "string", "pattern": "^[^/\\\\]+\\.pdraudit$"},
+    "archiveSha256": {"$ref": "#/$defs/sha256"},
+    "manifestSha256": {"$ref": "#/$defs/sha256"},
+    "checkpointId": {"$ref": "#/$defs/id"},
+    "checkpointSha256": {"$ref": "#/$defs/sha256"},
+    "auditPolicyId": {"$ref": "#/$defs/id"},
+    "auditPolicySha256": {"$ref": "#/$defs/sha256"},
+    "previousArchiveMarkerSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "createdAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

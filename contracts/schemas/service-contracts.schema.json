@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/service-contracts.schema.json",
+  "title": "PocoDDSRuntime Bundle service contracts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "provides", "requires"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "provides": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/provider" }
+    },
+    "requires": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/requirement" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "versionRange": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "anyOf": [
+        { "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        { "pattern": "^[\\[\\(]\\s*(?:[0-9]+\\.[0-9]+\\.[0-9]+)?\\s*,\\s*(?:[0-9]+\\.[0-9]+\\.[0-9]+)?\\s*[\\]\\)]$" }
+      ]
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "version", "serviceName"],
+      "properties": {
+        "contract": { "$ref": "#/$defs/identifier" },
+        "version": { "$ref": "#/$defs/version" },
+        "serviceName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 192,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "versionRange"],
+      "properties": {
+        "contract": { "$ref": "#/$defs/identifier" },
+        "versionRange": { "$ref": "#/$defs/versionRange" },
+        "required": { "type": "boolean", "default": true },
+        "minimumProviders": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 1
+        }
+      }
+    }
+  }
+}

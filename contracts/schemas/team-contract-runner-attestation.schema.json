@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-runner-attestation.schema.json",
+  "title": "Signed CI runner attestation for exact team contract impact execution evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "operation", "runnerId", "repository", "sourceRevision",
+    "workflow", "jobId", "runId", "issuedAt", "expiresAt", "impactReportSha256",
+    "impactInputSetSha256", "candidateLockSha256", "executionEvidenceSha256", "junitSha256",
+    "ctestExecutableSha256", "ctestCatalogSha256", "ctestCommandSha256", "keyId", "signature"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRunnerAttestation"},
+    "operation": {"const": "team-contract-runner-attest"},
+    "runnerId": {"$ref": "#/$defs/id"},
+    "repository": {"$ref": "#/$defs/repository"},
+    "sourceRevision": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "workflow": {"$ref": "#/$defs/id"},
+    "jobId": {"$ref": "#/$defs/id"},
+    "runId": {"$ref": "#/$defs/id"},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"},
+    "impactReportSha256": {"$ref": "#/$defs/sha256"},
+    "impactInputSetSha256": {"$ref": "#/$defs/sha256"},
+    "candidateLockSha256": {"$ref": "#/$defs/sha256"},
+    "executionEvidenceSha256": {"$ref": "#/$defs/sha256"},
+    "junitSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "ctestExecutableSha256": {"$ref": "#/$defs/sha256"},
+    "ctestCatalogSha256": {"$ref": "#/$defs/sha256"},
+    "ctestCommandSha256": {"$ref": "#/$defs/sha256"},
+    "keyId": {"$ref": "#/$defs/id"},
+    "signature": {"type": "string", "minLength": 88, "maxLength": 88}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", "maxLength": 256}
+  }
+}

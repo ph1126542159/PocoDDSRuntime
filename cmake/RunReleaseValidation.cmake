@@ -1,5 +1,5 @@
 foreach(required PDR_CMAKE PDR_PYTHON PDR_SOURCE_DIR PDR_BINARY_DIR PDR_CONFIG
-                 PDR_VERSION PDR_REQUIRE_CLEAN)
+                 PDR_VERSION PDR_PROFILE PDR_REQUIRE_CLEAN)
     if(NOT DEFINED ${required})
         message(FATAL_ERROR "RunReleaseValidation.cmake requires ${required}")
     endif()
@@ -23,7 +23,9 @@ set(generate_command
         --root "${PDR_SOURCE_DIR}"
         --artifacts "${install_dir}"
         --output "${release_dir}"
-        --version "${PDR_VERSION}")
+        --version "${PDR_VERSION}"
+        --builder-id "pocoddsruntime.cmake"
+        --build-profile "${PDR_PROFILE}")
 if(PDR_REQUIRE_CLEAN)
     list(APPEND generate_command --require-clean)
 endif()

@@ -93,13 +93,19 @@ int main()
     TransportRegistry registry;
     auto registration = registerFastDdsTransport(registry);
     if (!registration || registry.descriptors().size() != 1 ||
-        registry.descriptors().front().id != "fastdds")
+        registry.descriptors().front().id != "fastdds" ||
+        registry.descriptors().front().configurationKeys.size() != 4)
         return 5;
     const auto invalid = registry.create("fastdds", {{"domainId", "233"}});
     if (invalid || invalid.error().code != RuntimeErrorCode::invalidArgument)
         return 6;
+    const auto unknownKey = registry.create("fastdds", {{"discovreyMode", "simple"}});
+    const auto invalidMaximum =
+        registry.create("fastdds", {{"maximumFrameBytes", "184321"}});
+    if (unknownKey || invalidMaximum)
+        return 7;
 
     std::cout << "PDR_FASTDDS_TRANSPORT_PASS codec=PDRM/1 peer=bidirectional conformance=7 "
-                 "registry=verified\n";
+                 "registry=verified strictConfig=verified\n";
     return 0;
 }

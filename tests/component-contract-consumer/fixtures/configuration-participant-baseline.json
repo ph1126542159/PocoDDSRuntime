@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "product": "PocoDDSRuntimeConfigurationParticipantBaseline",
+  "runtimeVersion": "0.1.0",
+  "participants": [
+    {
+      "owner": "pdr.test.participantConsumer",
+      "id": "participant-consumer",
+      "serviceName": "pdr.configuration.participant.participantConsumer",
+      "ownedPrefixes": ["pdr.test.participantConsumer"],
+      "after": []
+    }
+  ]
+}

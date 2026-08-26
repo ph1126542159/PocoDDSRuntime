@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/bundle-repository-break-glass-audit.schema.json",
+  "title": "PocoDDSRuntime Bundle Repository Break-Glass Audit Record",
+  "type": "object",
+  "required": [
+    "schemaVersion", "product", "sequence", "timestamp", "previousRecordSha256",
+    "event", "recordSha256"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "product": { "const": "PocoDDSBundleRepositoryBreakGlass" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "previousRecordSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "event": {
+      "enum": [
+        "BUNDLE_BREAK_GLASS_AUTHORIZED",
+        "BUNDLE_BREAK_GLASS_APPLIED",
+        "BUNDLE_BREAK_GLASS_RECOVERED_ROLLBACK"
+      ]
+    },
+    "recordSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

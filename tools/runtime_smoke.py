@@ -379,19 +379,19 @@ def main() -> int:
     port = args.port or free_port(args.host)
     expected_statuses: dict[str, int] = {}
     for item in args.expect_status:
-        endpoint, separator, status_text = item.partition("=")
+        endpoint, separator, status_text = item.rpartition("=")
         if not separator or not endpoint.startswith("/") or not status_text.isdigit():
             raise SystemExit(f"invalid --expect-status value: {item}")
         expected_statuses[endpoint] = int(status_text)
     endpoint_bearer_environments: dict[str, str] = {}
     for item in args.endpoint_bearer_token_environment:
-        endpoint, separator, environment_name = item.partition("=")
+        endpoint, separator, environment_name = item.rpartition("=")
         if not separator or not endpoint.startswith("/") or not environment_name:
             raise SystemExit(f"invalid --endpoint-bearer-token-environment value: {item}")
         endpoint_bearer_environments[endpoint] = environment_name
     endpoint_basic_environments: dict[str, str] = {}
     for item in args.endpoint_basic_credentials_environment:
-        endpoint, separator, environment_name = item.partition("=")
+        endpoint, separator, environment_name = item.rpartition("=")
         if not separator or not endpoint.startswith("/") or not environment_name:
             raise SystemExit(f"invalid --endpoint-basic-credentials-environment value: {item}")
         endpoint_basic_environments[endpoint] = environment_name
@@ -405,7 +405,7 @@ def main() -> int:
         )
     post_expected_statuses: dict[tuple[int, str], int] = {}
     for item in args.post_expect_status:
-        selector, separator, status_text = item.partition("=")
+        selector, separator, status_text = item.rpartition("=")
         index_text, colon, endpoint = selector.partition(":")
         if (not separator or not colon or not index_text.isdigit() or
                 int(index_text) < 1 or not endpoint.startswith("/") or

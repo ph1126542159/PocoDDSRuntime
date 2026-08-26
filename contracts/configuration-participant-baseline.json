@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "product": "PocoDDSRuntimeConfigurationParticipantBaseline",
+  "runtimeVersion": "0.1.0",
+  "participants": [
+    {
+      "owner": "pdr.service.outboxRuntime",
+      "id": "outbox-scheduler",
+      "serviceName": "pdr.configuration.participant.outboxScheduler",
+      "ownedPrefixes": [
+        "pdr.outbox.schedulerEnabled",
+        "pdr.outbox.schedulerIntervalMilliseconds",
+        "pdr.outbox.schedulerJitterMilliseconds"
+      ],
+      "after": []
+    },
+    {
+      "owner": "pdr.service.workflowRuntime",
+      "id": "workflow-scheduler",
+      "serviceName": "pdr.configuration.participant.workflowScheduler",
+      "ownedPrefixes": [
+        "pdr.workflow.schedulerEnabled",
+        "pdr.workflow.schedulerIntervalMilliseconds",
+        "pdr.workflow.schedulerJitterMilliseconds"
+      ],
+      "after": []
+    }
+  ]
+}

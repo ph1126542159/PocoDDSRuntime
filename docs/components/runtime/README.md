@@ -48,8 +48,11 @@ ctest --test-dir build -C Release --output-on-failure
 | --- | --- | --- |
 | `poco.threadPool.default.capacity` | `32` | Poco 默认线程池最小容量 |
 | `osp.bundleRepository` | `${application.dir}bundles/` | Bundle 仓库；建议保留末尾 `/` |
-| `osp.bundleMonitor.enabled` | `true` | 是否监视 Bundle 变化 |
+| `osp.bundleMonitor.enabled` | `false` | 是否监视并预检 Bundle 仓库变化 |
 | `osp.bundleMonitor.intervalMilliseconds` | `1000` | 扫描周期，毫秒 |
+| `osp.bundleMonitor.stableScanCount` | `2` | 进入预检前要求连续一致的扫描次数 |
+| `osp.bundleMonitor.stateDirectory` | `${application.dir}data/bundle-manager/` | 部署事务、审计和 LKG 快照目录 |
+| `osp.bundleMonitor.inProcessReloadEnabled` | `false` | 生产保持关闭；合法变化记为 `restartRequired` |
 | `osp.codeCache` | `${application.dir}codeCache` | OSP 动态库展开/缓存目录 |
 | `osp.data` | `${application.dir}data` | Bundle 数据目录 |
 | `pdr.fastdds.domainId` | `0` | 所有 DDS 参与者必须一致 |

@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <symbolicName>pdr.test.participantConsumer</symbolicName>
+  </manifest>
+  <files>bundle/*</files>
+</bundlespec>

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.dev/contracts/sdk-public-surface-compatibility.schema.json",
+  "title": "PocoDDSRuntime installed SDK public surface compatibility report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operation",
+    "passed",
+    "baselineVersion",
+    "currentVersion",
+    "baselineSurfaceSha256",
+    "currentSurfaceSha256",
+    "abiChecked",
+    "abiKey",
+    "majorVersionBreakApproved",
+    "removedHeaders",
+    "addedHeaders",
+    "changedHeaders",
+    "removedCmakeTargets",
+    "addedCmakeTargets",
+    "removedAbiArtifacts",
+    "addedAbiArtifacts",
+    "changedAbiArtifacts"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "operation": { "const": "sdk-public-surface-compatibility" },
+    "passed": { "type": "boolean" },
+    "baselineVersion": { "$ref": "#/$defs/semver" },
+    "currentVersion": { "$ref": "#/$defs/semver" },
+    "baselineSurfaceSha256": { "$ref": "#/$defs/sha256" },
+    "currentSurfaceSha256": { "$ref": "#/$defs/sha256" },
+    "abiChecked": { "type": "boolean" },
+    "abiKey": { "type": ["string", "null"] },
+    "majorVersionBreakApproved": { "type": "boolean" },
+    "removedHeaders": { "$ref": "#/$defs/stringList" },
+    "addedHeaders": { "$ref": "#/$defs/stringList" },
+    "changedHeaders": { "$ref": "#/$defs/stringList" },
+    "removedCmakeTargets": { "$ref": "#/$defs/stringList" },
+    "addedCmakeTargets": { "$ref": "#/$defs/stringList" },
+    "removedAbiArtifacts": { "$ref": "#/$defs/stringList" },
+    "addedAbiArtifacts": { "$ref": "#/$defs/stringList" },
+    "changedAbiArtifacts": { "$ref": "#/$defs/stringList" }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "stringList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

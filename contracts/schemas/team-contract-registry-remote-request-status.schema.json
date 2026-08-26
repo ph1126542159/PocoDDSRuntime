@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-request-status.schema.json",
+  "title": "Sanitized durable status of a remote Registry request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "registryId", "requestId", "requestSha256", "principalId", "operation", "startedRevision", "status", "finalRevision", "finalStateSha256", "responseSha256", "lastAuditRecordSha256", "recovery"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteRequestStatus"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "requestId": {"$ref": "#/$defs/id"},
+    "requestSha256": {"$ref": "#/$defs/sha256"},
+    "principalId": {"$ref": "#/$defs/id"},
+    "operation": {"enum": ["publish", "promote", "rollback", "verify", "resolve"]},
+    "startedRevision": {"type": ["integer", "null"], "minimum": 0},
+    "status": {"enum": ["pending", "completed", "aborted", "uncertain"]},
+    "finalRevision": {"type": ["integer", "null"], "minimum": 0},
+    "finalStateSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "responseSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "lastAuditRecordSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "recovery": {"type": ["object", "null"]}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

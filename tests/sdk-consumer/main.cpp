@@ -1,5 +1,6 @@
 #include <PocoDDS/SDK/SDK.h>
 #ifdef PDR_SDK_CONSUMER_PROTOCOLS
+#include <PocoDDS/DDS/AbiV1.h>
 #include <PocoDDS/Protocols/WebTunnel/LocalForwarder.h>
 #include <PocoDDS/Protocols/MQTT/MqttClient.h>
 #include <PocoDDS/Protocols/ROS/BridgeClient.h>
@@ -15,7 +16,21 @@ int main()
     if (context.expired()) return 1;
     PocoDDS::Security::PrincipalStore emptyIdentityStore;
     if (emptyIdentityStore.required() || emptyIdentityStore.size() != 0) return 4;
+    PocoDDS::ResourceGovernance::ResourceGovernor resourceGovernor({});
+    const auto resourceSnapshot = resourceGovernor.snapshot("sdk.consumer");
+    if (resourceSnapshot.policy.owner != "sdk.consumer" ||
+        resourceSnapshot.policy.maximumConcurrency == 0)
+        return 5;
+    PocoDDS::Scheduling::Scheduler scheduler(
+        [](const std::string& owner,
+           PocoDDS::ResourceGovernance::WorkItem item) {
+            return PocoDDS::ResourceGovernance::Admission{
+                PocoDDS::ResourceGovernance::AdmissionStatus::invalid,
+                owner, item.id, "SDK consumer does not execute scheduled work"};
+        });
+    scheduler.shutdown();
 #ifdef PDR_SDK_CONSUMER_PROTOCOLS
+    if (pdr_fastdds_abi_version_v1() != PDR_FASTDDS_ABI_VERSION_V1) return 6;
     PocoDDS::Protocols::WebTunnel::LocalForwarder::Options options;
     options.remoteUri = "ws://127.0.0.1:65535/tunnel";
     options.remotePort = 1;

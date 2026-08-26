@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-capacity.schema.json",
+  "title": "Bounded remote Registry control-state capacity and admission status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "registryId", "policyId", "policyRevision", "acceptingMutations", "acceptingRecoveries", "usage", "limits", "measuredAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteCapacity"},
+    "passed": {"const": true},
+    "registryId": {"$ref": "#/$defs/id"},
+    "policyId": {"$ref": "#/$defs/id"},
+    "policyRevision": {"type": "integer", "minimum": 0},
+    "acceptingMutations": {"type": "boolean"},
+    "acceptingRecoveries": {"type": "boolean"},
+    "usage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["activeRequestRecords", "recoveryRecords", "auditRecords", "requestBytes", "recoveryBytes", "auditBytes", "controlBytes"],
+      "properties": {
+        "activeRequestRecords": {"type": "integer", "minimum": 0},
+        "recoveryRecords": {"type": "integer", "minimum": 0},
+        "auditRecords": {"type": "integer", "minimum": 0},
+        "requestBytes": {"type": "integer", "minimum": 0},
+        "recoveryBytes": {"type": "integer", "minimum": 0},
+        "auditBytes": {"type": "integer", "minimum": 0},
+        "controlBytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "limits": {
+      "type": "object", "additionalProperties": false,
+      "required": ["maxActiveRequestRecords", "maxRecoveryRecords", "maxAuditRecords", "maxControlBytes"],
+      "properties": {
+        "maxActiveRequestRecords": {"type": "integer", "minimum": 1},
+        "maxRecoveryRecords": {"type": "integer", "minimum": 1},
+        "maxAuditRecords": {"type": "integer", "minimum": 2},
+        "maxControlBytes": {"type": "integer", "minimum": 1048576}
+      }
+    },
+    "measuredAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}
+  }
+}

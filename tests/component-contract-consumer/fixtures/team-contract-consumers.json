@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "product": "PocoDDSRuntimeTeamContractConsumerCatalog",
+  "consumers": [
+    {
+      "id": "team.observer",
+      "owner": "team.observability",
+      "dependencies": [
+        {
+          "packageId": "team.order-workflow",
+          "roles": ["participant-declaration"]
+        }
+      ],
+      "requiredTestLabels": ["configuration", "participant"]
+    },
+    {
+      "id": "team.workflow",
+      "owner": "team.workflow",
+      "dependencies": [
+        {
+          "packageId": "team.scheduler",
+          "roles": ["service-contract"]
+        }
+      ],
+      "requiredTestLabels": ["component", "service"]
+    }
+  ]
+}

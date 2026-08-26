@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/contracts/project-component.schema.json",
+  "title": "PocoDDSRuntime project component collaboration contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "name", "kind", "plane", "target",
+    "owner", "isolation", "requires"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Za-z0-9]*$"
+    },
+    "kind": {
+      "enum": [
+        "module", "service", "device", "workflow", "bundle", "plugin",
+        "subprocess", "robot-module", "robot-hardware-adapter",
+        "robot-simulation-adapter", "robot-process", "ros2-node"
+      ]
+    },
+    "plane": {
+      "enum": ["application", "management", "robotics", "isolated", "external"]
+    },
+    "target": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.:+-]*$"
+    },
+    "owner": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@/+:-]*$"
+    },
+    "isolation": {
+      "enum": ["in-process", "bundle", "subprocess", "external-process"]
+    },
+    "requires": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+      }
+    }
+  }
+}

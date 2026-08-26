@@ -21,6 +21,8 @@
 #include "Poco/OSP/OSP.h"
 #include "Poco/Util/AbstractConfiguration.h"
 #include "Poco/AutoPtr.h"
+#include "Poco/Mutex.h"
+#include <map>
 
 
 namespace Poco {
@@ -49,9 +51,12 @@ protected:
 private:
 	friend class PreferencesService;
 	void setProperty(const std::string& key, const std::string& value);
+	void replaceProperties(const std::map<std::string, std::string>& values);
+	std::map<std::string, std::string> properties() const;
 	Configuration();
 
 	AbstractConfiguration* _pConfig;
+	mutable Poco::FastMutex _mutex;
 };
 
 

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-resolution.schema.json",
+  "title": "Resolved exact package set from one promoted team contract Registry channel",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "operation", "passed", "registry", "registryId",
+    "registryRevision", "registryStateSha256", "channel", "generation", "lockSha256",
+    "output", "packageResolutionReport", "packageResolutionReportSha256", "packages"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryResolution"},
+    "operation": {"const": "resolve"},
+    "passed": {"const": true},
+    "registry": {"type": "string", "minLength": 1},
+    "registryId": {"$ref": "#/$defs/id"},
+    "registryRevision": {"type": "integer", "minimum": 0},
+    "registryStateSha256": {"$ref": "#/$defs/sha256"},
+    "channel": {"$ref": "#/$defs/id"},
+    "generation": {"type": "integer", "minimum": 1},
+    "lockSha256": {"$ref": "#/$defs/sha256"},
+    "output": {"type": "string", "minLength": 1},
+    "packageResolutionReport": {"type": "string", "minLength": 1},
+    "packageResolutionReportSha256": {"$ref": "#/$defs/sha256"},
+    "packages": {
+      "type": "array", "minItems": 1, "maxItems": 4096,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["packageId", "version", "packageSha256"],
+        "properties": {
+          "packageId": {"$ref": "#/$defs/id"},
+          "version": {"$ref": "#/$defs/version"},
+          "packageSha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

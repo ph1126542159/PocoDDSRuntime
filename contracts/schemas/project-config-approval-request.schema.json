@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-approval-request.schema.json",
+  "title": "PocoDDSRuntime project configuration approval request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "operation", "requestId", "transactionId",
+    "project", "planSha256", "policyId", "policySha256", "ticket",
+    "initiator", "issuedAt", "expiresAt", "rules", "requestSha256"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeProjectConfiguration"},
+    "operation": {"const": "project-config-approval-request"},
+    "requestId": {"type": "string", "format": "uuid"},
+    "transactionId": {"type": "string", "format": "uuid"},
+    "project": {"type": "string", "minLength": 1},
+    "planSha256": {"$ref": "#/$defs/sha256"},
+    "policyId": {"type": "string", "minLength": 1},
+    "policySha256": {"$ref": "#/$defs/sha256"},
+    "ticket": {"type": "string", "minLength": 1},
+    "initiator": {"type": "string", "minLength": 1},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"},
+    "rules": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/rule"}},
+    "requestSha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "rule": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "changedPaths", "minimumApprovals", "requiredRoles", "separateInitiator"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "changedPaths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^/"}},
+        "minimumApprovals": {"type": "integer", "minimum": 1, "maximum": 16},
+        "requiredRoles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "separateInitiator": {"type": "boolean"}
+      }
+    }
+  }
+}

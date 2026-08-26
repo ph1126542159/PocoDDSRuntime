@@ -42,6 +42,8 @@ class OSP_API BundleRepository
 	/// to log non-fatal errors.
 {
 public:
+	using Bundles = std::vector<Bundle::Ptr>;
+
 	BundleRepository(const std::string& path, BundleLoader& loader, BundleFilter::Ptr pBundleFilter = 0);
 		/// Creates the BundleRepository, using the given
 		/// path and BundleLoader, and optional BundleFilter.
@@ -84,6 +86,15 @@ public:
 		/// If two or more versions of a bundle are found,
 		/// the latest version of the bundle is loaded
 		/// and a warning message is logged.
+
+	Bundles validateBundles();
+		/// Parses every bundle candidate, applies the repository version-selection
+		/// rules and validates required bundle/module dependencies without changing
+		/// the BundleLoader. Unlike loadBundles(), this method is strict: malformed
+		/// candidates and unsatisfied dependencies are reported to the caller.
+		///
+		/// The returned Bundle objects can subsequently be passed to
+		/// BundleLoader::loadBundle() so the exact preflighted artifacts are loaded.
 
 	Bundle::Ptr installBundle(std::istream& istr);
 		/// Reads a bundle archive file from the given stream
@@ -158,6 +169,16 @@ protected:
 
 	void loadBundle(const std::string& path, BundleMap& bundles);
 		/// Loads a bundle from the given path.
+
+	void collectBundles(const std::string& path, BundleMap& bundles, bool strict);
+		/// Collects available bundles from path. In strict mode, parsing failures
+		/// are propagated instead of being reduced to log messages.
+
+	void collectBundle(const std::string& path, BundleMap& bundles, bool strict);
+		/// Collects one bundle candidate.
+
+	void validateDependencies(const BundleMap& bundles) const;
+		/// Validates required bundles and modules against the selected repository set.
 
 	Bundle::Ptr installBundleImpl(std::istream& istr, const std::string& replaceBundle, const std::string& path);
 		/// Reads a bundle archive file from the given stream

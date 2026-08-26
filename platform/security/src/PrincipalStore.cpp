@@ -1,24 +1,15 @@
 #include "PocoDDS/Security/PrincipalStore.h"
+#include "PocoDDS/Security/SecretFile.h"
 
 #include "Poco/Environment.h"
 #include "Poco/Exception.h"
-#include "Poco/File.h"
 #include "Poco/Path.h"
-#include "Poco/UnicodeConverter.h"
 
 #include <algorithm>
 #include <cctype>
-#include <fstream>
 #include <mutex>
 #include <sstream>
 #include <utility>
-
-#ifdef _WIN32
-#include <Windows.h>
-#include <Aclapi.h>
-#else
-#include <sys/stat.h>
-#endif
 
 namespace PocoDDS::Security
 {
@@ -66,78 +57,15 @@ struct TokenMaterial
     bool restricted{true};
 };
 
-std::pair<bool, bool> restrictedTokenFile(const std::string& path)
-{
-#ifdef _WIN32
-    PACL dacl = nullptr;
-    PSECURITY_DESCRIPTOR descriptor = nullptr;
-    std::wstring widePath;
-    Poco::UnicodeConverter::toUTF16(path, widePath);
-    const DWORD status = GetNamedSecurityInfoW(
-        const_cast<wchar_t*>(widePath.c_str()), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
-        nullptr, nullptr, &dacl, nullptr, &descriptor);
-    if (status != ERROR_SUCCESS || !dacl)
-    {
-        if (descriptor) LocalFree(descriptor);
-        return {false, false};
-    }
-    bool restricted = true;
-    for (const WELL_KNOWN_SID_TYPE type : {
-             WinWorldSid, WinAuthenticatedUserSid, WinBuiltinUsersSid, WinBuiltinGuestsSid})
-    {
-        BYTE sidBuffer[SECURITY_MAX_SID_SIZE];
-        DWORD sidSize = sizeof(sidBuffer);
-        if (!CreateWellKnownSid(type, nullptr, sidBuffer, &sidSize))
-        {
-            LocalFree(descriptor);
-            return {false, false};
-        }
-        TRUSTEE_W trustee{};
-        trustee.TrusteeForm = TRUSTEE_IS_SID;
-        trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
-        trustee.ptstrName = reinterpret_cast<LPWSTR>(sidBuffer);
-        ACCESS_MASK rights = 0;
-        if (GetEffectiveRightsFromAclW(dacl, &trustee, &rights) != ERROR_SUCCESS)
-        {
-            LocalFree(descriptor);
-            return {false, false};
-        }
-        constexpr ACCESS_MASK sensitive = GENERIC_READ | GENERIC_WRITE | FILE_GENERIC_READ |
-            FILE_GENERIC_WRITE | FILE_READ_DATA | FILE_WRITE_DATA | FILE_APPEND_DATA |
-            DELETE | WRITE_DAC | WRITE_OWNER;
-        if ((rights & sensitive) != 0) restricted = false;
-    }
-    LocalFree(descriptor);
-    return {true, restricted};
-#else
-    struct stat information{};
-    if (::stat(path.c_str(), &information) != 0) return {false, false};
-    return {true, (information.st_mode & (S_IRWXG | S_IRWXO)) == 0};
-#endif
-}
-
 TokenMaterial tokenFromFile(const std::string& configuredPath,
                           const Poco::Util::AbstractConfiguration& configuration,
                           const std::string& description)
 {
     Poco::Path path(configuration.expand(configuredPath));
     path.makeAbsolute();
-    Poco::File file(path);
-    if (!file.exists() || !file.isFile())
-        throw Poco::NotFoundException(description + " file is missing", path.toString());
-    if (file.getSize() > 16 * 1024)
-        throw Poco::RangeException(description + " file exceeds 16 KiB", path.toString());
-    std::ifstream stream(path.toString(), std::ios::binary);
-    if (!stream) throw Poco::OpenFileException(description + " file", path.toString());
-    std::string token((std::istreambuf_iterator<char>(stream)),
-                      std::istreambuf_iterator<char>());
-    while (!token.empty() && (token.back() == '\n' || token.back() == '\r')) token.pop_back();
-    if (token.find('\n') != std::string::npos || token.find('\r') != std::string::npos)
-        throw Poco::InvalidArgumentException(description + " file contains embedded newline");
-    if (token.empty())
-        throw Poco::InvalidArgumentException(description + " file is empty", path.toString());
-    const auto [verified, restricted] = restrictedTokenFile(path.toString());
-    return {std::move(token), true, verified, restricted};
+    auto material = loadSecretFile(path.toString(), 16 * 1024, description);
+    return {std::move(material.value), true,
+            material.permissionsVerified, material.restricted};
 }
 
 TokenMaterial tokenFromSource(const Poco::Util::AbstractConfiguration& configuration,
@@ -172,7 +100,8 @@ const PermissionSet& managementPermissions()
     static const PermissionSet permissions{
         "protocol.manage", "process.manage", "bundle.manage", "configuration.manage",
         "identity.manage", "audit.read", "task.read", "task.cancel",
-        "diagnostics.read", "diagnostics.execute"};
+        "diagnostics.read", "diagnostics.execute", "capability.read", "capability.manage",
+        "resource.read"};
     return permissions;
 }
 

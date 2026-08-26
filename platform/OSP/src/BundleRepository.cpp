@@ -114,7 +114,33 @@ void BundleRepository::loadBundles()
 }
 
 
+BundleRepository::Bundles BundleRepository::validateBundles()
+{
+	BundleMap bundles;
+	for (std::vector<std::string>::const_iterator it = _paths.begin(); it != _paths.end(); ++it)
+	{
+		collectBundles(*it, bundles, true);
+	}
+	validateDependencies(bundles);
+
+	Bundles result;
+	result.reserve(bundles.size());
+	for (BundleMap::const_iterator it = bundles.begin(); it != bundles.end(); ++it)
+	{
+		result.push_back(it->second);
+	}
+	return result;
+}
+
+
 void BundleRepository::loadBundles(const std::string& path, BundleMap& bundles)
+
+{
+	collectBundles(path, bundles, false);
+}
+
+
+void BundleRepository::collectBundles(const std::string& path, BundleMap& bundles, bool strict)
 {
 	std::set<std::string> paths;
 	Poco::Path normalizedPath(path);
@@ -144,10 +170,11 @@ void BundleRepository::loadBundles(const std::string& path, BundleMap& bundles)
 					{
 						_logger.debug("Found bundle %s."s, *git);
 					}
-					loadBundle(*git, bundles);
+					collectBundle(*git, bundles, strict);
 				}
 				catch (Poco::Exception& exc)
 				{
+					if (strict) throw;
 					std::string msg("Failed to load bundle from ");
 					msg += "'";
 					msg += *git;
@@ -182,11 +209,12 @@ void BundleRepository::loadBundles(const std::string& path, BundleMap& bundles)
 							{
 								_logger.debug("Found bundle %s."s, it->path());
 							}
-							loadBundle(it->path(), bundles);
+							collectBundle(it->path(), bundles, strict);
 						}
 					}
 					catch (Poco::Exception& exc)
 					{
+						if (strict) throw;
 						std::string msg("Failed to load bundle from ");
 						msg += "'";
 						msg += it->path();
@@ -202,8 +230,29 @@ void BundleRepository::loadBundles(const std::string& path, BundleMap& bundles)
 
 
 void BundleRepository::loadBundle(const std::string& path, BundleMap& bundles)
+
 {
-	Bundle::Ptr pBundle(_loader.createBundle(path));
+	collectBundle(path, bundles, false);
+}
+
+
+void BundleRepository::collectBundle(const std::string& path, BundleMap& bundles, bool strict)
+{
+	Bundle::Ptr pBundle;
+	try
+	{
+		pBundle = _loader.createBundle(path);
+	}
+	catch (Poco::Exception& exc)
+	{
+		if (!strict) throw;
+		throw BundleLoadException("Bundle repository preflight failed for '" + path + "'", exc.displayText());
+	}
+	catch (std::exception& exc)
+	{
+		if (!strict) throw;
+		throw BundleLoadException("Bundle repository preflight failed for '" + path + "'", exc.what());
+	}
 
 	if (_pFilter && !_pFilter->accept(pBundle))
 	{
@@ -252,6 +301,55 @@ void BundleRepository::loadBundle(const std::string& path, BundleMap& bundles)
 	else
 	{
 		bundles[id] = pBundle;
+	}
+}
+
+
+void BundleRepository::validateDependencies(const BundleMap& bundles) const
+{
+	for (BundleMap::const_iterator it = bundles.begin(); it != bundles.end(); ++it)
+	{
+		Bundle::Ptr pBundle = it->second;
+		const BundleManifest::Dependencies& requiredBundles = pBundle->requiredBundles();
+		for (BundleManifest::Dependencies::const_iterator dep = requiredBundles.begin(); dep != requiredBundles.end(); ++dep)
+		{
+			BundleMap::const_iterator available = bundles.find(dep->symbolicName);
+			if (available == bundles.end())
+			{
+				throw BundleResolveException("Bundle repository preflight found an unsatisfied bundle dependency",
+					pBundle->symbolicName() + " requires " + dep->symbolicName);
+			}
+			if (!dep->versions.isEmpty() && !dep->versions.isInRange(available->second->version()))
+			{
+				throw BundleResolveException("Bundle repository preflight found an incompatible bundle dependency",
+					pBundle->symbolicName() + " requires " + dep->symbolicName + " " + dep->versions.toString() +
+					", available " + available->second->version().toString());
+			}
+		}
+
+		const BundleManifest::Dependencies& requiredModules = pBundle->requiredModules();
+		for (BundleManifest::Dependencies::const_iterator module = requiredModules.begin(); module != requiredModules.end(); ++module)
+		{
+			bool provided = false;
+			for (BundleMap::const_iterator provider = bundles.begin(); provider != bundles.end() && !provided; ++provider)
+			{
+				const Bundle::Modules modules = provider->second->providedModules();
+				for (Bundle::Modules::const_iterator candidate = modules.begin(); candidate != modules.end(); ++candidate)
+				{
+					if (candidate->symbolicName == module->symbolicName &&
+						(module->versions.isEmpty() || module->versions.isInRange(candidate->version)))
+					{
+						provided = true;
+						break;
+					}
+				}
+			}
+			if (!provided)
+			{
+				throw BundleResolveException("Bundle repository preflight found an unsatisfied module dependency",
+					pBundle->symbolicName() + " requires " + module->symbolicName + " " + module->versions.toString());
+			}
+		}
 	}
 }
 

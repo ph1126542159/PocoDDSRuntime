@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "participants": [
+    {
+      "id": "outbox-scheduler",
+      "serviceName": "pdr.configuration.participant.outboxScheduler",
+      "ownedPrefixes": [
+        "pdr.outbox.schedulerEnabled",
+        "pdr.outbox.schedulerIntervalMilliseconds",
+        "pdr.outbox.schedulerJitterMilliseconds"
+      ],
+      "after": []
+    }
+  ]
+}

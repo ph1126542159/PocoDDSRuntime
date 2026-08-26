@@ -1,6 +1,14 @@
-# Subprocesses are started in ascending numeric order.
+# Slots may be declared in any order. Explicit dependency edges determine
+# startup order; shutdown follows the reverse dependency order.
 # Paths and working directories are relative to the pdr-runtime directory.
 subprocess.count = 1
+subprocess.supervisionIntervalMilliseconds = 100
+# Optional operator-intent persistence. When enabled, manual start/stop and
+# terminal crash-loop decisions survive Runtime restarts. The path is relative
+# to the Runtime bin directory; the primary, .previous and .new files are
+# managed exclusively by ProcessManagement.
+subprocess.desiredStatePersistence.enabled = false
+subprocess.desiredStatePersistence.path = data/process-desired-state.json
 
 # Qt3D architecture test subprocess. It is disabled automatically for profiles
 # that do not build the Qt3D/observability target.
@@ -8,6 +16,22 @@ subprocess.0.enabled = @PDR_QT3D_SUBPROCESS_ENABLED@
 subprocess.0.name = pdr-qt3d-subprocess
 subprocess.0.location = local
 subprocess.0.required = false
+subprocess.0.dependency.count = 0
+# Optional architecture/demo process: do not restart it automatically. For
+# production workers prefer on-failure with a finite retry budget and bounded
+# exponential backoff.
+subprocess.0.restartPolicy = never
+subprocess.0.restartMaximumAttempts = 5
+subprocess.0.restartInitialBackoffMilliseconds = 250
+subprocess.0.restartMaximumBackoffMilliseconds = 30000
+subprocess.0.restartBackoffMultiplier = 2.0
+subprocess.0.restartResetAfterMilliseconds = 60000
+# Optional startup/ongoing health signal. The file path is relative to the
+# Runtime bin directory and must be rewritten by this process after every
+# launch; stale content from a previous PID is not accepted.
+# subprocess.0.readinessFile = processes/pdr-qt3d-subprocess/pdr-process-status.json
+# subprocess.0.readinessTimeoutMilliseconds = 10000
+# subprocess.0.heartbeatTimeoutMilliseconds = 0
 subprocess.0.path = processes/pdr-qt3d-subprocess/pdr-qt3d-subprocess.exe
 subprocess.0.workingDirectory = processes/pdr-qt3d-subprocess
 subprocess.0.argument.count = 2

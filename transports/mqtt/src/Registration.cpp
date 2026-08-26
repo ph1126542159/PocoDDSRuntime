@@ -20,9 +20,10 @@ bool parseBoolean(std::string_view key, const std::string& value)
         return false;
     throw std::invalid_argument(std::string(key) + " must be true, false, 1, or 0");
 }
+} // namespace
 
 Outcome<std::shared_ptr<IMessageTransport>>
-createTransport(const TransportConfiguration& configuration)
+createMqttTransport(const TransportConfiguration& configuration)
 {
     const auto server = configuration.find("serverUri");
     const auto client = configuration.find("clientId");
@@ -88,19 +89,21 @@ createTransport(const TransportConfiguration& configuration)
             {RuntimeErrorCode::invalidArgument, exception.what(), false});
     }
 }
-} // namespace
+
+TransportDescriptor mqttTransportDescriptor()
+{
+    return {"mqtt",
+            "1.0.0",
+            {false, false, true, false, true, false},
+            {"serverUri", "clientId", "topicPrefix", "username", "password", "trustStore",
+             "keyStore", "privateKey", "privateKeyPassword", "enabledCipherSuites",
+             "verifyServerCertificate", "verifyHostname", "cleanSession", "keepAliveSeconds",
+             "connectTimeoutSeconds", "maximumFrameBytes"}};
+}
 
 Outcome<TransportRegistration> registerMqttTransport(ITransportRegistry& registry)
 {
-    return registry.registerFactory(
-        {"mqtt",
-         "1.0.0",
-         {false, false, true, false, true, false},
-         {"serverUri", "clientId", "topicPrefix", "username", "password", "trustStore", "keyStore",
-          "privateKey", "privateKeyPassword", "enabledCipherSuites", "verifyServerCertificate",
-          "verifyHostname", "cleanSession", "keepAliveSeconds", "connectTimeoutSeconds",
-          "maximumFrameBytes"}},
-        createTransport);
+    return registry.registerFactory(mqttTransportDescriptor(), createMqttTransport);
 }
 
 } // namespace PocoDDS::MqttTransport

@@ -1,10 +1,15 @@
-add_library(PDRSecurity src/PrincipalStore.cpp)
+add_library(PDRSecurity
+    src/DetachedSignatureVerifier.cpp
+    src/PrincipalStore.cpp
+    src/SecretFile.cpp)
 add_library(PocoDDS::Security ALIAS PDRSecurity)
 set_target_properties(PDRSecurity PROPERTIES EXPORT_NAME Security)
 target_include_directories(PDRSecurity PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
-target_link_libraries(PDRSecurity PUBLIC Poco::Util Poco::Foundation)
+target_link_libraries(PDRSecurity
+    PUBLIC Poco::Util Poco::Foundation
+    PRIVATE Poco::JSON OpenSSL::Crypto)
 if(WIN32)
     target_link_libraries(PDRSecurity PRIVATE advapi32)
 endif()

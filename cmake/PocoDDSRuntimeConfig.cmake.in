@@ -16,9 +16,10 @@ if(NOT PocoDDSRuntime_FIND_COMPONENTS)
     set(PocoDDSRuntime_FIND_COMPONENTS SDK)
 endif()
 
-set(_pdr_known_components
-    SDK Security Plugins Protocols BtLE CAN FastDDSCore FastDDSTransport Modbus MQTT MQTTTransport ROS SerialProtocol UDP WebTunnelProtocol XBee)
-set(_pdr_poco_components Foundation Util)
+set(PocoDDSRuntime_KNOWN_COMPONENTS
+    SDK Security Plugins GatewayAPI WorkflowAPI WorkflowCore StoreForwardAPI StoreForwardCore TransportProviderAPI TransportProviderCore CapabilitiesAPI CapabilitiesCore CapabilitiesPersistence ConfigTransactionAPI ConfigTransactionCore SchemaRegistryAPI SchemaRegistryCore ResourceGovernanceAPI ResourceGovernanceCore SchedulingAPI SchedulingCore SchedulingConfiguration ServiceClientAPI ServiceClientCore ServiceClientTesting ServiceDependencyAPI ServiceDependencyCore ServiceDirectoryAPI ServiceDirectoryCore MembershipAPI MembershipCore MembershipPersistence LifecycleAPI LifecycleCore LifecyclePersistence ProtocolCore Protocols BtLE CAN FastDDSAbiV1 FastDDSCore FastDDSTransport Modbus MQTT MQTTTransport ROS SerialProtocol UDP WebTunnelProtocol XBee)
+set(_pdr_known_components ${PocoDDSRuntime_KNOWN_COMPONENTS})
+set(_pdr_poco_components Foundation Util JSON)
 set(_pdr_need_paho FALSE)
 set(_pdr_need_fastdds FALSE)
 foreach(_pdr_component IN LISTS PocoDDSRuntime_FIND_COMPONENTS)
@@ -36,10 +37,45 @@ foreach(_pdr_component IN LISTS PocoDDSRuntime_FIND_COMPONENTS)
        _pdr_component STREQUAL "WebTunnelProtocol")
         list(APPEND _pdr_poco_components Net)
     endif()
-    if(_pdr_component STREQUAL "Plugins")
+    if(_pdr_component STREQUAL "Plugins" OR
+       _pdr_component STREQUAL "GatewayAPI" OR
+       _pdr_component STREQUAL "WorkflowAPI" OR
+       _pdr_component STREQUAL "WorkflowCore" OR
+       _pdr_component STREQUAL "StoreForwardAPI" OR
+       _pdr_component STREQUAL "StoreForwardCore" OR
+       _pdr_component STREQUAL "TransportProviderAPI" OR
+       _pdr_component STREQUAL "TransportProviderCore" OR
+       _pdr_component STREQUAL "CapabilitiesAPI" OR
+       _pdr_component STREQUAL "CapabilitiesCore" OR
+       _pdr_component STREQUAL "CapabilitiesPersistence" OR
+       _pdr_component STREQUAL "ConfigTransactionAPI" OR
+       _pdr_component STREQUAL "ConfigTransactionCore" OR
+       _pdr_component STREQUAL "ResourceGovernanceAPI" OR
+       _pdr_component STREQUAL "SchedulingAPI" OR
+       _pdr_component STREQUAL "SchedulingConfiguration" OR
+       _pdr_component STREQUAL "ServiceClientAPI" OR
+       _pdr_component STREQUAL "ServiceClientTesting" OR
+       _pdr_component STREQUAL "ServiceDependencyAPI" OR
+       _pdr_component STREQUAL "ServiceDirectoryAPI" OR
+       _pdr_component STREQUAL "MembershipAPI" OR
+       _pdr_component STREQUAL "LifecycleAPI" OR
+       _pdr_component STREQUAL "SchemaRegistryAPI" OR
+       _pdr_component STREQUAL "SchemaRegistryCore")
         list(APPEND _pdr_poco_components Zip XML)
     endif()
-    if(_pdr_component STREQUAL "Protocols" OR _pdr_component STREQUAL "ROS")
+    if(_pdr_component STREQUAL "WorkflowCore" OR
+       _pdr_component STREQUAL "StoreForwardCore" OR
+       _pdr_component STREQUAL "CapabilitiesPersistence" OR
+       _pdr_component STREQUAL "ConfigTransactionCore" OR
+       _pdr_component STREQUAL "SchemaRegistryCore")
+        list(APPEND _pdr_poco_components Data DataSQLite JSON)
+    endif()
+    if(_pdr_component STREQUAL "LifecyclePersistence" OR
+       _pdr_component STREQUAL "MembershipPersistence")
+        list(APPEND _pdr_poco_components Data DataSQLite JSON)
+    endif()
+    if(_pdr_component STREQUAL "CapabilitiesCore" OR
+       _pdr_component STREQUAL "Protocols" OR _pdr_component STREQUAL "ROS")
         list(APPEND _pdr_poco_components JSON)
     endif()
     if(_pdr_component STREQUAL "Protocols" OR
@@ -51,14 +87,16 @@ foreach(_pdr_component IN LISTS PocoDDSRuntime_FIND_COMPONENTS)
        _pdr_component STREQUAL "MQTTTransport")
         set(_pdr_need_paho TRUE)
     endif()
-    if(_pdr_component STREQUAL "FastDDSCore" OR _pdr_component STREQUAL "FastDDSTransport")
+    if(_pdr_component STREQUAL "FastDDSAbiV1" OR
+       _pdr_component STREQUAL "FastDDSCore" OR
+       _pdr_component STREQUAL "FastDDSTransport")
         set(_pdr_need_fastdds TRUE)
     endif()
 endforeach()
 list(REMOVE_DUPLICATES _pdr_poco_components)
 find_dependency(Poco 1.15.3 CONFIG COMPONENTS ${_pdr_poco_components})
+find_dependency(OpenSSL REQUIRED)
 if(_pdr_need_paho)
-    find_dependency(OpenSSL REQUIRED)
     find_dependency(eclipse-paho-mqtt-c CONFIG REQUIRED)
 endif()
 if(_pdr_need_fastdds)
@@ -67,13 +105,89 @@ endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/PocoDDSRuntimeTargets.cmake")
 
+set(PocoDDSRuntime_COMPONENT_CONTRACT_TEST_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/component_contract_test.py")
+set(PocoDDSRuntime_CONFIGURATION_PARTICIPANT_CONTRACT_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/configuration_participant_contract.py")
+set(PocoDDSRuntime_CONFIGURATION_PARTICIPANT_BASELINE
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/PocoDDSRuntime/contracts/configuration-participant-baseline.json")
+set(PocoDDSRuntime_CONFIGURATION_KEY_LIFECYCLE_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/configuration_key_lifecycle.py")
+set(PocoDDSRuntime_CONFIGURATION_KEY_LIFECYCLE_BASELINE
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/PocoDDSRuntime/contracts/configuration-key-lifecycle-baseline.json")
+set(PocoDDSRuntime_TEAM_CONTRACT_PACKAGE_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_package.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_IMPACT_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_impact.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_IMPACT_GATE_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_impact_gate.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_REGISTRY_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_registry.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_PROVENANCE_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_provenance.py")
+set(PocoDDSRuntime_PDR_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/pdr.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_REGISTRY_REMOTE_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_registry_remote.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_REGISTRY_AUDIT_ARCHIVE_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_registry_audit_archive.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_REGISTRY_RECOVERY_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_registry_recovery.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_REGISTRY_STANDBY_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_registry_standby.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_REGISTRY_LEADER_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_registry_leader.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_REGISTRY_HANDOFF_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_registry_handoff.py")
+set(PocoDDSRuntime_TEAM_CONTRACT_REGISTRY_ACCESS_POLICY_TOOL
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/team_contract_registry_access_policy.py")
+set(PocoDDSRuntime_PROCESS_FILE_LEASE_MODULE
+    "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_BINDIR@/process_file_lease.py")
+set(PocoDDSRuntime_PROCESS_FILE_LEASE_TOOL
+    "${PocoDDSRuntime_PROCESS_FILE_LEASE_MODULE}")
+include("${CMAKE_CURRENT_LIST_DIR}/PocoDDSComponentTesting.cmake")
+
 set(_pdr_component_targets
     SDK PocoDDS::SDK
     Security PocoDDS::Security
     Plugins PocoDDS::Plugins
+    GatewayAPI PocoDDS::GatewayAPI
+    WorkflowAPI PocoDDS::WorkflowAPI
+    WorkflowCore PocoDDS::WorkflowCore
+    StoreForwardAPI PocoDDS::StoreForwardAPI
+    StoreForwardCore PocoDDS::StoreForwardCore
+    TransportProviderAPI PocoDDS::TransportProviderAPI
+    TransportProviderCore PocoDDS::TransportProviderCore
+    CapabilitiesAPI PocoDDS::CapabilitiesAPI
+    CapabilitiesCore PocoDDS::CapabilitiesCore
+    CapabilitiesPersistence PocoDDS::CapabilitiesPersistence
+    ConfigTransactionAPI PocoDDS::ConfigTransactionAPI
+    ConfigTransactionCore PocoDDS::ConfigTransactionCore
+    SchemaRegistryAPI PocoDDS::SchemaRegistryAPI
+    SchemaRegistryCore PocoDDS::SchemaRegistryCore
+    ResourceGovernanceAPI PocoDDS::ResourceGovernanceAPI
+    ResourceGovernanceCore PocoDDS::ResourceGovernanceCore
+    SchedulingAPI PocoDDS::SchedulingAPI
+    SchedulingCore PocoDDS::SchedulingCore
+    SchedulingConfiguration PocoDDS::SchedulingConfiguration
+    ServiceClientAPI PocoDDS::ServiceClientAPI
+    ServiceClientCore PocoDDS::ServiceClientCore
+    ServiceClientTesting PocoDDS::ServiceClientTesting
+    ServiceDependencyAPI PocoDDS::ServiceDependencyAPI
+    ServiceDependencyCore PocoDDS::ServiceDependencyCore
+    ServiceDirectoryAPI PocoDDS::ServiceDirectoryAPI
+    ServiceDirectoryCore PocoDDS::ServiceDirectoryCore
+    MembershipAPI PocoDDS::MembershipAPI
+    MembershipCore PocoDDS::MembershipCore
+    MembershipPersistence PocoDDS::MembershipPersistence
+    LifecycleAPI PocoDDS::LifecycleAPI
+    LifecycleCore PocoDDS::LifecycleCore
+    LifecyclePersistence PocoDDS::LifecyclePersistence
+    ProtocolCore PocoDDS::ProtocolCore
     Protocols PocoDDS::Protocols
     BtLE PocoDDS::BtLE
     CAN PocoDDS::CAN
+    FastDDSAbiV1 PocoDDS::FastDDSAbiV1
     FastDDSCore PocoDDS::FastDDSCore
     FastDDSTransport PocoDDS::FastDDSTransport
     Modbus PocoDDS::Modbus

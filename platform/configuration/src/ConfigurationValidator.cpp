@@ -107,6 +107,50 @@ void bundleManagementPatterns(const Poco::Util::AbstractConfiguration& config,
             issues.push_back({key, "duplicate Bundle pattern " + pattern});
     }
 }
+
+void booleanValue(const Poco::Util::AbstractConfiguration& config,
+                  const std::string& key,
+                  std::vector<ValidationIssue>& issues)
+{
+    if (!config.hasProperty(key)) return;
+    try { static_cast<void>(config.getBool(key)); }
+    catch (...) { issues.push_back({key, "must be a boolean"}); }
+}
+
+void resourceGovernance(const Poco::Util::AbstractConfiguration& config,
+                        std::vector<ValidationIssue>& issues)
+{
+    const auto validatePolicy = [&](const std::string& prefix) {
+        integerRange(config, prefix + "maximumConcurrency", 1, 64, false, issues);
+        integerRange(config, prefix + "queueCapacity", 1, 100000, false, issues);
+        integerRange(config, prefix + "queueTimeoutMilliseconds", 1, 3600000, false,
+                     issues);
+        integerRange(config, prefix + "executionTimeoutMilliseconds", 1, 3600000,
+                     false, issues);
+        integerRange(config, prefix + "failureThreshold", 1, 100000, false, issues);
+        integerRange(config, prefix + "circuitResetMilliseconds", 1, 3600000, false,
+                     issues);
+    };
+    validatePolicy("pdr.resourceGovernor.default.");
+    integerRange(config, "pdr.resourceGovernor.overrides.count", 0, 128, false, issues);
+    int count = 0;
+    try { count = config.getInt("pdr.resourceGovernor.overrides.count", 0); }
+    catch (...) {}
+    std::unordered_set<std::string> owners;
+    for (int index = 0; index < count && index < 128; ++index)
+    {
+        const auto prefix = "pdr.resourceGovernor.overrides." +
+            std::to_string(index) + ".";
+        const auto owner = config.getString(prefix + "owner", "");
+        if (!std::regex_match(owner,
+                std::regex("[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")))
+            issues.push_back({prefix + "owner",
+                              "must be a 1-128 character Bundle or module owner ID"});
+        else if (!owners.insert(owner).second)
+            issues.push_back({prefix + "owner", "duplicate resource owner " + owner});
+        validatePolicy(prefix);
+    }
+}
 }
 
 std::vector<ValidationIssue> ConfigurationValidator::validate(
@@ -120,6 +164,68 @@ std::vector<ValidationIssue> ConfigurationValidator::validate(
     integerRange(config, "osp.web.server.port", 1, 65535, true, issues);
     integerRange(config, "pdr.fastdds.domainId", 0, 232, true, issues);
     integerRange(config, "pdr.subprocess.shutdownTimeoutMilliseconds", 1, 3600000, true, issues);
+    const bool bundleAuthorizationRequired =
+        config.getBool("osp.bundleMonitor.authorization.required", false);
+    if (bundleAuthorizationRequired)
+    {
+        for (const std::string& key : {
+                 "osp.bundleMonitor.authorization.repositoryId",
+                 "osp.bundleMonitor.authorization.evidenceDirectory",
+                 "osp.bundleMonitor.authorization.trustPolicyFile",
+                 "osp.bundleMonitor.authorization.expectedTrustPolicyId",
+                 "osp.bundleMonitor.authorization.trustedKeysDirectory"})
+        {
+            if (config.getString(key, "").empty())
+                issues.push_back({key, "is required when Bundle publisher authorization is enabled"});
+        }
+        const std::string digest = config.getString(
+            "osp.bundleMonitor.authorization.expectedTrustPolicySha256", "");
+        if (!std::regex_match(digest, std::regex("[0-9a-f]{64}")))
+            issues.push_back({"osp.bundleMonitor.authorization.expectedTrustPolicySha256",
+                              "must be a lowercase SHA-256 when Bundle publisher authorization is enabled"});
+    }
+    if (config.hasProperty("pdr.capabilityRuntime.policy") &&
+        config.getString("pdr.capabilityRuntime.policy", "").empty())
+        issues.push_back({"pdr.capabilityRuntime.policy", "must be a non-empty path"});
+    if (config.hasProperty("pdr.capabilityRuntime.database") &&
+        config.getString("pdr.capabilityRuntime.database", "").empty())
+        issues.push_back({"pdr.capabilityRuntime.database", "must be a non-empty path"});
+    integerRange(config, "pdr.capabilityRuntime.auditMaximumRecords",
+                 1, 1000000, false, issues);
+    integerRange(config, "pdr.capabilityRuntime.memoryAuditCapacity",
+                 1, 1000000, false, issues);
+    integerRange(config, "pdr.capabilityRuntime.leaseDurationMilliseconds",
+                 1, 60000, false, issues);
+    integerRange(config, "pdr.capabilityRuntime.leaseMaximumUses",
+                 1, 1000000, false, issues);
+    integerRange(config, "pdr.capabilityRuntime.leaseCapacity",
+                 1, 1000000, false, issues);
+    resourceGovernance(config, issues);
+    const auto validateSchedule = [&](const std::string& prefix) {
+        booleanValue(config, prefix + "schedulerEnabled", issues);
+        const auto intervalKey = prefix + "schedulerIntervalMilliseconds";
+        const auto jitterKey = prefix + "schedulerJitterMilliseconds";
+        integerRange(config, intervalKey, 1, 86400000, false, issues);
+        integerRange(config, jitterKey, 0, 86400000, false, issues);
+        if (config.hasProperty(intervalKey) && config.hasProperty(jitterKey))
+        {
+            try
+            {
+                if (config.getInt64(jitterKey) > config.getInt64(intervalKey))
+                    issues.push_back({jitterKey,
+                                      "must not exceed schedulerIntervalMilliseconds"});
+            }
+            catch (...) {}
+        }
+    };
+    validateSchedule("pdr.workflow.");
+    validateSchedule("pdr.outbox.");
+    integerRange(config, "pdr.outbox.maintenanceIntervalSeconds",
+                 1, 86400, false, issues);
+    if (config.hasProperty("pdr.lifecycleRuntime.database") &&
+        config.getString("pdr.lifecycleRuntime.database", "").empty())
+        issues.push_back({"pdr.lifecycleRuntime.database",
+                          "must be a non-empty path"});
     bundleManagementPatterns(config, issues);
     const bool managementAuthenticationRequired =
         config.getBool("pdr.management.authentication.required", false);
@@ -161,7 +267,8 @@ std::vector<ValidationIssue> ConfigurationValidator::validate(
     const std::unordered_set<std::string> allowedManagementPermissions{
         "protocol.manage", "process.manage", "bundle.manage", "configuration.manage",
         "identity.manage", "audit.read", "task.read", "task.cancel",
-        "diagnostics.read", "diagnostics.execute"};
+        "diagnostics.read", "diagnostics.execute", "capability.read", "capability.manage",
+        "resource.read"};
     std::unordered_set<std::string> principalIds;
     std::unordered_set<std::string> principalTokenEnvironments;
     std::unordered_set<std::string> principalTokenValues;
@@ -702,6 +809,9 @@ std::vector<ValidationIssue> ConfigurationValidator::validate(
         if (config.getBool("auth.simple.enable", false))
             issues.push_back({"auth.simple.enable",
                               "legacy SimpleAuth is prohibited in production"});
+        if (!bundleAuthorizationRequired)
+            issues.push_back({"osp.bundleMonitor.authorization.required",
+                              "production requires signed Bundle repository authorization"});
     }
     return issues;
 }

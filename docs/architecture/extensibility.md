@@ -43,6 +43,10 @@ PocoDDSRuntime/
 
 特定客户或产品的代码优先放在独立产品仓库，通过安装后的 `PocoDDSRuntime` CMake Package 消费 SDK。这样框架升级与项目交付可以分别版本化。确实需要同仓开发时，项目目录也必须保持 `modules/`、`services/`、`bundles/`、`subprocesses/` 分开，并由项目自己的顶层 CMake 组合；不要把项目分支写进 `server/MacchinaServer.cpp`。
 
+产品若实现独立进程治理控制面，可消费 `PocoDDS::ProcessGraph` 中的
+`ProcessDesiredStateMaintenance.h`，用 ProcessGraph 观测到的代次执行 CAS 重新提交。该接口只提供
+核心原语，不替产品实现认证、授权、审计和幂等；匿名 HTTP Bundle 不得直接转发该写操作。
+
 ## 快速新增
 
 ```powershell
@@ -58,6 +62,16 @@ PocoDDSRuntime/
 项目创建、清单校验和源码摘要锁定的完整流程见[产品项目工作区](../development/project-workspaces.md)；新项目先按[框架模型选择与项目适配](framework-model-selection.md)选择 Profile、Host 和 Transport。
 
 `bundle` 是受治理的外部 OSP Plugin Bundle 别名，仍使用 `pdr.plugin.*` 命名并经过 API/ABI、签名、隔离和回退门禁。生成器默认拒绝覆盖非空目录。
+
+产品项目中的每个生成组件使用 `pdr-component.json` 声明 ID、Owner、公共 Target、隔离方式和
+显式 `requires`。项目组合器按依赖拓扑加载组件，并在 CMake 配置期核对实际项目 Target 链接；
+禁止依赖环、未声明链接以及 Module/Service/Bundle/Subprocess 反向依赖。
+
+设备和协议实现通过 `PocoDDS::GatewayAPI` 中的 `DeviceFactoryService` 或
+`ProtocolFactoryService` 注册到 OSP Service Registry。提供者 Bundle 必须早于对应 Gateway
+启动，并在已创建实例的完整生命周期内保持激活。Gateway 只拥有枚举、公共配置、实例 ID、
+健康、重连和关闭顺序；业务 Bundle 只拥有具体对象创建及该类型专属配置，禁止包含或链接
+Gateway 的 `BundleActivator.cpp`。
 
 框架内的 `services/`、`SubSystem/` 和 `webui/` 会自动发现包含 `CMakeLists.txt` 的直接子目录。新增组件无需再修改中央目录清单；组件自己的 CMake 负责源文件、测试、打包、安装和可选开关。
 

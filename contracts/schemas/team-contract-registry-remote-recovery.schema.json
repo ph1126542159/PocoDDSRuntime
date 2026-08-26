@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-recovery.schema.json",
+  "title": "Pinned operator disposition for an interrupted remote Registry request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "registryId", "targetRequestId", "targetRequestSha256", "expectedStartedRevision", "expectedCurrentRevision", "disposition", "reason"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteRecovery"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "targetRequestId": {"$ref": "#/$defs/id"},
+    "targetRequestSha256": {"$ref": "#/$defs/sha256"},
+    "expectedStartedRevision": {"type": "integer", "minimum": 0},
+    "expectedCurrentRevision": {"type": "integer", "minimum": 0},
+    "disposition": {"enum": ["aborted", "uncertain"]},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 512}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

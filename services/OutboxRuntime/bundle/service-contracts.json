@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "provides": [
+    {
+      "contract": "pdr.store-forward-runtime",
+      "version": "1.0.0",
+      "serviceName": "pdr.service.outboxRuntime"
+    }
+  ],
+  "requires": [
+    {
+      "contract": "pdr.scheduling",
+      "versionRange": "[1.0.0,2.0.0)",
+      "required": true,
+      "minimumProviders": 1
+    }
+  ]
+}

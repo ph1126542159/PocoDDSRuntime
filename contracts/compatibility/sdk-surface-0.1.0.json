@@ -1,0 +1,688 @@
+{
+  "schemaVersion": 1,
+  "operation": "sdk-public-surface-snapshot",
+  "runtimeVersion": "0.1.0",
+  "surfaceSha256": "06e1dc6c828e15fb7e9defccde733ebf080e411a25b00521aab9f841bcf938ab",
+  "publicHeaders": {
+    "include/PocoDDS/Application/Application.h": {
+      "tokenSha256": "1d22eb25ae75cfa405a6cead5e565e470f93f443b3fee32fb61234c1dd72b0ab",
+      "tokenCount": 1171
+    },
+    "include/PocoDDS/BundleManagement/BundleDeploymentCoordinator.h": {
+      "tokenSha256": "65cc9d9759f5a30c914199361424c507b6e6efde9a7b3335d6674d7612e5c68c",
+      "tokenCount": 297
+    },
+    "include/PocoDDS/BundleManagement/BundleManager.h": {
+      "tokenSha256": "6894070e3998a9d323d42f3e54217887ecd27006d08aab27f3490f2bae2e31a1",
+      "tokenCount": 251
+    },
+    "include/PocoDDS/BundleManagement/BundleRepositoryAuthorization.h": {
+      "tokenSha256": "27877f98e4f937fb9493dd591824f60455a251f01c16909ef8389a5e7ca064e0",
+      "tokenCount": 214
+    },
+    "include/PocoDDS/BundleManagement/BundleRepositoryFingerprint.h": {
+      "tokenSha256": "7384c1571b03990d98b792c603b9ac5ad4f62f90d6d5cecfff1a88506b47be69",
+      "tokenCount": 74
+    },
+    "include/PocoDDS/BundleManagement/BundleRepositoryRolloutGuard.h": {
+      "tokenSha256": "4b2b08bfed111d0db62120af6391c24ef71138f123a82ac4304b689e047d5d47",
+      "tokenCount": 223
+    },
+    "include/PocoDDS/Capabilities/AuthorizedTransport.h": {
+      "tokenSha256": "2e8313b48cb5a9b01d2f85e274e76a016fe880060f14c221df0d5bf3198d0155",
+      "tokenCount": 215
+    },
+    "include/PocoDDS/Capabilities/Capabilities.h": {
+      "tokenSha256": "3eb5aad96c52ac9f3d48960164a6abb310c12eeb1221c6dbdf8156fece3b08e3",
+      "tokenCount": 536
+    },
+    "include/PocoDDS/Capabilities/CapabilityRuntimeService.h": {
+      "tokenSha256": "e351008656eecacdcbd79993ca670cc7d5b1246fd69e4bbaa23a44b902157e13",
+      "tokenCount": 250
+    },
+    "include/PocoDDS/Capabilities/DecisionLease.h": {
+      "tokenSha256": "084dfef60df9b68001ee149aee3235f5ff7c5e88437ff77550548a80b9ba695c",
+      "tokenCount": 300
+    },
+    "include/PocoDDS/Capabilities/Export.h": {
+      "tokenSha256": "2e0ab6334c812c31efa304d29ea2eb87e84576ee7d35c49facd5daf33a993b57",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/Capabilities/PolicyEngine.h": {
+      "tokenSha256": "ab4d4b1dacea7799f2ed2643ee683d739d1edc789200f23e88833301e3927235",
+      "tokenCount": 209
+    },
+    "include/PocoDDS/Capabilities/SqlitePolicyStore.h": {
+      "tokenSha256": "c5e3095f47ed006236228d1bf610a85ce8c48130bc70ab7eea8d2f6336eb3b0d",
+      "tokenCount": 160
+    },
+    "include/PocoDDS/ConfigTransaction/ConfigTransaction.h": {
+      "tokenSha256": "8d7c9a4e213a5a3030e281201bef88dbbf67f91ba2a2925eab6b4680950520f3",
+      "tokenCount": 617
+    },
+    "include/PocoDDS/ConfigTransaction/ConfigurationParticipantService.h": {
+      "tokenSha256": "f2193788e405c7a1beff189da6e26074c4a0943313b75597f779b86f418991c6",
+      "tokenCount": 193
+    },
+    "include/PocoDDS/ConfigTransaction/ConfigurationRuntimeService.h": {
+      "tokenSha256": "dfadde64094f3667d16faffed880be4c7727a46e8244b351f2e2c8810cfe1bea",
+      "tokenCount": 216
+    },
+    "include/PocoDDS/ConfigTransaction/Export.h": {
+      "tokenSha256": "8386603e01af107cef123463240596237826c196628ba8f5edff5978e84fe4f5",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/ConfigTransaction/SqliteTransactionStore.h": {
+      "tokenSha256": "6e4a5697dc371f265a41221b914700e0c9a05ebab782751ff5cdc0ae700ba34c",
+      "tokenCount": 171
+    },
+    "include/PocoDDS/ConfigTransaction/TransactionEngine.h": {
+      "tokenSha256": "e382eff72a8622f1dc9773897cce44a3ed59df656876573d273aa82c8b4569e8",
+      "tokenCount": 337
+    },
+    "include/PocoDDS/ConfigTransaction/TransactionStore.h": {
+      "tokenSha256": "f8e1aef3379ad881a18c80b10042b119538c5d893c1ff55b1e8e42ba614dd03d",
+      "tokenCount": 159
+    },
+    "include/PocoDDS/Configuration/ConfigurationValidator.h": {
+      "tokenSha256": "98b02b3110a4ab15c03ed6feb4276755b4fdba6c1e73f3719a20d59addb4e171",
+      "tokenCount": 88
+    },
+    "include/PocoDDS/Configuration/IndexedConfiguration.h": {
+      "tokenSha256": "59d00cb415dc80441dc1a8951163f9468e63c8a6c2842219cc01162ea0674a65",
+      "tokenCount": 120
+    },
+    "include/PocoDDS/DDS/DeviceBridge.h": {
+      "tokenSha256": "9ef9fe0dd01451918b17c7d41d6f7f4e8b4c530b5b8c5be14a1ed26ff1bf37e7",
+      "tokenCount": 137
+    },
+    "include/PocoDDS/DDS/Envelope.h": {
+      "tokenSha256": "63f74af88b26be7df9fdcd8489f017a21c45c7d1800548519aac9d6fd771f2aa",
+      "tokenCount": 93
+    },
+    "include/PocoDDS/DDS/EnvelopeTopicDataType.h": {
+      "tokenSha256": "71b8fcc5b51163782c1b67e2620713d8e5b1e00577ced0d921e5ad7184ad8040",
+      "tokenCount": 195
+    },
+    "include/PocoDDS/DDS/Runtime.h": {
+      "tokenSha256": "06a6d1c45186aed28e89e60c8291e3397306f03dcf505c2942d1376fa5ae2342",
+      "tokenCount": 332
+    },
+    "include/PocoDDS/DDS/ServiceEndpoint.h": {
+      "tokenSha256": "be89442812b064b7448bb68a66fc72a95f56495fd605f17ecdacb74b30b38297",
+      "tokenCount": 319
+    },
+    "include/PocoDDS/DDS/TracePropagation.h": {
+      "tokenSha256": "2a83a5438d838618f6825fcf310e6fcdb71d5e66d86ab9e25dd3c24830f5051e",
+      "tokenCount": 87
+    },
+    "include/PocoDDS/Devices/BooleanSensor.h": {
+      "tokenSha256": "0131cd4b2a49f1a22d735e33ec17d5aec86f49c37e2ca8267e9421e3552d5433",
+      "tokenCount": 59
+    },
+    "include/PocoDDS/Devices/CanSignalSensor.h": {
+      "tokenSha256": "abebe0ba43389d13b81e750cda6e901e0d46d92142bc1a548fc916900c9bdcbb",
+      "tokenCount": 533
+    },
+    "include/PocoDDS/Devices/Counter.h": {
+      "tokenSha256": "a1647dfdc1e6bd8d3fa1b3a5af144061a6d5f3292fe53b75f10e43352fdaff33",
+      "tokenCount": 76
+    },
+    "include/PocoDDS/Devices/Device.h": {
+      "tokenSha256": "1bf11cb82a83eb96dd798274cf93011b300764792b3904c1376df785f118c8c3",
+      "tokenCount": 431
+    },
+    "include/PocoDDS/Devices/DeviceService.h": {
+      "tokenSha256": "d3e226a42dcbc793275862a74445a66d4024445894a67a702102def8d9afe81d",
+      "tokenCount": 148
+    },
+    "include/PocoDDS/Devices/DeviceTypes.h": {
+      "tokenSha256": "7aad49756fb07135dc5d76e5f58432ff2b1cd25a1eb2e08f56b684b0dba2eab1",
+      "tokenCount": 149
+    },
+    "include/PocoDDS/Devices/DigitalIO.h": {
+      "tokenSha256": "76067c50b16f67172394237d8f783613ca2d158b5dddc138dab4f62b1ee29e2a",
+      "tokenCount": 156
+    },
+    "include/PocoDDS/Devices/Filesystem.h": {
+      "tokenSha256": "1a6a53565de07818eb8258be7d13fcb04d213bba23f2b2f36495402da7ac401b",
+      "tokenCount": 61
+    },
+    "include/PocoDDS/Devices/GNSSSensor.h": {
+      "tokenSha256": "60ff323142d97da122b10434b686fe9f9782a2e3239d1cac2a07860e8a32bfee",
+      "tokenCount": 73
+    },
+    "include/PocoDDS/Devices/LinuxSysfsGpioDevice.h": {
+      "tokenSha256": "ecb6d4060f80c2b5f9458c4183389c981419302026011eb58e4b092c70384ba7",
+      "tokenCount": 388
+    },
+    "include/PocoDDS/Devices/LinuxSysfsLedDevice.h": {
+      "tokenSha256": "741b874e7fc6fe7208ae83640365ab102922f3777825094cbbe00ca22afb1030",
+      "tokenCount": 284
+    },
+    "include/PocoDDS/Devices/MediaDevices.h": {
+      "tokenSha256": "d4c5c6bc1a676c78d019898ed2f3ea4dc44953d3f5e85ff8d8701deb0fd79625",
+      "tokenCount": 152
+    },
+    "include/PocoDDS/Devices/ModbusRegisterDevice.h": {
+      "tokenSha256": "52fa4cd835c703e3a5a255c942c7145282d2495852c58baa2bf4d42b5d2e9f72",
+      "tokenCount": 335
+    },
+    "include/PocoDDS/Devices/MotionSensors.h": {
+      "tokenSha256": "b62b601372adf05cd0fad08cb750cf9d2ffeff2f52f8896ccff5e5b93f0c3694",
+      "tokenCount": 152
+    },
+    "include/PocoDDS/Devices/NmeaGnssDevice.h": {
+      "tokenSha256": "f11c6106ec685edbdfff0a2b6a576f2914f089a64af47a345e6cc0fca13f5503",
+      "tokenCount": 484
+    },
+    "include/PocoDDS/Devices/Sensor.h": {
+      "tokenSha256": "b09d90570185c6725610ddeb3e88dabf3e5896d57d40ee7bd44119656815cadc",
+      "tokenCount": 86
+    },
+    "include/PocoDDS/Devices/SerialDevice.h": {
+      "tokenSha256": "923c1233610dfe868bfecf8297d1c2b5a353caa06def739fe8b390d9f308af1f",
+      "tokenCount": 95
+    },
+    "include/PocoDDS/Devices/SerialPortDevice.h": {
+      "tokenSha256": "c95134e8a77180d6a3031ca6ef47c248e7efb11e514a3a7c95d469f07c7424e1",
+      "tokenCount": 407
+    },
+    "include/PocoDDS/Devices/SimulatedDevice.h": {
+      "tokenSha256": "8d2f686f701f3f639538f9698b83f76fa279ff4170bcae2326ca99e2f6aba3fe",
+      "tokenCount": 189
+    },
+    "include/PocoDDS/Devices/XBeeAnalogSensor.h": {
+      "tokenSha256": "089048c69a83422de55c57869267de118978f657b85c28b7b7ebe93f38d5abcc",
+      "tokenCount": 552
+    },
+    "include/PocoDDS/DiagnosticTerminal/DiagnosticProvider.h": {
+      "tokenSha256": "86e87ed6a275dbc13c156ea13e76f867ecfe4195338f7899d1846b7414f05a43",
+      "tokenCount": 427
+    },
+    "include/PocoDDS/FastDdsTransport/Export.h": {
+      "tokenSha256": "266f433d401743ec6f59ffdbd74a1b896cb2382f9687491cac2e9b4ab9207852",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/FastDdsTransport/FastDdsTransport.h": {
+      "tokenSha256": "f90dca056be4e78d5cf17700a7d1711bbeb64ebdabf80e12616533cde4d79e9a",
+      "tokenCount": 234
+    },
+    "include/PocoDDS/FastDdsTransport/Registration.h": {
+      "tokenSha256": "0c4a77210c02d2db00c4e66116e56943d3818294a051773f0859fa679f07f4d3",
+      "tokenCount": 78
+    },
+    "include/PocoDDS/Gateways/FactoryService.h": {
+      "tokenSha256": "be92f7421549a811c699a6027aacfcf170fb8e8c83c87a8a4f229440eb4e1dca",
+      "tokenCount": 445
+    },
+    "include/PocoDDS/Health/Health.h": {
+      "tokenSha256": "8199cca88b57b296a82213d436d003a137bebf7b569ca179f1e81f043f24069c",
+      "tokenCount": 316
+    },
+    "include/PocoDDS/Lifecycle/DrainGate.h": {
+      "tokenSha256": "9904b8c615398991a36ad9e2533bbad3642568b9543df71f7072e78a11e8f094",
+      "tokenCount": 307
+    },
+    "include/PocoDDS/Lifecycle/DrainParticipantService.h": {
+      "tokenSha256": "c7b88c0cc9a3a7f21f87257d2933224460ae0783d1ecb106d86cc826e551a4c8",
+      "tokenCount": 240
+    },
+    "include/PocoDDS/Lifecycle/Export.h": {
+      "tokenSha256": "c0eca1ed52577e13037993b0bff912bd5623c146b69b182b827fdd87e22ad352",
+      "tokenCount": 73
+    },
+    "include/PocoDDS/Lifecycle/LifecycleRuntimeService.h": {
+      "tokenSha256": "692e97cb3342c62679172fb67e3c3296aecb812b54f1f76350d57cb938224db0",
+      "tokenCount": 273
+    },
+    "include/PocoDDS/Lifecycle/Maintenance.h": {
+      "tokenSha256": "f6bebc24ea4abe72150ded6e44608dc9abcad9c03c2c999eabd0e00e4a0d8a5e",
+      "tokenCount": 209
+    },
+    "include/PocoDDS/Lifecycle/MaintenanceStore.h": {
+      "tokenSha256": "7ce35180a129345c8078f9dc965b77c2872dc8ba84a6706563fdae78991bdfbe",
+      "tokenCount": 164
+    },
+    "include/PocoDDS/Lifecycle/SqliteMaintenanceStore.h": {
+      "tokenSha256": "e84e509f417243fab234508654a4d3be2bbca1fff95707260c5e5ff5c1aaf24f",
+      "tokenCount": 261
+    },
+    "include/PocoDDS/ManagementAuth/IdentityService.h": {
+      "tokenSha256": "fc508f7af878de68d8230ccdc54be346fd39f49833186566a0484ff3da78ba42",
+      "tokenCount": 229
+    },
+    "include/PocoDDS/MqttTransport/Export.h": {
+      "tokenSha256": "0830e077bf7a7ba6237a56cdb7e011f5a0e3bbe3955d1b421339a94146c915a4",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/MqttTransport/MqttTransport.h": {
+      "tokenSha256": "3653d1774d1f51c91ee3550a069a0176b823d88b55aea92fa2d3f02d600599b4",
+      "tokenCount": 280
+    },
+    "include/PocoDDS/MqttTransport/Registration.h": {
+      "tokenSha256": "7a73b1ea4323d45cd231acb2f3accbf107ca16588563162f67efe289cb796528",
+      "tokenCount": 78
+    },
+    "include/PocoDDS/Observability/BusinessTracer.h": {
+      "tokenSha256": "2d3ad8634d830181088690817f3caa572b7dbcd96f954c59204c50229c9dcd47",
+      "tokenCount": 675
+    },
+    "include/PocoDDS/Observability/Metrics.h": {
+      "tokenSha256": "f2ef35a05697c565e181127dfabc0a27f5424543b9300b2e7ea2da35ad22d73a",
+      "tokenCount": 605
+    },
+    "include/PocoDDS/Observability/TraceHttpServer.h": {
+      "tokenSha256": "2d76975450a22cc4aaf5a12d7095c6f801a768733daed52fb0f25511494747fb",
+      "tokenCount": 127
+    },
+    "include/PocoDDS/Observability/TraceSerialization.h": {
+      "tokenSha256": "807c4f9c626869700db002be7dbb37ef02e0f35f3823e7d8906049ab8af542fc",
+      "tokenCount": 39
+    },
+    "include/PocoDDS/Observability/TraceStore.h": {
+      "tokenSha256": "929fff1492805e15009f6b5c4515458f690c63c58f35d9ad1f96c927ce563842",
+      "tokenCount": 468
+    },
+    "include/PocoDDS/Persistence/Persistence.h": {
+      "tokenSha256": "9f933ed1357df9b35cbb8eb12e79c161c0b163dfcfa4c2e40d48bc8d9e5c0290",
+      "tokenCount": 276
+    },
+    "include/PocoDDS/ProcessManagement/SubprocessManager.h": {
+      "tokenSha256": "2082945ec4617ecd74d995c2c91eb624e402349add8518a6121da23714d833bd",
+      "tokenCount": 276
+    },
+    "include/PocoDDS/Protocols/BtLE/GattClient.h": {
+      "tokenSha256": "56dba75c7091f1b5dc8d95d491590d2691cd066584dfa2a16e78e21ca744cd93",
+      "tokenCount": 668
+    },
+    "include/PocoDDS/Protocols/BtLE/PeripheralBrowser.h": {
+      "tokenSha256": "ddf96c050b60f01f4887284131c320e378945b003627716106795e343a9602aa",
+      "tokenCount": 220
+    },
+    "include/PocoDDS/Protocols/BtLE/SimulatedGattClient.h": {
+      "tokenSha256": "40ef73f811d154865a132f27ccc1b65a6736de1445998b17dcbd59c3adca5ba2",
+      "tokenCount": 657
+    },
+    "include/PocoDDS/Protocols/CAN/CanEndpoint.h": {
+      "tokenSha256": "1f1c8766d266828a59e43e0eff51ca1a592c7787285ec38dde1bf7866179f316",
+      "tokenCount": 161
+    },
+    "include/PocoDDS/Protocols/CAN/LoopbackCanEndpoint.h": {
+      "tokenSha256": "6fe86c66d31af115ae3fa75cc50cf172289f92df78427c2c77bf70ed0f1b5098",
+      "tokenCount": 169
+    },
+    "include/PocoDDS/Protocols/CAN/SignalCodec.h": {
+      "tokenSha256": "4c44dfa55c4188941be09b7425a3fcef69b10de4188b3340eb1c6d5a2099ebef",
+      "tokenCount": 122
+    },
+    "include/PocoDDS/Protocols/CAN/SocketCanEndpoint.h": {
+      "tokenSha256": "757d33c80567a8c0555037353b10a6d03456a8201bd3e48ac2ec2099dc917aac",
+      "tokenCount": 127
+    },
+    "include/PocoDDS/Protocols/Modbus/ModbusTcpClient.h": {
+      "tokenSha256": "641455edda52dc966f00f4996b4adffb6d3cfa92c8a5411faa9838ae8ad28812",
+      "tokenCount": 279
+    },
+    "include/PocoDDS/Protocols/Modbus/ModbusTcpCodec.h": {
+      "tokenSha256": "08febe60110aa553fb0bace65b8ab6c867d45bab6086fa134e8b661b19b3c8cd",
+      "tokenCount": 211
+    },
+    "include/PocoDDS/Protocols/MQTT/MqttClient.h": {
+      "tokenSha256": "72cdbd20df61b89253e66788b0d3e87f8ff7059b414361d59120c626a6d07487",
+      "tokenCount": 561
+    },
+    "include/PocoDDS/Protocols/Protocol.h": {
+      "tokenSha256": "cdcc5f160727c32577a68a61ee8cd65bd02d5f12cde25e08f4fdf7283cefea5b",
+      "tokenCount": 67
+    },
+    "include/PocoDDS/Protocols/ProtocolDiagnostics.h": {
+      "tokenSha256": "0732758f5c77722b5879e6c0039025f611a90571698426de8ab810997c53b1af",
+      "tokenCount": 266
+    },
+    "include/PocoDDS/Protocols/ProtocolMetrics.h": {
+      "tokenSha256": "566bdc173e6983afd67550c5df85429e9e4406ca95dc4ccbccf9b8b498972457",
+      "tokenCount": 426
+    },
+    "include/PocoDDS/Protocols/ProtocolService.h": {
+      "tokenSha256": "7dac990f1e4ae35edef57d4e2bdebbb5fc598dc3e877e9720586ce8c28480749",
+      "tokenCount": 777
+    },
+    "include/PocoDDS/Protocols/ROS/BridgeClient.h": {
+      "tokenSha256": "6d74549feb9efe7bb36b47a50c4cd172df5b5bfa06551e382801bc48c627f2fd",
+      "tokenCount": 568
+    },
+    "include/PocoDDS/Protocols/Serial/LoopbackSerialChannel.h": {
+      "tokenSha256": "802da9953737b3034508bde62fc5eb9768cca2956d20f279e8cb0378e8e5daaf",
+      "tokenCount": 176
+    },
+    "include/PocoDDS/Protocols/Serial/SerialChannel.h": {
+      "tokenSha256": "5dfdfad33bbf7bee368fdd7cdb9e32a66c2f25ea7944781949c89e47ce924d3e",
+      "tokenCount": 285
+    },
+    "include/PocoDDS/Protocols/UDP/UdpChannel.h": {
+      "tokenSha256": "77e986464de5d268846511321aad3dd9098f76d531a560f14156198a31878fc4",
+      "tokenCount": 300
+    },
+    "include/PocoDDS/Protocols/WebTunnel/LocalForwarder.h": {
+      "tokenSha256": "f414c78184920e052c876ba6d733f9468740298bcf79350754f8f0cdb03138f5",
+      "tokenCount": 212
+    },
+    "include/PocoDDS/Protocols/WebTunnel/Service.h": {
+      "tokenSha256": "643d009dee41b94b70d00c9e43c2b9ecd429abe23e81150290dbaf59efec587d",
+      "tokenCount": 252
+    },
+    "include/PocoDDS/Protocols/WebTunnel/SimulatedService.h": {
+      "tokenSha256": "1dffa144224fd44e605e263bf9024f366576b0980c416ff8f84c267db4f63192",
+      "tokenCount": 372
+    },
+    "include/PocoDDS/Protocols/XBee/IoSample.h": {
+      "tokenSha256": "cfd804881cb2f4c8cf6807583643d118f1d05c00218fb35758e8b36572510ee9",
+      "tokenCount": 150
+    },
+    "include/PocoDDS/Protocols/XBee/XBeeFrame.h": {
+      "tokenSha256": "872a2011ace5ba93b10463eef222233e6f5d623bc2785cd9cee65440c32f5784",
+      "tokenCount": 269
+    },
+    "include/PocoDDS/Protocols/XBee/XBeePort.h": {
+      "tokenSha256": "3624285c4966919e5d58b4a6d043dd7b6e70063cc83c2f14af9e9901d17f789e",
+      "tokenCount": 151
+    },
+    "include/PocoDDS/Reliability/AlertSink.h": {
+      "tokenSha256": "d316ee60f06234a789be3d6faa238e0560e3dc88c6e52ad39e794c61324c8ab2",
+      "tokenCount": 116
+    },
+    "include/PocoDDS/Reliability/Reliability.h": {
+      "tokenSha256": "416391a249d4ea2ee1b7e239f356be029afc389990b8af9a3a84df92f9f024f5",
+      "tokenCount": 1392
+    },
+    "include/PocoDDS/ResourceGovernance/Export.h": {
+      "tokenSha256": "2ae2e3f81d7cc300e880073fd82e1784de5075fee50b90bc2be48281c0dd7673",
+      "tokenCount": 89
+    },
+    "include/PocoDDS/ResourceGovernance/ManagedWorkLane.h": {
+      "tokenSha256": "ad7842a5bb69a4d4c2ec177dfb86fdddda3930fe797bb732f405a3dcfb54a4bf",
+      "tokenCount": 171
+    },
+    "include/PocoDDS/ResourceGovernance/ResourceGovernor.h": {
+      "tokenSha256": "54a4c5871e407d3a54edd8ca0a1426649c5a857f93310698c06af0fee211712a",
+      "tokenCount": 605
+    },
+    "include/PocoDDS/ResourceGovernance/ResourceGovernorService.h": {
+      "tokenSha256": "4858a3af0133b08e711c1eda4e3a250b16b2bf1abb71484507cbddf912a0d8c2",
+      "tokenCount": 200
+    },
+    "include/PocoDDS/RuntimeCore/Codec.h": {
+      "tokenSha256": "79d40225f6fef6f02e8b5ef11d1a28b9e690b584cd8b8c05274a6db383174ace",
+      "tokenCount": 139
+    },
+    "include/PocoDDS/RuntimeCore/Contract.h": {
+      "tokenSha256": "3b08d27e8a6e5c2430ad7b85edebe8f767ee24e0677cef32d58d2103a306ee18",
+      "tokenCount": 472
+    },
+    "include/PocoDDS/RuntimeCore/Executor.h": {
+      "tokenSha256": "09dac87d876e2fef1b89dc5bd832bd2abbcb2c6ca7ea189411c65fec357a3d6e",
+      "tokenCount": 341
+    },
+    "include/PocoDDS/RuntimeCore/Export.h": {
+      "tokenSha256": "f2df8d1510d774c98cca16082f28423f7a539a1619cf5c9c7066466789738e1b",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/RuntimeCore/Host.h": {
+      "tokenSha256": "434c4c48fae2d4092d4bb668f8ff728d02fa3b7a3487fa3a7d60a2c3d1aeabad",
+      "tokenCount": 388
+    },
+    "include/PocoDDS/RuntimeCore/InProcessTransport.h": {
+      "tokenSha256": "52b5019a276c04149f0aaf76136a759c768db9b2f2ac0da44573333a00117ce2",
+      "tokenCount": 275
+    },
+    "include/PocoDDS/RuntimeCore/Process.h": {
+      "tokenSha256": "5986b140ae816d49f079ff2d053d54a0435b0234e30341ac374084f6518b635b",
+      "tokenCount": 340
+    },
+    "include/PocoDDS/RuntimeCore/StaticHost.h": {
+      "tokenSha256": "ce3f53307e95742dcbad293f03e878452f7411b96ba5f6234ac60d38b41da168",
+      "tokenCount": 123
+    },
+    "include/PocoDDS/RuntimeCore/Testing/Export.h": {
+      "tokenSha256": "add86086fd1c615512e2c7eef06db54501bdae714d1d51275e3c6631f7251517",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/RuntimeCore/Testing/TransportConformance.h": {
+      "tokenSha256": "6c9d31d370a423f35a7108b85a098e8cae0ed59d03a4750738b0ed6609e4cc79",
+      "tokenCount": 80
+    },
+    "include/PocoDDS/RuntimeCore/Transport.h": {
+      "tokenSha256": "3a361f32a2c2640f7ef0fe73ed5b3b6c75188956a2d0d968e78b684483855522",
+      "tokenCount": 417
+    },
+    "include/PocoDDS/RuntimeCore/TransportRegistry.h": {
+      "tokenSha256": "70562f5468b36d427ab82b66a9c14d300e4abc99095395ceb45eedb5342030ea",
+      "tokenCount": 383
+    },
+    "include/PocoDDS/Scheduling/ConfigurationExport.h": {
+      "tokenSha256": "a6875f9eb1117896ab10797ba9ec0ec0ef276a72109c974c40d4f9334696146f",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/Scheduling/Export.h": {
+      "tokenSha256": "50b0b971a4d0a6a211349399775f0a0d5de2bd2f0554321e4ae0eb8e89941d95",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/Scheduling/ScheduleConfigurationParticipant.h": {
+      "tokenSha256": "bfce737bc4b264fa5ca7bc80819f8a1e7161a8ecc56624580c415259336b215a",
+      "tokenCount": 183
+    },
+    "include/PocoDDS/Scheduling/Scheduler.h": {
+      "tokenSha256": "693cba69b67c1cb63878ca877bcc1229efabba8a0c0ee20a971bb586d3db37f1",
+      "tokenCount": 620
+    },
+    "include/PocoDDS/Scheduling/SchedulerService.h": {
+      "tokenSha256": "207828d678bfb3c347fb4ab086ec93a0f54c93cc615cd5f4103d2337f17184d0",
+      "tokenCount": 232
+    },
+    "include/PocoDDS/SchemaRegistry/Export.h": {
+      "tokenSha256": "8be6a33678797b36cca8b75b13a9b585f38daf014ad1717611618ea349a9cbbc",
+      "tokenCount": 39
+    },
+    "include/PocoDDS/SchemaRegistry/Registry.h": {
+      "tokenSha256": "7173745862e90d6fc9799df9cc3260c2cfc633e5baaa1b2b40d7d702b2451bdb",
+      "tokenCount": 215
+    },
+    "include/PocoDDS/SchemaRegistry/Schema.h": {
+      "tokenSha256": "8e2acea2cd382ba82eb6c49269bfb32413e0947fbfd6d14316760cd1be767c14",
+      "tokenCount": 375
+    },
+    "include/PocoDDS/SchemaRegistry/SchemaProviderService.h": {
+      "tokenSha256": "89eaac107d067659a9426a4bdf116200b26db0e0efd955212e72fe601375f890",
+      "tokenCount": 178
+    },
+    "include/PocoDDS/SchemaRegistry/SchemaRegistryService.h": {
+      "tokenSha256": "0bf8056c261da4c5fa1c1104756ae67da00011de741727a9963a9ab39e2b00ed",
+      "tokenCount": 278
+    },
+    "include/PocoDDS/SchemaRegistry/SchemaStore.h": {
+      "tokenSha256": "795c86733e71e04b663dd7b53398472f354dfd99b6d532d2eebcbd2b9c567162",
+      "tokenCount": 130
+    },
+    "include/PocoDDS/SchemaRegistry/SqliteSchemaStore.h": {
+      "tokenSha256": "cb505a918bfd08a2952187c83844a7b118dff876338fa7a7ee6bbd12cc933e0b",
+      "tokenCount": 139
+    },
+    "include/PocoDDS/SDK/SDK.h": {
+      "tokenSha256": "bd2e8fc5ad098dff325d4cb1514e06839dd84e70d7ac179065a6ac332d0a6e0b",
+      "tokenCount": 124
+    },
+    "include/PocoDDS/SDK/Version.h": {
+      "tokenSha256": "204c7e022b2709829ccd71e4934cd931a4337bc6007afdd7ac5c4f1910fc912e",
+      "tokenCount": 94
+    },
+    "include/PocoDDS/Security/DetachedSignatureVerifier.h": {
+      "tokenSha256": "824742ba7d112381f3930231c8e14c78d5727c75cbf76ccc1e3ccafdee91256f",
+      "tokenCount": 96
+    },
+    "include/PocoDDS/Security/PrincipalStore.h": {
+      "tokenSha256": "889b61aa489da0ce3cbf445009f7eb169828d9b02ab294f74527c876502b7ccf",
+      "tokenCount": 584
+    },
+    "include/PocoDDS/ServiceDependency/Export.h": {
+      "tokenSha256": "efb26596fedd752b083ba0d21bbc8c900a509f6c1f1ea2fea82a595aff6bccc4",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/ServiceDependency/ServiceDependency.h": {
+      "tokenSha256": "5f4011d465d4f6ec83106c590a15d613ce726250eb5f3642b9a65aa647003a50",
+      "tokenCount": 625
+    },
+    "include/PocoDDS/ServiceDependency/ServiceDependencyRuntimeService.h": {
+      "tokenSha256": "634f62ea449033e1afb4733e5b36334d20529922d8136f52392acc2ddbccd2b3",
+      "tokenCount": 196
+    },
+    "include/PocoDDS/Services/WebEventService.h": {
+      "tokenSha256": "8c25eb2636708a98f89772a26756fcb5a32aefbee4b85604d6b8e16d790cf430",
+      "tokenCount": 162
+    },
+    "include/PocoDDS/StoreForward/DeliveryProviderService.h": {
+      "tokenSha256": "d6f907b28a8dad48767a43cc1cd3f2dce2a97ed20205fdce0afd72eb7c8d0061",
+      "tokenCount": 169
+    },
+    "include/PocoDDS/StoreForward/OutboxEngine.h": {
+      "tokenSha256": "65542127d898fcdd33b9c88db1134a7c97688cb3390a4afae3f358f32d1caf7c",
+      "tokenCount": 302
+    },
+    "include/PocoDDS/StoreForward/OutboxRuntimeService.h": {
+      "tokenSha256": "ea60099c497aa9e46706237d0fb5242a50c1d27f49b72073ead42ea914789118",
+      "tokenCount": 220
+    },
+    "include/PocoDDS/StoreForward/OutboxStore.h": {
+      "tokenSha256": "f1900c0c3c488137338aca28f218df35121352880bb3ad2d054eb5478d37925b",
+      "tokenCount": 185
+    },
+    "include/PocoDDS/StoreForward/SqliteOutboxStore.h": {
+      "tokenSha256": "a15c2fe3c3bedd7366ec148e2df68cae665fa192565a96a3cce59776f22cf0a2",
+      "tokenCount": 186
+    },
+    "include/PocoDDS/StoreForward/StoreForward.h": {
+      "tokenSha256": "147eba027660788ae0f48a312c8025b267aefc365b75070b631fb8a52b862168",
+      "tokenCount": 572
+    },
+    "include/PocoDDS/TransportProviders/Export.h": {
+      "tokenSha256": "745c4065778c19041cd79186a3a6820b190dfbfde8128efd7dd160aa7d8eedce",
+      "tokenCount": 46
+    },
+    "include/PocoDDS/TransportProviders/ProviderRegistration.h": {
+      "tokenSha256": "51d2fe7a82a4581a96ecb0eb4fd2c13fee6a0cb73abd258d7d602f69fdf6ff7d",
+      "tokenCount": 50
+    },
+    "include/PocoDDS/TransportProviders/TransportFactoryService.h": {
+      "tokenSha256": "950cb9b35ca9352d191b3dedac2de418d9a3282e5e13a636bc8c3093c7589581",
+      "tokenCount": 190
+    },
+    "include/PocoDDS/TransportProviders/TransportRegistryService.h": {
+      "tokenSha256": "7a5c3d57c7b42e8455764aefae17c1702ccb156660546af1da143bc598a72755",
+      "tokenCount": 135
+    },
+    "include/PocoDDS/Workflow/SqliteWorkflowStore.h": {
+      "tokenSha256": "72f0fe3d0059e93851b0292aaa075b62cd7a5e807630e08aa0866fddb949084c",
+      "tokenCount": 181
+    },
+    "include/PocoDDS/Workflow/Workflow.h": {
+      "tokenSha256": "7bc9e0dc67fe88e0ea0859b0822cedb7251853e7a7eb8bd495127a2a305735ec",
+      "tokenCount": 557
+    },
+    "include/PocoDDS/Workflow/WorkflowDefinitionService.h": {
+      "tokenSha256": "b7017286a09fbcebebaa2876fa20b9961d8655363337debf67d0fc95a1d2649b",
+      "tokenCount": 195
+    },
+    "include/PocoDDS/Workflow/WorkflowEngine.h": {
+      "tokenSha256": "a223b4aa480f5331e62f2d5a8dca640d51feed8d85bdf9849ad84092988240be",
+      "tokenCount": 319
+    },
+    "include/PocoDDS/Workflow/WorkflowRuntimeService.h": {
+      "tokenSha256": "20f87e47e954b8ccd0debe4e49436bf770eda4aaa0df00f707dc6fe2db34fe44",
+      "tokenCount": 255
+    },
+    "include/PocoDDS/Workflow/WorkflowStore.h": {
+      "tokenSha256": "14b613c2f38bda5febcd773370a793ccbf517b452003f2c506c5c5d432b3b6b5",
+      "tokenCount": 155
+    }
+  },
+  "cmakeLibraryTargets": [
+    "PocoDDS::Application",
+    "PocoDDS::BtLE",
+    "PocoDDS::CAN",
+    "PocoDDS::CapabilitiesAPI",
+    "PocoDDS::CapabilitiesCore",
+    "PocoDDS::CapabilitiesPersistence",
+    "PocoDDS::ConfigTransactionAPI",
+    "PocoDDS::ConfigTransactionCore",
+    "PocoDDS::Configuration",
+    "PocoDDS::DeviceCore",
+    "PocoDDS::FastDDSCore",
+    "PocoDDS::FastDDSTransport",
+    "PocoDDS::GatewayAPI",
+    "PocoDDS::Health",
+    "PocoDDS::LifecycleAPI",
+    "PocoDDS::LifecycleCore",
+    "PocoDDS::LifecyclePersistence",
+    "PocoDDS::MQTT",
+    "PocoDDS::MQTTTransport",
+    "PocoDDS::Modbus",
+    "PocoDDS::OSP",
+    "PocoDDS::Persistence",
+    "PocoDDS::Plugins",
+    "PocoDDS::ProtocolCore",
+    "PocoDDS::Protocols",
+    "PocoDDS::ROS",
+    "PocoDDS::Reliability",
+    "PocoDDS::ResourceGovernanceAPI",
+    "PocoDDS::ResourceGovernanceCore",
+    "PocoDDS::RuntimeCore",
+    "PocoDDS::RuntimeCoreTesting",
+    "PocoDDS::SDK",
+    "PocoDDS::SchedulingAPI",
+    "PocoDDS::SchedulingConfiguration",
+    "PocoDDS::SchedulingCore",
+    "PocoDDS::SchemaRegistryAPI",
+    "PocoDDS::SchemaRegistryCore",
+    "PocoDDS::Security",
+    "PocoDDS::Serial",
+    "PocoDDS::SerialProtocol",
+    "PocoDDS::ServiceDependencyAPI",
+    "PocoDDS::ServiceDependencyCore",
+    "PocoDDS::StoreForwardAPI",
+    "PocoDDS::StoreForwardCore",
+    "PocoDDS::TransportProviderAPI",
+    "PocoDDS::TransportProviderCore",
+    "PocoDDS::UDP",
+    "PocoDDS::WebTunnel",
+    "PocoDDS::WebTunnelProtocol",
+    "PocoDDS::WorkflowAPI",
+    "PocoDDS::WorkflowCore",
+    "PocoDDS::XBee"
+  ],
+  "binaryAbi": {
+    "key": "windows-msvc-19.43-x64",
+    "artifacts": {
+      "bin/PDRBundleManagement.dll": {
+        "symbolSha256": "124466e5afec5224143e7a5ec1f494b847105620b276eae5dcc0819f08dff3bc",
+        "symbolCount": 32
+      },
+      "bin/PDRFastDDS.dll": {
+        "symbolSha256": "785832467119202d98c3947f380548ea929e725d31d219b196f8eaf01d79abbe",
+        "symbolCount": 3963
+      },
+      "bin/PDRFastDDSCore.dll": {
+        "symbolSha256": "0773b965fe3004619c4481d9beca99e4efc2a00d8a64ec6fe36d9b149a18b684",
+        "symbolCount": 5085
+      },
+      "bin/PDRObservability.dll": {
+        "symbolSha256": "e9efe4b94e271a2f443dce10f3da40fe994ed572946c2cd64cccb2237ccf13ce",
+        "symbolCount": 6277
+      },
+      "bin/PDRProcessManagement.dll": {
+        "symbolSha256": "5f499bb4627811b29eac257728c3c2f3d7f465ffc6238b917224780f3ec6023a",
+        "symbolCount": 10
+      }
+    }
+  }
+}
+

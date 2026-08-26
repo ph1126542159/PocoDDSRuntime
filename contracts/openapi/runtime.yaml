@@ -117,6 +117,40 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ProcessDetail" }
+  /api/v1/process-dependencies:
+    get:
+      operationId: getProcessDependencyGraph
+      summary: Return the authoritative managed-process dependency DAG and current blocking reasons
+      responses:
+        "200":
+          description: Topologically ordered process dependency graph
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProcessDependencyGraph" }
+        "503":
+          description: ProcessManagement has not initialized
+  /api/v1/process-dependencies/impact:
+    get:
+      operationId: analyzeProcessLifecycleImpact
+      summary: Build a side-effect-free managed-process lifecycle impact plan
+      description: The response uses the same authoritative DAG ordering as SubprocessManager. Stop and restart plans include transitively affected dependents; start plans include the prerequisite closure. This endpoint does not execute the action and its generation is a point-in-time snapshot.
+      parameters:
+        - in: query
+          name: target
+          required: true
+          schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        - in: query
+          name: action
+          required: true
+          schema: { type: string, enum: [start, stop, restart] }
+      responses:
+        "200":
+          description: Lifecycle impact plan or a denied local-management decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProcessLifecycleImpactPlan" }
+        "400": { description: Missing, duplicate or unsupported impact query parameter }
+        "503": { description: ProcessManagement has not initialized }
   /api/v1/process-lifecycle:
     post:
       security: [{ ManagementBearer: [] }]
@@ -322,6 +356,410 @@ paths:
   /api/v1/business-trace-history:
     get:
       responses: { "200": { description: Persisted business trace history } }
+  /api/v1/capabilities:
+    get:
+      operationId: getCapabilityStatus
+      summary: Return authoritative policy, persistence and Decision Lease status
+      security: [{ ManagementBearer: [] }]
+      responses:
+        "200":
+          description: Capability governance status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CapabilityStatus" }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks capability.read or capability.manage }
+        "503": { description: Identity or capability Runtime service is unavailable }
+  /api/v1/capabilities/audit:
+    get:
+      operationId: listCapabilityAudit
+      summary: Return durable capability authorization audit records
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        "200":
+          description: Durable capability audit records
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CapabilityAudit" }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks capability.read or capability.manage }
+  /api/v1/capabilities/validate:
+    post:
+      operationId: validateCapabilityPolicy
+      summary: Validate and digest a complete default-deny policy without applying it
+      security: [{ ManagementBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CapabilityPolicyDocument" }
+      responses:
+        "200": { description: Policy is structurally and semantically valid }
+        "400": { description: Policy is invalid }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks capability.manage }
+        "413": { description: Request exceeds 1 MiB }
+        "429": { description: Per-principal management rate limit exceeded }
+  /api/v1/capabilities/policy:
+    post:
+      operationId: replaceCapabilityPolicy
+      summary: Atomically replace the authoritative policy using the authenticated Principal as actor
+      description: The request must not contain actor; actor is derived exclusively from the validated Bearer token. The current policy must also authorize that Principal for service:use on pdr.service.capabilityRuntime.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CapabilityRequestId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CapabilityPolicyReplaceRequest" }
+      responses:
+        "200":
+          description: Policy committed, or an identical request replayed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CapabilityPolicyReplaceResult" }
+        "400": { description: Invalid request, supplied actor, or invalid policy }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Principal lacks capability.manage or current capability policy denies service:use }
+        "409": { description: Generation conflict or request ID reused with different input }
+        "413": { description: Request exceeds 1 MiB }
+        "429": { description: Per-principal management rate limit exceeded }
+        "503": { description: Persistence failed closed or Runtime service is unavailable }
+  /api/v1/resource-governance:
+    get:
+      operationId: getResourceGovernanceStatus
+      summary: Return per-Bundle or module workload isolation, backpressure and circuit status
+      description: Execution deadlines use cooperative cancellation and never claim hard C++ thread termination.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: query
+          name: owner
+          required: false
+          schema: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" }
+      responses:
+        "200":
+          description: Runtime-process Bundle owner lane status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResourceGovernanceStatus" }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks resource.read }
+        "503": { description: Identity or ResourceGovernor service is unavailable }
+  /api/v1/scheduled-tasks:
+    get:
+      operationId: getScheduledTasks
+      summary: Return Runtime-managed periodic task schedules and execution counters
+      description: One central timer triggers tasks; business callbacks execute through ResourceGovernor owner lanes. The endpoint is read-only.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: query
+          name: taskId
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      responses:
+        "200":
+          description: Managed periodic task status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScheduledTaskStatus" }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks resource.read }
+        "503": { description: Identity or Scheduler service is unavailable }
+  /api/v1/configuration-transactions:
+    get:
+      operationId: getConfigurationTransactions
+      summary: Return the active transactional configuration generation, participants and history
+      description: Values are intentionally omitted so management responses cannot disclose Runtime secrets.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: query
+          name: historyLimit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Transactional configuration status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigurationTransactionStatus" }
+        "400": { description: Invalid historyLimit }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks configuration.manage }
+        "503": { description: Identity or ConfigurationRuntime service is unavailable }
+    post:
+      operationId: applyConfigurationTransaction
+      summary: Atomically validate and apply a bounded configuration patch
+      description: The server merges string changes into its current snapshot; participant preflight, ordered commit, activation and reverse rollback remain one idempotent transaction.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: header
+          name: X-PDR-Request-Id
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfigurationTransactionApplyRequest" }
+      responses:
+        "200":
+          description: Transaction committed or an identical request was replayed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigurationTransactionApplyResult" }
+        "400": { description: Invalid patch, generation conflict, validator rejection, or request ID reuse with different input }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Principal lacks configuration.manage or configuration:write capability for a changed key }
+        "409":
+          description: Participant commit failed and the transaction rolled back
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigurationTransactionApplyResult" }
+        "413": { description: Request exceeds 1 MiB }
+        "422":
+          description: A configuration participant rejected preflight
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigurationTransactionApplyResult" }
+        "503": { description: Rollback failed, recovery is pending, or the Runtime service is unavailable }
+  /api/v1/configuration-transactions/preflight:
+    post:
+      operationId: preflightConfigurationTransaction
+      summary: Preview a bounded configuration patch without changing Runtime state
+      description: The Runtime runs the same generation, full-snapshot validation, capability, ownership, participant ordering and participant preflight checks used by apply. It does not write transaction history, activate Preferences, or call participant commit/rollback. A later apply always repeats every check against current generation and participant topology.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: header
+          name: X-PDR-Request-Id
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfigurationTransactionApplyRequest" }
+      responses:
+        "200":
+          description: The patch is currently accepted, including an explicit no-change result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigurationTransactionPreflightResult" }
+        "400": { description: Invalid patch or full-snapshot validator rejection }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Principal lacks configuration.manage or configuration:write capability for a changed key }
+        "409":
+          description: expectedGeneration is stale; no participant preflight was invoked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigurationTransactionPreflightResult" }
+        "413": { description: Request exceeds 1 MiB }
+        "422":
+          description: A configuration participant rejected the side-effect-free preflight
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigurationTransactionPreflightResult" }
+        "503": { description: Identity, ConfigurationRuntime or preflight service is unavailable }
+  /api/v1/configuration-participants:
+    get:
+      operationId: getConfigurationParticipants
+      summary: Return the current transactional configuration ownership, dependency and admission status
+      description: The point-in-time catalog is sorted by participant ID and exposes owned key prefixes, ordering dependencies, registration generations, sanitized registration failures, Bundle-local expected participant contracts, and Bundle-owned configuration key deprecation/removal lifecycles. It contains no configuration values or exception text. Catalog generation advances on every successful attach or detach; admissionGeneration, expectationGeneration and keyLifecycleGeneration advance only when their respective states change. Digest binds the admitted topology. Active Bundle declarations must exactly match admitted ownership; invalid or cross-owner key lifecycles degrade readiness while inactive Bundle declarations remain diagnostic only.
+      security: [{ ManagementBearer: [] }]
+      responses:
+        "200":
+          description: Runtime-process configuration participant catalog
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigurationParticipantCatalogStatus" }
+        "400": { description: Query parameters are not supported }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks configuration.manage }
+        "503": { description: Identity or configuration participant catalog service is unavailable }
+  /api/v1/service-dependencies:
+    get:
+      operationId: getServiceDependencies
+      summary: Return discovered Bundle Service contracts and evaluated dependency readiness
+      description: Bundle ownership is inferred from the resource containing service-contracts.json. Required unsatisfied dependencies propagate to /health/ready; optional gaps remain visible without blocking readiness.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: query
+          name: owner
+          required: false
+          schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        - in: query
+          name: contract
+          required: false
+          schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+      responses:
+        "200":
+          description: Runtime-process Bundle Service dependency snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceDependencyStatus" }
+        "400": { description: Unsupported query filter }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks resource.read }
+        "503": { description: Identity or ServiceDependencyRuntime service is unavailable }
+  /api/v1/service-dependencies/impact:
+    get:
+      operationId: analyzeServiceDependencyLifecycleImpact
+      summary: Analyze Bundle start or stop dependency impact without changing state
+      description: Start analysis evaluates the target Consumer's required and optional contracts. Stop analysis simulates removal of the target Provider and reports active Consumers that would lose a satisfied contract. The same decision model is enforced by BundleLoader through the generic osp.bundleLifecycleGuard extension point.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: query
+          name: action
+          required: true
+          schema: { type: string, enum: [start, stop] }
+        - in: query
+          name: target
+          required: true
+          schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+      responses:
+        "200":
+          description: Side-effect-free lifecycle admission decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceDependencyLifecycleDecision" }
+        "400": { description: Missing, duplicate or unsupported impact query parameter }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks resource.read }
+        "503": { description: Identity or ServiceDependencyRuntime service is unavailable }
+  /api/v1/service-directory:
+    get:
+      operationId: getRuntimeServiceDirectory
+      summary: Return explicitly advertised cross-Runtime service instances
+      description: Ordinary OSP services are not advertised automatically. Optional serviceName filtering is read-only; tags are routing metadata and not authorization claims.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: query
+          name: serviceName
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      responses:
+        "200":
+          description: Runtime-fleet service instance directory snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceDirectorySnapshot" }
+        "400": { description: Unsupported or duplicate query parameter }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks resource.read }
+        "503": { description: Identity or ServiceDirectoryRuntime service is unavailable }
+  /api/v1/service-directory/route:
+    get:
+      operationId: routeRuntimeServiceInstance
+      summary: Select one ready service endpoint without invoking it
+      description: Selection excludes expired, draining and Membership-ineligible Runtime incarnations. This endpoint does not proxy, retry or authorize the selected business call.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: query
+          name: serviceName
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - in: query
+          name: policy
+          required: false
+          schema: { type: string, enum: [round-robin, rendezvous-hash, prefer-local], default: round-robin }
+        - in: query
+          name: routingKey
+          required: false
+          schema: { type: string, maxLength: 512 }
+        - in: query
+          name: localRuntimeId
+          required: false
+          schema: { type: string, maxLength: 128 }
+        - in: query
+          name: tags
+          required: false
+          description: Comma-separated required tags
+          schema: { type: string, maxLength: 4159 }
+      responses:
+        "200":
+          description: Selected endpoint
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceDirectoryRouteResult" }
+        "400": { description: Invalid request or rendezvous-hash omitted routingKey }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks resource.read }
+        "503": { description: No eligible service instance or Runtime service is unavailable }
+  /api/v1/service-client:
+    get:
+      operationId: getRuntimeServiceClient
+      summary: Return governed cross-Runtime invocation Provider and circuit status
+      description: This read-only endpoint exposes local Provider ownership, per-instance circuits, invocation counters and the ResourceGovernor owner lane. It does not provide a generic remote invocation proxy.
+      security: [{ ManagementBearer: [] }]
+      responses:
+        "200":
+          description: Runtime-process Service Client status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServiceClientStatus" }
+        "400": { description: Query parameters are not accepted }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks resource.read }
+        "503": { description: Identity or ServiceClientRuntime service is unavailable }
+  /api/v1/lifecycle-maintenance:
+    get:
+      operationId: getLifecycleMaintenance
+      summary: Return transactional Bundle drain plans and live drain participants
+      description: Reports durable maintenance history and current acceptance/in-flight state. In-progress records loaded after a Runtime restart are exposed as crash-recovery pending until topology recovery succeeds. An optional planId filter has no side effects.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - in: query
+          name: planId
+          required: false
+          schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+      responses:
+        "200":
+          description: Runtime-process lifecycle maintenance snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LifecycleMaintenanceStatus" }
+        "400": { description: Invalid or duplicate planId filter }
+        "401": { description: Missing or invalid management Bearer token when authentication is required }
+        "403": { description: Authenticated principal lacks resource.read }
+        "503": { description: Identity or LifecycleRuntime service is unavailable }
+    post:
+      operationId: executeLifecycleMaintenance
+      summary: Transactionally drain a Provider, restore a drained plan, or retry persisted crash recovery
+      description: Drain first quiesces every affected Consumer, waits for in-flight work, stops Consumers, rechecks dependency impact, and stops the Provider. Any failure attempts reverse-order rollback. Restore starts the Provider before its Consumers. Recover retries a durable drainRecoveryPending or restoreRecoveryPending plan. Plans and request IDs are persisted in SQLite and bound to the complete request across Runtime restarts.
+      security: [{ ManagementBearer: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/LifecycleRequestId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LifecycleMaintenanceRequest" }
+      responses:
+        "200":
+          description: Drain, restore or recovery completed, or an identical durable request was replayed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LifecycleMaintenanceOperation" }
+        "400": { description: Invalid action, target, plan ID, timeout, unknown request field, or durable request ID reuse with different input }
+        "401": { description: Missing or invalid management Bearer token }
+        "403": { description: Authenticated principal lacks bundle.manage }
+        "404": { description: Target Bundle, maintenance plan or required Runtime service was not found }
+        "409":
+          description: The operation safely rolled back or restore preflight failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LifecycleMaintenanceOperation" }
+        "413": { description: Request exceeds 64 KiB }
+        "428": { description: A valid X-PDR-Request-Id is required }
+        "503":
+          description: Drain failed before a safe transaction could be established, rollback was incomplete, or persisted crash recovery remains pending
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LifecycleMaintenanceOperation" }
   /health/live:
     get:
       operationId: getLiveness
@@ -355,12 +793,785 @@ components:
         minLength: 1
         maxLength: 128
         pattern: "^[A-Za-z0-9._:-]+$"
+    CapabilityRequestId:
+      in: header
+      name: X-PDR-Request-Id
+      required: true
+      description: Durable idempotency key bound to the authenticated Principal, expected generation and candidate policy digest
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    LifecycleRequestId:
+      in: header
+      name: X-PDR-Request-Id
+      required: true
+      description: Durable SQLite-backed idempotency key bound to the complete lifecycle-maintenance request across Runtime restarts
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: "^[A-Za-z0-9._:-]+$"
   securitySchemes:
     ManagementBearer:
       type: http
       scheme: bearer
-      description: Required for protected management APIs; principals receive explicit protocol.manage, process.manage, bundle.manage, configuration.manage, audit.read, task.read and task.cancel permissions
+      description: Required for protected management APIs; principals receive explicit protocol.manage, process.manage, bundle.manage, configuration.manage, identity.manage, audit.read, task.read, task.cancel, diagnostics.read, diagnostics.execute, capability.read, capability.manage and resource.read permissions
   schemas:
+    LifecycleDrainSnapshot:
+      type: object
+      additionalProperties: false
+      required: [state, accepting, inFlight, generation]
+      properties:
+        state: { type: string, enum: [accepting, quiescing, quiesced] }
+        accepting: { type: boolean }
+        inFlight: { type: integer, minimum: 0 }
+        generation: { type: integer, minimum: 0 }
+    LifecycleDrainParticipant:
+      type: object
+      additionalProperties: false
+      required: [owner, drain]
+      properties:
+        owner: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        drain: { $ref: "#/components/schemas/LifecycleDrainSnapshot" }
+    LifecycleMaintenanceStep:
+      type: object
+      additionalProperties: false
+      required: [phase, target, succeeded, detail]
+      properties:
+        phase: { type: string, minLength: 1, maxLength: 128 }
+        target: { type: string, minLength: 1, maxLength: 128 }
+        succeeded: { type: boolean }
+        detail: { type: string }
+    LifecycleMaintenancePlan:
+      type: object
+      additionalProperties: false
+      required: [id, target, status, desiredState, rollbackComplete, code, detail, consumers, steps, createdMicroseconds, updatedMicroseconds, recoveryAttempts]
+      properties:
+        id: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        target: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        status: { type: string, enum: [draining, restoring, drainRecoveryPending, restoreRecoveryPending, drained, restored, rolledBack, restoreRolledBack, failed] }
+        desiredState: { type: string, enum: [active, stopped, transitioning], description: Effective durable Bundle topology intent represented by this plan }
+        rollbackComplete: { type: boolean }
+        code: { type: string, minLength: 1, maxLength: 128 }
+        detail: { type: string }
+        createdMicroseconds: { type: integer, minimum: 1 }
+        updatedMicroseconds: { type: integer, minimum: 1 }
+        recoveryAttempts: { type: integer, minimum: 0 }
+        consumers:
+          type: array
+          maxItems: 1024
+          items: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        steps:
+          type: array
+          maxItems: 4096
+          items: { $ref: "#/components/schemas/LifecycleMaintenanceStep" }
+    LifecycleMaintenanceStatus:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, planCount, participantCount, plans, participants]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string, minLength: 1 }
+        scope: { type: string, const: runtime-process/bundle-lifecycle-maintenance }
+        planCount: { type: integer, minimum: 0, maximum: 1024 }
+        participantCount: { type: integer, minimum: 0, maximum: 1024 }
+        plans:
+          type: array
+          maxItems: 1024
+          items: { $ref: "#/components/schemas/LifecycleMaintenancePlan" }
+        participants:
+          type: array
+          maxItems: 1024
+          items: { $ref: "#/components/schemas/LifecycleDrainParticipant" }
+    LifecycleDrainRequest:
+      type: object
+      additionalProperties: false
+      required: [action, target]
+      properties:
+        action: { type: string, const: drain }
+        target: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        timeoutMilliseconds: { type: integer, minimum: 10, maximum: 30000, default: 5000 }
+    LifecycleRestoreRequest:
+      type: object
+      additionalProperties: false
+      required: [action, planId]
+      properties:
+        action: { type: string, const: restore }
+        planId: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+    LifecycleRecoveryRequest:
+      type: object
+      additionalProperties: false
+      required: [action, planId]
+      properties:
+        action: { type: string, const: recover }
+        planId: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+    LifecycleMaintenanceRequest:
+      oneOf:
+        - { $ref: "#/components/schemas/LifecycleDrainRequest" }
+        - { $ref: "#/components/schemas/LifecycleRestoreRequest" }
+        - { $ref: "#/components/schemas/LifecycleRecoveryRequest" }
+      discriminator:
+        propertyName: action
+    LifecycleMaintenanceOperation:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, succeeded, idempotentReplay, requestId, plan]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string, minLength: 1 }
+        scope: { type: string, const: runtime-process/bundle-lifecycle-maintenance }
+        succeeded: { type: boolean }
+        idempotentReplay: { type: boolean }
+        requestId: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        plan: { $ref: "#/components/schemas/LifecycleMaintenancePlan" }
+    ServiceContractProvider:
+      type: object
+      additionalProperties: false
+      required: [contract, version, owner, serviceName, state, detail]
+      properties:
+        contract: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        version: { type: string, pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+        owner: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        serviceName: { type: string, pattern: "^[A-Za-z0-9._:-]{1,192}$" }
+        state: { type: string, enum: [ready, degraded, unavailable] }
+        detail: { type: string, maxLength: 512 }
+    ServiceContractRequirement:
+      type: object
+      additionalProperties: false
+      required: [contract, versionRange, owner, required, consumerActive, minimumProviders, status, declaredProviders, matchingProviders, readyProviders, detail, matchedProviderServices, availableVersions]
+      properties:
+        contract: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        versionRange: { type: string, minLength: 1, maxLength: 128 }
+        owner: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        required: { type: boolean }
+        consumerActive:
+          type: boolean
+          description: Runtime-derived Bundle activity; inactive Consumers remain available for start admission but do not degrade process readiness
+        minimumProviders: { type: integer, minimum: 1, maximum: 64 }
+        status: { type: string, enum: [satisfied, missing, versionMismatch, providerDegraded, providerUnavailable] }
+        declaredProviders: { type: integer, minimum: 0 }
+        matchingProviders: { type: integer, minimum: 0 }
+        readyProviders: { type: integer, minimum: 0 }
+        detail: { type: string }
+        matchedProviderServices:
+          type: array
+          maxItems: 1024
+          items: { type: string, minLength: 1 }
+        availableVersions:
+          type: array
+          maxItems: 1024
+          uniqueItems: true
+          items: { type: string, pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+    ServiceContractIssue:
+      type: object
+      additionalProperties: false
+      required: [owner, detail]
+      properties:
+        owner: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        detail: { type: string, minLength: 1, maxLength: 1024 }
+    ServiceDependencyStatus:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, generation, ready, requiredBlocked, optionalUnsatisfied, declarationErrors, activeRequirements, inactiveRequirements, providerCount, requirementCount, providers, requirements, issues, filters]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string, minLength: 1 }
+        scope: { type: string, const: runtime-process/bundle-service-contracts }
+        generation: { type: integer, minimum: 1 }
+        ready: { type: boolean }
+        requiredBlocked: { type: integer, minimum: 0, maximum: 1024 }
+        optionalUnsatisfied: { type: integer, minimum: 0, maximum: 1024 }
+        declarationErrors: { type: integer, minimum: 0, maximum: 1024 }
+        activeRequirements: { type: integer, minimum: 0, maximum: 1024 }
+        inactiveRequirements: { type: integer, minimum: 0, maximum: 1024 }
+        providerCount: { type: integer, minimum: 0, maximum: 1024 }
+        requirementCount: { type: integer, minimum: 0, maximum: 1024 }
+        providers:
+          type: array
+          maxItems: 1024
+          items: { $ref: "#/components/schemas/ServiceContractProvider" }
+        requirements:
+          type: array
+          maxItems: 1024
+          items: { $ref: "#/components/schemas/ServiceContractRequirement" }
+        issues:
+          type: array
+          maxItems: 1024
+          items: { $ref: "#/components/schemas/ServiceContractIssue" }
+        filters:
+          type: object
+          additionalProperties: false
+          properties:
+            owner: { type: string }
+            contract: { type: string }
+    ServiceDependencyLifecycleFinding:
+      type: object
+      additionalProperties: false
+      required: [code, consumer, contract, status, detail]
+      properties:
+        code:
+          type: string
+          enum: [DEPENDENCY_DECLARATION_INVALID, DEPENDENCY_REQUIRED_UNSATISFIED, OPTIONAL_DEPENDENCY_UNSATISFIED, ACTIVE_CONSUMER_DEPENDENCY_IMPACT, OPTIONAL_CONSUMER_DEPENDENCY_IMPACT]
+        consumer: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        contract: { type: string, maxLength: 128 }
+        status: { type: string, enum: [satisfied, missing, versionMismatch, providerDegraded, providerUnavailable] }
+        detail: { type: string, minLength: 1 }
+    ServiceDependencyLifecycleDecision:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, action, target, allowed, detail, blockerCount, blockers, warningCount, warnings, affectedConsumers]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string, minLength: 1 }
+        scope: { type: string, const: runtime-process/bundle-service-contracts }
+        action: { type: string, enum: [start, stop] }
+        target: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        allowed: { type: boolean }
+        detail: { type: string, minLength: 1 }
+        blockerCount: { type: integer, minimum: 0, maximum: 1024 }
+        blockers:
+          type: array
+          maxItems: 1024
+          items: { $ref: "#/components/schemas/ServiceDependencyLifecycleFinding" }
+        warningCount: { type: integer, minimum: 0, maximum: 1024 }
+        warnings:
+          type: array
+          maxItems: 1024
+          items: { $ref: "#/components/schemas/ServiceDependencyLifecycleFinding" }
+        affectedConsumers:
+          type: array
+          maxItems: 1024
+          uniqueItems: true
+          items: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+    ServiceDirectoryInstance:
+      type: object
+      additionalProperties: false
+      required: [serviceName, instanceId, runtimeId, runtimeIncarnation, revision, endpoint, protocol, zone, tags, state, ageMilliseconds]
+      properties:
+        serviceName: { type: string, minLength: 1, maxLength: 128 }
+        instanceId: { type: string, minLength: 1, maxLength: 128 }
+        runtimeId: { type: string, minLength: 1, maxLength: 128 }
+        runtimeIncarnation: { type: integer, minimum: 1 }
+        revision: { type: integer, minimum: 1 }
+        endpoint: { type: string, minLength: 1, maxLength: 512 }
+        protocol: { type: string, minLength: 1, maxLength: 64 }
+        zone: { type: string, maxLength: 64 }
+        tags:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items: { type: string, minLength: 1, maxLength: 64 }
+        state: { type: string, enum: [ready, draining, expired] }
+        ageMilliseconds: { type: integer, minimum: 0 }
+    ServiceDirectorySnapshot:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, generation, serviceCount, ready, draining, expired, instanceCount, instances]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string, minLength: 1 }
+        scope: { type: string, const: runtime-fleet/service-instance-directory }
+        generation: { type: integer, minimum: 0 }
+        serviceCount: { type: integer, minimum: 0 }
+        ready: { type: integer, minimum: 0 }
+        draining: { type: integer, minimum: 0 }
+        expired: { type: integer, minimum: 0 }
+        instanceCount: { type: integer, minimum: 0 }
+        instances:
+          type: array
+          maxItems: 100000
+          items: { $ref: "#/components/schemas/ServiceDirectoryInstance" }
+    ServiceDirectoryRouteResult:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, status, policy, candidates, detail, instance]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string, minLength: 1 }
+        scope: { type: string, const: runtime-fleet/service-instance-routing }
+        status: { type: string, const: selected }
+        policy: { type: string, enum: [round-robin, rendezvous-hash, prefer-local] }
+        candidates: { type: integer, minimum: 1 }
+        detail: { type: string }
+        instance: { $ref: "#/components/schemas/ServiceDirectoryInstance" }
+    ServiceClientProvider:
+      type: object
+      additionalProperties: false
+      required: [providerId, protocol, accepting, active, dispatched, failed]
+      properties:
+        providerId: { type: string, pattern: "^[!-~]{1,128}$" }
+        protocol: { type: string, pattern: "^[!-~]{1,32}$" }
+        accepting: { type: boolean }
+        active: { type: integer, minimum: 0 }
+        dispatched: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+    ServiceClientInstanceCircuit:
+      type: object
+      additionalProperties: false
+      required: [serviceName, instanceId, runtimeId, runtimeIncarnation, state, consecutiveFailures, probeInFlight]
+      properties:
+        serviceName: { type: string, minLength: 1, maxLength: 128 }
+        instanceId: { type: string, minLength: 1, maxLength: 128 }
+        runtimeId: { type: string, minLength: 1, maxLength: 128 }
+        runtimeIncarnation: { type: integer, minimum: 1 }
+        state: { type: string, enum: [closed, open, half-open] }
+        consecutiveFailures: { type: integer, minimum: 0 }
+        probeInFlight: { type: boolean }
+    ServiceClientStatus:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, remoteInvocation, durableDelivery, idempotencyEnabled, idempotencyDurable, idempotencyHealthy, idempotencyBackend, idempotencyMaximumEntries, idempotencyEntries, idempotencyInFlight, idempotencyCompleted, idempotencyClaims, idempotencyReplays, idempotencyJoined, idempotencyConflicts, idempotencyIndeterminate, idempotencyRecovered, idempotencyCapacityRejected, idempotencyJournalErrors, idempotencyCoordinatorErrors, providerGeneration, providerCount, maximumProviders, providers, calls, succeeded, failed, attempts, retries, noRoute, circuitRejected, deadlineExceeded, cancelled, instanceCircuitCount, instanceCircuits, resourceOwner, resourceCircuit, resourceActive, resourcePending, maximumPayloadBytes, maximumMetadataEntries, maximumMetadataBytes]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string, minLength: 1 }
+        scope: { type: string, const: runtime-process/service-client }
+        remoteInvocation: { type: string, const: provider-required }
+        durableDelivery: { type: boolean, const: false }
+        idempotencyEnabled: { type: boolean }
+        idempotencyDurable: { type: boolean }
+        idempotencyHealthy: { type: boolean }
+        idempotencyBackend: { type: string, minLength: 1, maxLength: 64 }
+        idempotencyMaximumEntries: { type: integer, minimum: 0, maximum: 100000 }
+        idempotencyEntries: { type: integer, minimum: 0, maximum: 100000 }
+        idempotencyInFlight: { type: integer, minimum: 0, maximum: 100000 }
+        idempotencyCompleted: { type: integer, minimum: 0, maximum: 100000 }
+        idempotencyClaims: { type: integer, minimum: 0 }
+        idempotencyReplays: { type: integer, minimum: 0 }
+        idempotencyJoined: { type: integer, minimum: 0 }
+        idempotencyConflicts: { type: integer, minimum: 0 }
+        idempotencyIndeterminate: { type: integer, minimum: 0 }
+        idempotencyRecovered: { type: integer, minimum: 0 }
+        idempotencyCapacityRejected: { type: integer, minimum: 0 }
+        idempotencyJournalErrors: { type: integer, minimum: 0 }
+        idempotencyCoordinatorErrors: { type: integer, minimum: 0 }
+        providerGeneration: { type: integer, minimum: 0 }
+        providerCount: { type: integer, minimum: 0, maximum: 4096 }
+        maximumProviders: { type: integer, minimum: 1, maximum: 4096 }
+        providers:
+          type: array
+          maxItems: 4096
+          items: { $ref: "#/components/schemas/ServiceClientProvider" }
+        calls: { type: integer, minimum: 0 }
+        succeeded: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+        attempts: { type: integer, minimum: 0 }
+        retries: { type: integer, minimum: 0 }
+        noRoute: { type: integer, minimum: 0 }
+        circuitRejected: { type: integer, minimum: 0 }
+        deadlineExceeded: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+        instanceCircuitCount: { type: integer, minimum: 0, maximum: 100000 }
+        instanceCircuits:
+          type: array
+          maxItems: 100000
+          items: { $ref: "#/components/schemas/ServiceClientInstanceCircuit" }
+        resourceOwner: { type: string, minLength: 1, maxLength: 128 }
+        resourceCircuit: { type: string, enum: [closed, open, half-open] }
+        resourceActive: { type: integer, minimum: 0 }
+        resourcePending: { type: integer, minimum: 0 }
+        maximumPayloadBytes: { type: integer, minimum: 1, maximum: 16777216 }
+        maximumMetadataEntries: { type: integer, minimum: 0, maximum: 256 }
+        maximumMetadataBytes: { type: integer, minimum: 1, maximum: 1048576 }
+    ResourceGovernanceLane:
+      type: object
+      additionalProperties: false
+      required: [owner, maximumConcurrency, queueCapacity, queueTimeoutMilliseconds, executionTimeoutMilliseconds, failureThreshold, circuitResetMilliseconds, circuit, stopping, active, pending, consecutiveFailures, submitted, accepted, rejectedQueueFull, rejectedCircuitOpen, queueTimedOut, executionTimedOut, succeeded, failed, cancelled]
+      properties:
+        owner: { type: string, minLength: 1, maxLength: 128 }
+        maximumConcurrency: { type: integer, minimum: 1, maximum: 64 }
+        queueCapacity: { type: integer, minimum: 1, maximum: 100000 }
+        queueTimeoutMilliseconds: { type: integer, minimum: 1, maximum: 3600000 }
+        executionTimeoutMilliseconds: { type: integer, minimum: 1, maximum: 3600000 }
+        failureThreshold: { type: integer, minimum: 1, maximum: 100000 }
+        circuitResetMilliseconds: { type: integer, minimum: 1, maximum: 3600000 }
+        circuit: { type: string, enum: [closed, open, half-open] }
+        stopping: { type: boolean }
+        active: { type: integer, minimum: 0 }
+        pending: { type: integer, minimum: 0 }
+        consecutiveFailures: { type: integer, minimum: 0 }
+        submitted: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        rejectedQueueFull: { type: integer, minimum: 0 }
+        rejectedCircuitOpen: { type: integer, minimum: 0 }
+        queueTimedOut: { type: integer, minimum: 0 }
+        executionTimedOut: { type: integer, minimum: 0 }
+        succeeded: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+    ResourceGovernanceStatus:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, cooperativeExecutionTimeout, hardThreadTermination, totalActive, totalPending, laneCount, lanes]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string }
+        scope: { type: string, const: runtime-process/bundle-owner-lanes }
+        cooperativeExecutionTimeout: { type: boolean, const: true }
+        hardThreadTermination: { type: boolean, const: false }
+        totalActive: { type: integer, minimum: 0 }
+        totalPending: { type: integer, minimum: 0 }
+        laneCount: { type: integer, minimum: 0 }
+        lanes:
+          type: array
+          items: { $ref: "#/components/schemas/ResourceGovernanceLane" }
+    ScheduledTask:
+      type: object
+      additionalProperties: false
+      required: [id, owner, enabled, mode, misfirePolicy, initialDelayMilliseconds, intervalMilliseconds, jitterMilliseconds, rejectionBackoffMilliseconds, inFlight, coalesced, nextRunInMilliseconds, triggered, accepted, rejected, misfires, completed, failed, lastStatus, lastMessage]
+      properties:
+        id: { type: string, minLength: 1, maxLength: 128 }
+        owner: { type: string, minLength: 1, maxLength: 128 }
+        enabled: { type: boolean }
+        mode: { type: string, enum: [fixed-delay, fixed-rate] }
+        misfirePolicy: { type: string, enum: [skip, coalesce] }
+        initialDelayMilliseconds: { type: integer, minimum: 0, maximum: 86400000 }
+        intervalMilliseconds: { type: integer, minimum: 1, maximum: 86400000 }
+        jitterMilliseconds: { type: integer, minimum: 0, maximum: 86400000 }
+        rejectionBackoffMilliseconds: { type: integer, minimum: 1, maximum: 3600000 }
+        inFlight: { type: boolean }
+        coalesced: { type: boolean }
+        nextRunInMilliseconds: { type: [integer, "null"], minimum: 0 }
+        triggered: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        rejected: { type: integer, minimum: 0 }
+        misfires: { type: integer, minimum: 0 }
+        completed: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+        lastStatus: { type: [string, "null"], enum: [succeeded, failed, queue-timed-out, execution-timed-out, circuit-open, cancelled, null] }
+        lastMessage: { type: string }
+    ScheduledTaskStatus:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, taskCount, tasks]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string }
+        scope: { type: string, const: runtime-process/managed-periodic-tasks }
+        taskCount: { type: integer, minimum: 0 }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/ScheduledTask" }
+    ConfigurationTransactionApplyRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedGeneration, changes]
+      properties:
+        expectedGeneration: { type: integer, minimum: 1 }
+        changes:
+          type: object
+          minProperties: 1
+          maxProperties: 128
+          additionalProperties: { type: string }
+    ConfigurationTransactionApplyResult:
+      type: object
+      additionalProperties: false
+      required: [transactionId, status, generation, digest, changedKeys, participants, errorCode, errorMessage, idempotentReplay, rolledBack]
+      properties:
+        transactionId: { type: string, format: uuid }
+        status: { type: string, enum: [preflighting, preflight-failed, committing, rolling-back, rolled-back, rollback-failed, committed, recovery-pending] }
+        generation: { type: integer, minimum: 1 }
+        digest: { type: string, pattern: "^[a-f0-9]{64}$" }
+        changedKeys: { type: array, items: { type: string } }
+        participants: { type: array, items: { type: string } }
+        errorCode: { type: string }
+        errorMessage: { type: string }
+        idempotentReplay: { type: boolean }
+        rolledBack: { type: boolean }
+    ConfigurationTransactionPreflightResult:
+      type: object
+      additionalProperties: false
+      required: [preflightId, accepted, changed, expectedGeneration, observedGeneration, candidateGeneration, candidateDigest, changedKeys, participants, errorCode, errorMessage]
+      properties:
+        preflightId: { type: string, format: uuid }
+        accepted: { type: boolean }
+        changed: { type: boolean }
+        expectedGeneration: { type: integer, minimum: 1 }
+        observedGeneration: { type: integer, minimum: 1 }
+        candidateGeneration: { type: integer, minimum: 1 }
+        candidateDigest: { type: string, pattern: "^[a-f0-9]{64}$" }
+        changedKeys: { type: array, items: { type: string } }
+        participants: { type: array, items: { type: string } }
+        errorCode: { type: string }
+        errorMessage: { type: string }
+    ConfigurationParticipantCatalogEntry:
+      type: object
+      additionalProperties: false
+      required: [id, ownedPrefixes, after, unresolvedAfter, registrationGeneration]
+      properties:
+        id: { type: string, pattern: "^[a-z][a-z0-9.-]*$" }
+        ownedPrefixes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        after:
+          type: array
+          items: { type: string, pattern: "^[a-z][a-z0-9.-]*$" }
+        unresolvedAfter:
+          type: array
+          description: Ordering dependencies not currently registered; these are diagnostic and do not imply a hard availability dependency.
+          items: { type: string, pattern: "^[a-z][a-z0-9.-]*$" }
+        registrationGeneration: { type: integer, minimum: 1 }
+    ConfigurationParticipantAdmissionFailure:
+      type: object
+      additionalProperties: false
+      required: [participantId, code, observationGeneration]
+      properties:
+        participantId:
+          type: string
+          description: Validated participant ID, or unknown when the rejected descriptor/property was unsafe to expose.
+          pattern: "^(unknown|[a-z][a-z0-9.-]*)$"
+        code:
+          type: string
+          enum: [participant-service-invalid, participant-descriptor-invalid, participant-identity-mismatch, participant-contract-invalid, participant-ownership-conflict, participant-registration-failed]
+        observationGeneration: { type: integer, minimum: 1 }
+    ConfigurationParticipantExpectation:
+      type: object
+      additionalProperties: false
+      required: [owner, id, serviceName, ownerActive, status, code]
+      properties:
+        owner: { type: string, minLength: 1, maxLength: 192 }
+        id: { type: string, pattern: "^[a-z][a-z0-9.-]*$" }
+        serviceName: { type: string, minLength: 1, maxLength: 192, pattern: "^[A-Za-z0-9._:-]+$" }
+        ownerActive: { type: boolean }
+        status: { type: string, enum: [inactive, missing, mismatched, satisfied] }
+        code:
+          type: string
+          enum: ["", participant-required-missing, participant-declaration-mismatch]
+    ConfigurationParticipantDeclarationIssue:
+      type: object
+      additionalProperties: false
+      required: [owner, code]
+      properties:
+        owner: { type: string, minLength: 1, maxLength: 192 }
+        code: { type: string, enum: [participant-declaration-invalid] }
+    ConfigurationKeyLifecycleEntry:
+      type: object
+      additionalProperties: false
+      required: [owner, ownerActive, id, participantId, operation, sourceKey, replacementKey, deprecatedSince, removalAllowedFrom, status, code]
+      properties:
+        owner: { type: string, minLength: 1, maxLength: 192 }
+        ownerActive: { type: boolean }
+        id: { type: string, pattern: "^PDR-CFG-[0-9]{4,}$" }
+        participantId: { type: string, pattern: "^[a-z][a-z0-9.-]{0,127}$" }
+        operation: { type: string, enum: [rename, remove] }
+        sourceKey: { type: string, minLength: 1, maxLength: 192 }
+        replacementKey:
+          oneOf:
+            - { type: string, minLength: 1, maxLength: 192 }
+            - { type: "null" }
+        deprecatedSince: { type: string, pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+        removalAllowedFrom: { type: string, pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+        status: { type: string, enum: [inactive, mismatched, published] }
+        code: { type: string, enum: ["", configuration-key-lifecycle-owner-mismatch] }
+    ConfigurationKeyLifecycleIssue:
+      type: object
+      additionalProperties: false
+      required: [owner, code, blocking]
+      properties:
+        owner: { type: string, minLength: 1, maxLength: 192 }
+        code:
+          type: string
+          enum: [configuration-key-lifecycle-invalid, configuration-key-lifecycle-cycle]
+        blocking: { type: boolean }
+    ConfigurationParticipantCatalogStatus:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, generation, digest, participantCount, participants, admissionGeneration, rejectedCount, admissionOverflow, rejectedParticipants, expectationGeneration, expectationsReady, declaredParticipantCount, declaredParticipants, declarationIssueCount, declarationIssues, keyLifecycleGeneration, keyLifecyclesReady, keyLifecycleDeclarationCount, keyLifecycleEntryCount, keyLifecycles, keyLifecycleIssueCount, keyLifecycleIssues]
+      properties:
+        schemaVersion: { type: integer, const: 4 }
+        principal: { type: string }
+        scope: { type: string, const: runtime-process/transactional-configuration-participants }
+        generation: { type: integer, minimum: 0 }
+        digest: { type: string, pattern: "^[a-f0-9]{64}$" }
+        participantCount: { type: integer, minimum: 0 }
+        participants:
+          type: array
+          items: { $ref: "#/components/schemas/ConfigurationParticipantCatalogEntry" }
+        admissionGeneration: { type: integer, minimum: 0 }
+        rejectedCount:
+          type: integer
+          minimum: 0
+          maximum: 128
+          description: Number of retained sanitized rejection records.
+        admissionOverflow:
+          type: boolean
+          description: True when the bounded rejection diagnostic capacity was exceeded; readiness remains degraded until ConfigurationRuntime restarts.
+        rejectedParticipants:
+          type: array
+          maxItems: 128
+          items: { $ref: "#/components/schemas/ConfigurationParticipantAdmissionFailure" }
+        expectationGeneration: { type: integer, minimum: 0 }
+        expectationsReady:
+          type: boolean
+          description: True when all active Bundle-local participant declarations exactly match admitted participants and every declaration document is valid.
+        declaredParticipantCount: { type: integer, minimum: 0, maximum: 1024 }
+        declaredParticipants:
+          type: array
+          maxItems: 1024
+          items: { $ref: "#/components/schemas/ConfigurationParticipantExpectation" }
+        declarationIssueCount: { type: integer, minimum: 0 }
+        declarationIssues:
+          type: array
+          items: { $ref: "#/components/schemas/ConfigurationParticipantDeclarationIssue" }
+        keyLifecycleGeneration: { type: integer, minimum: 0 }
+        keyLifecyclesReady:
+          type: boolean
+          description: True when every active Bundle key lifecycle is structurally valid and remains inside its admitted Participant ownership.
+        keyLifecycleDeclarationCount: { type: integer, minimum: 0 }
+        keyLifecycleEntryCount: { type: integer, minimum: 0, maximum: 1024 }
+        keyLifecycles:
+          type: array
+          maxItems: 1024
+          items: { $ref: "#/components/schemas/ConfigurationKeyLifecycleEntry" }
+        keyLifecycleIssueCount: { type: integer, minimum: 0 }
+        keyLifecycleIssues:
+          type: array
+          items: { $ref: "#/components/schemas/ConfigurationKeyLifecycleIssue" }
+    ConfigurationTransactionSummary:
+      type: object
+      additionalProperties: false
+      required: [transactionId, requestId, principal, status, previousGeneration, candidateGeneration, candidateDigest, changedKeys, participants, errorCode, errorMessage, createdMicroseconds, updatedMicroseconds]
+      properties:
+        transactionId: { type: string, format: uuid }
+        requestId: { type: string }
+        principal: { type: string }
+        status: { type: string, enum: [preflighting, preflight-failed, committing, rolling-back, rolled-back, rollback-failed, committed, recovery-pending] }
+        previousGeneration: { type: integer, minimum: 1 }
+        candidateGeneration: { type: integer, minimum: 1 }
+        candidateDigest: { type: string, pattern: "^[a-f0-9]{64}$" }
+        changedKeys: { type: array, items: { type: string } }
+        participants: { type: array, items: { type: string } }
+        errorCode: { type: string }
+        errorMessage: { type: string }
+        createdMicroseconds: { type: integer, minimum: 0 }
+        updatedMicroseconds: { type: integer, minimum: 0 }
+    ConfigurationTransactionStatus:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, principal, scope, generation, digest, participants, history]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string }
+        scope: { type: string, const: runtime-process/transactional-configuration }
+        generation: { type: integer, minimum: 1 }
+        digest: { type: string, pattern: "^[a-f0-9]{64}$" }
+        participants: { type: array, items: { type: string } }
+        history:
+          type: array
+          items: { $ref: "#/components/schemas/ConfigurationTransactionSummary" }
+    CapabilityRule:
+      type: object
+      additionalProperties: false
+      required: [id, effect, principal, resourceKind, resource, actions]
+      properties:
+        id: { type: string, minLength: 1, pattern: "^[A-Za-z0-9._:/-]+$" }
+        effect: { type: string, enum: [allow, deny] }
+        principal: { type: string, minLength: 1 }
+        resourceKind: { type: string, enum: [service, topic, configuration, device, schema] }
+        resource: { type: string, minLength: 1 }
+        actions:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [discover, use, publish, subscribe, read, write, observe, operate, register, deprecate] }
+    CapabilityPolicyDocument:
+      type: object
+      additionalProperties: false
+      required: [version, defaultEffect, rules]
+      properties:
+        $schema: { type: string }
+        version: { type: integer, const: 1 }
+        defaultEffect: { type: string, const: deny }
+        rules:
+          type: array
+          items: { $ref: "#/components/schemas/CapabilityRule" }
+    CapabilityPolicySnapshot:
+      type: object
+      required: [generation, digest, ruleCount, defaultEffect]
+      properties:
+        generation: { type: integer, minimum: 1 }
+        digest: { type: string, pattern: "^[0-9a-f]{64}$" }
+        ruleCount: { type: integer, minimum: 0 }
+        defaultEffect: { type: string, const: deny }
+    CapabilityPersistenceStatus:
+      type: object
+      required: [backend, healthy, recoveryRequired, generation, digest, auditRecords, requestRecords]
+      properties:
+        backend: { type: string, const: sqlite-wal-full }
+        healthy: { type: boolean }
+        recoveryRequired: { type: boolean }
+        generation: { type: integer, minimum: 0 }
+        digest: { type: string }
+        auditRecords: { type: integer, minimum: 0 }
+        requestRecords: { type: integer, minimum: 0 }
+        error: { type: string }
+    CapabilityDecisionLeases:
+      type: object
+      required: [enabled, policyGeneration, entries, hits, misses, issued, denied, expired, invalidated, evicted]
+      properties:
+        enabled: { type: boolean }
+        policyGeneration: { type: integer, minimum: 0 }
+        entries: { type: integer, minimum: 0 }
+        hits: { type: integer, minimum: 0 }
+        misses: { type: integer, minimum: 0 }
+        issued: { type: integer, minimum: 0 }
+        denied: { type: integer, minimum: 0 }
+        expired: { type: integer, minimum: 0 }
+        invalidated: { type: integer, minimum: 0 }
+        evicted: { type: integer, minimum: 0 }
+    CapabilityStatus:
+      type: object
+      required: [schemaVersion, principal, actorSource, anonymousWriteAllowed, policy, persistence, leases]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string }
+        actorSource: { type: string, const: authenticated-principal }
+        anonymousWriteAllowed: { type: boolean, const: false }
+        policy: { $ref: "#/components/schemas/CapabilityPolicySnapshot" }
+        persistence: { $ref: "#/components/schemas/CapabilityPersistenceStatus" }
+        leases: { $ref: "#/components/schemas/CapabilityDecisionLeases" }
+    CapabilityPolicyReplaceRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedGeneration, policy]
+      properties:
+        expectedGeneration: { type: integer, minimum: 1 }
+        policy: { $ref: "#/components/schemas/CapabilityPolicyDocument" }
+    CapabilityPolicyReplaceResult:
+      type: object
+      required: [committed, requestId, idempotentReplay, actor, policy]
+      properties:
+        committed: { type: boolean, const: true }
+        requestId: { type: string, minLength: 1, maxLength: 128 }
+        idempotentReplay: { type: boolean }
+        actor: { type: string, minLength: 1 }
+        policy: { $ref: "#/components/schemas/CapabilityPolicySnapshot" }
+    CapabilityAuditRecord:
+      type: object
+      required: [timestampMicroseconds, principal, resourceKind, resource, action, allowed, code, matchedRuleId, policyGeneration, policyDigest, explanation]
+      properties:
+        timestampMicroseconds: { type: integer }
+        principal: { type: string }
+        resourceKind: { type: string }
+        resource: { type: string }
+        action: { type: string }
+        allowed: { type: boolean }
+        code: { type: string }
+        matchedRuleId: { type: string }
+        policyGeneration: { type: integer, minimum: 1 }
+        policyDigest: { type: string }
+        explanation: { type: string }
+    CapabilityAudit:
+      type: object
+      required: [schemaVersion, principal, count, items]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        principal: { type: string }
+        count: { type: integer, minimum: 0, maximum: 100 }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CapabilityAuditRecord" }
     IdempotentReplayResponse:
       type: object
       required: [message, requestId, idempotentReplay, operation, target, action]
@@ -460,6 +1671,152 @@ components:
         serviceInventoryAuthority: { type: string, enum: [local-registry, child-status, unavailable] }
         resources: { type: object }
         configurationScope: { type: string, const: process }
+    ProcessDependencyBlocker:
+      type: object
+      additionalProperties: false
+      required: [name, state, reason]
+      properties:
+        name: { type: string, minLength: 1 }
+        state: { type: string, minLength: 1 }
+        reason:
+          type: string
+          enum: [dependency-unavailable, dependency-starting, dependency-waiting, dependency-recovering, dependency-stopped, dependency-failed, dependency-not-ready]
+    ProcessDependencyNode:
+      type: object
+      additionalProperties: false
+      required: [id, name, location, state, processId, manageable, required, desiredState, readyForDependents, dependencies, dependents, blockedBy, blockingReason]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        location: { type: string, enum: [local, remote] }
+        state: { type: string, minLength: 1 }
+        processId: { type: integer, minimum: 0 }
+        manageable: { type: boolean }
+        required: { type: boolean }
+        desiredState: { type: string, enum: [running, stopped] }
+        readyForDependents: { type: boolean }
+        dependencies:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        dependents:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        blockedBy:
+          type: array
+          items: { $ref: "#/components/schemas/ProcessDependencyBlocker" }
+        blockingReason:
+          type: string
+          enum: [none, dependency-unavailable, dependency-starting, dependency-waiting, dependency-recovering, dependency-stopped, dependency-failed, dependency-not-ready]
+    ProcessDependencyEdge:
+      type: object
+      additionalProperties: false
+      required: [from, to, state, reason]
+      properties:
+        from: { type: string, minLength: 1 }
+        to: { type: string, minLength: 1 }
+        state: { type: string, enum: [satisfied, waiting, failed] }
+        reason: { type: string, minLength: 1 }
+    ProcessDesiredStatePersistenceStatus:
+      type: object
+      additionalProperties: false
+      required: [enabled, healthy, leaseHeld, recoveredFromPrevious, primaryValid, previousAvailable, previousValid, generation, lastIntegrityCheckEpochMicroseconds, state, integrityState]
+      properties:
+        enabled: { type: boolean }
+        healthy: { type: boolean }
+        leaseHeld: { type: boolean }
+        recoveredFromPrevious: { type: boolean }
+        primaryValid: { type: boolean }
+        previousAvailable: { type: boolean }
+        previousValid: { type: boolean }
+        generation: { type: integer, minimum: 0 }
+        lastIntegrityCheckEpochMicroseconds: { type: integer, minimum: 0 }
+        state: { type: string, enum: [disabled, healthy, recovered, degraded] }
+        integrityState: { type: string, enum: [disabled, healthy, primary-invalid, previous-invalid, inspection-failed, commit-failed, generation-exhausted] }
+    ProcessDependencyGraph:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, available, generation, scope, runtimeProcessId, desiredStatePersistence, nodes, edges, startupOrder, shutdownOrder, summary]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        available: { type: boolean, const: true }
+        generation: { type: integer, minimum: 1 }
+        scope: { type: string, const: runtime-process }
+        runtimeProcessId: { type: integer, minimum: 1 }
+        desiredStatePersistence: { $ref: "#/components/schemas/ProcessDesiredStatePersistenceStatus" }
+        nodes:
+          type: array
+          items: { $ref: "#/components/schemas/ProcessDependencyNode" }
+        edges:
+          type: array
+          items: { $ref: "#/components/schemas/ProcessDependencyEdge" }
+        startupOrder:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        shutdownOrder:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        summary:
+          type: object
+          additionalProperties: false
+          required: [configured, running, waiting, blocked]
+          properties:
+            configured: { type: integer, minimum: 0 }
+            running: { type: integer, minimum: 0 }
+            waiting: { type: integer, minimum: 0 }
+            blocked: { type: integer, minimum: 0 }
+    ProcessLifecycleImpactNode:
+      type: object
+      additionalProperties: false
+      required: [name, role, state, processId, desiredState]
+      properties:
+        name: { type: string, minLength: 1 }
+        role: { type: string, enum: [prerequisite, target, dependent] }
+        state: { type: string, minLength: 1 }
+        processId: { type: integer, minimum: 0 }
+        desiredState: { type: string, enum: [running, stopped] }
+    ProcessLifecycleImpactPlan:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, available, generation, scope, action, target, allowed, code, detail, requiresConfirmation, noOp, prerequisites, affectedDependents, stopOrder, startOrder, affectedCount, affected]
+      properties:
+        schemaVersion: { type: integer, const: 1 }
+        available: { type: boolean, const: true }
+        generation: { type: integer, minimum: 1 }
+        scope: { type: string, const: runtime-process }
+        action: { type: string, enum: [start, stop, restart] }
+        target: { type: string, minLength: 1 }
+        allowed: { type: boolean }
+        code:
+          type: string
+          enum: [PDR-PROCESS-IMPACT-READY, PDR-PROCESS-IMPACT-NO_CHANGE, PDR-PROCESS-IMPACT-TARGET_NOT_FOUND, PDR-PROCESS-IMPACT-TARGET_NOT_MANAGEABLE]
+        detail: { type: string, minLength: 1 }
+        requiresConfirmation: { type: boolean }
+        noOp: { type: boolean }
+        prerequisites:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        affectedDependents:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        stopOrder:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        startOrder:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        affectedCount: { type: integer, minimum: 0 }
+        affected:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/ProcessLifecycleImpactNode" }
     ResourceScope:
       type: object
       required: [hostId, runtimeId]
@@ -625,7 +1982,7 @@ components:
           uniqueItems: true
           items:
             type: string
-            enum: [protocol.manage, process.manage, bundle.manage, configuration.manage, audit.read, task.read, task.cancel]
+            enum: [protocol.manage, process.manage, bundle.manage, configuration.manage, identity.manage, audit.read, task.read, task.cancel, diagnostics.read, diagnostics.execute, capability.read, capability.manage, resource.read]
     ManagementTaskState:
       type: string
       enum: [queued, running, succeeded, failed, cancelled, timed-out, interrupted]

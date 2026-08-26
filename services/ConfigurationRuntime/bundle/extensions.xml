@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/configuration-transactions"
+             class="PocoDDS::ConfigTransaction::ConfigurationRuntimeHandlerFactory"
+             library="pdr.service.configurationRuntime"
+             allowSpecialization="all"
+             hidden="true"/>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/configuration-transactions/preflight"
+             class="PocoDDS::ConfigTransaction::ConfigurationRuntimeHandlerFactory"
+             library="pdr.service.configurationRuntime"
+             hidden="true"/>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/configuration-participants"
+             class="PocoDDS::ConfigTransaction::ConfigurationRuntimeHandlerFactory"
+             library="pdr.service.configurationRuntime"
+             hidden="true"/>
+</extensions>

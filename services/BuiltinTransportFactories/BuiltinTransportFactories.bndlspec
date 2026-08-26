@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<bundlespec>
+  <manifest>
+    <name>PocoDDS Built-in Transport Factories</name>
+    <symbolicName>pdr.transport.factories.builtin</symbolicName>
+    <version>1.0.0</version>
+    <vendor>PocoDDSRuntime</vendor>
+    <activator>
+      <class>PocoDDS::Services::BuiltinTransportFactoriesActivator</class>
+      <library>pdr.transport.factories.builtin</library>
+    </activator>
+    <lazyStart>false</lazyStart>
+    <runLevel>105</runLevel>
+    <requiredBundles>
+      <bundle><symbolicName>osp.core</symbolicName><version>[1.0.0,2.0.0)</version></bundle>
+    </requiredBundles>
+  </manifest>
+  <code>
+    ${bin}/*.dll,
+    ${bin}/*.pdb,
+    bin/${osName}/${osArch}/*.so,
+    bin/${osName}/${osArch}/*.dylib
+  </code>
+</bundlespec>

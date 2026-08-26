@@ -218,6 +218,127 @@ class ProjectManagerTests(unittest.TestCase):
             )
             self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
 
+    def test_change_impact_selects_direct_and_transitive_component_owners(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            created = self.run_tool(
+                "project", "create", "ImpactProduct", "--output", str(root),
+                "--profile", "edge-industrial",
+            )
+            self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
+            project = root / "ImpactProduct"
+            for kind, name, folder in (
+                ("module", "SharedModel", "modules"),
+                ("service", "AlarmService", "services"),
+            ):
+                generated = self.run_tool(
+                    "new", kind, name, "--output", str(project / folder)
+                )
+                self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
+            dependency = self.run_tool(
+                "component", "dependency", "add",
+                str(project / "services/AlarmService"), "shared-model",
+            )
+            self.assertEqual(dependency.returncode, 0, dependency.stdout + dependency.stderr)
+            manifest = project / "pdr-project.yaml"
+            synced = self.run_tool("project", "sync", str(manifest))
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+
+            report_path = project / "build/impact.json"
+            impacted = self.run_tool(
+                "project", "impact", str(manifest),
+                "modules/SharedModel/src/SharedModel.cpp",
+                "--output", str(report_path),
+            )
+            self.assertEqual(impacted.returncode, 0, impacted.stdout + impacted.stderr)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertFalse(report["frameworkWide"])
+            self.assertEqual(
+                [(item["id"], item["reason"]) for item in report["components"]],
+                [("alarm-service", "dependency"), ("shared-model", "changed")],
+            )
+            self.assertEqual(report["owners"], ["project"])
+
+            global_change = self.run_tool(
+                "project", "impact", str(manifest), "CMakeLists.txt"
+            )
+            self.assertEqual(
+                global_change.returncode, 0, global_change.stdout + global_change.stderr
+            )
+            self.assertTrue(json.loads(global_change.stdout)["frameworkWide"])
+
+    def test_component_contracts_order_dependencies_and_reject_cycles_and_reverse_edges(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            created = self.run_tool(
+                "project", "create", "CollaborativeRuntime", "--output", str(root),
+                "--profile", "server",
+            )
+            self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
+            project = root / "CollaborativeRuntime"
+            for kind, name, folder in (
+                ("module", "SharedModel", "modules"),
+                ("service", "InventoryService", "services"),
+                ("bundle", "InventoryBundle", "bundles"),
+                ("subprocess", "VisionWorker", "subprocesses"),
+            ):
+                generated = self.run_tool(
+                    "new", kind, name, "--output", str(project / folder)
+                )
+                self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
+
+            def contract(relative: str) -> tuple[Path, dict]:
+                path = project / relative / "pdr-component.json"
+                return path, json.loads(path.read_text(encoding="utf-8"))
+
+            for relative, requires in (
+                ("services/InventoryService", ["shared-model"]),
+                ("bundles/InventoryBundle", ["inventory-service"]),
+                ("subprocesses/VisionWorker", ["shared-model"]),
+            ):
+                path, document = contract(relative)
+                document["requires"] = requires
+                path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+            manifest = project / "pdr-project.yaml"
+            synced = self.run_tool("project", "sync", str(manifest))
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+            composition = (project / "pdr-project.components.cmake").read_text(
+                encoding="utf-8"
+            )
+            self.assertLess(composition.index("modules/SharedModel"),
+                            composition.index("services/InventoryService"))
+            self.assertLess(composition.index("services/InventoryService"),
+                            composition.index("bundles/InventoryBundle"))
+            self.assertIn("pdr_generated_module_shared_model", composition)
+            self.assertIn("PDR_COMPONENT_OWNER", composition)
+
+            module_path, module = contract("modules/SharedModel")
+            module["requires"] = ["inventory-service"]
+            module_path.write_text(json.dumps(module, indent=2) + "\n", encoding="utf-8")
+            reverse = self.run_tool("project", "validate", str(manifest))
+            self.assertNotEqual(reverse.returncode, 0)
+            self.assertIn("dependency crosses boundary", reverse.stdout + reverse.stderr)
+
+            module["requires"] = []
+            module_path.write_text(json.dumps(module, indent=2) + "\n", encoding="utf-8")
+            service_path, service = contract("services/InventoryService")
+            service["requires"] = ["shared-model"]
+            service_path.write_text(json.dumps(service, indent=2) + "\n", encoding="utf-8")
+            second_module = self.run_tool(
+                "new", "module", "SharedPolicy", "--output", str(project / "modules")
+            )
+            self.assertEqual(second_module.returncode, 0,
+                             second_module.stdout + second_module.stderr)
+            policy_path, policy = contract("modules/SharedPolicy")
+            module["requires"] = ["shared-policy"]
+            policy["requires"] = ["shared-model"]
+            module_path.write_text(json.dumps(module, indent=2) + "\n", encoding="utf-8")
+            policy_path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+            cycle = self.run_tool("project", "validate", str(manifest))
+            self.assertNotEqual(cycle.returncode, 0)
+            self.assertIn("component dependency cycle", cycle.stdout + cycle.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

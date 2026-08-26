@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-access-policy-activation.schema.json",
+  "title": "Evidence for an atomically activated remote Registry access policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "policyId", "registryId", "previousPolicySha256", "policyRevision", "policySha256", "signerKeyId", "signerPublicKeySha256", "trustPolicyId", "trustPolicySha256", "activatedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryAccessPolicyActivation"},
+    "passed": {"const": true},
+    "policyId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "previousPolicySha256": {"$ref": "#/$defs/sha256"},
+    "policyRevision": {"type": "integer", "minimum": 1},
+    "policySha256": {"$ref": "#/$defs/sha256"},
+    "signerKeyId": {"$ref": "#/$defs/id"},
+    "signerPublicKeySha256": {"$ref": "#/$defs/sha256"},
+    "trustPolicyId": {"$ref": "#/$defs/id"},
+    "trustPolicySha256": {"$ref": "#/$defs/sha256"},
+    "activatedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

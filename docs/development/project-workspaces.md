@@ -56,6 +56,29 @@ cmake -S . -B build-management `
 `remove` 只解除登记，不删除源码。直接编辑清单后必须执行 `sync`；组合文件记录 Manifest
 SHA-256，清单与组合文件不一致时 CMake 会拒绝配置，防止构建到错误的组件集合。
 
+每个当前模板组件还带有产品所有的 `pdr-component.json`。多人协作时，每个组件 Owner 只在
+自己的目录内维护源码、公共 Target 和 `requires`；`project sync` 会按依赖拓扑生成组合顺序。
+如果 CMake 实际链接另一个项目组件却没有在 `requires` 声明，配置阶段直接失败。Subprocess
+不能通过链接进程内 Service 绕过进程边界，应通过 DDS、HTTP 或其他版本化公开协议协作。
+
+```powershell
+pdr component dependency add services/InventoryService shared-model
+pdr component dependency list services/InventoryService
+pdr project sync pdr-project.yaml
+```
+
+Pull Request 或 CI 可以把改动文件映射到直接受影响组件、所有下游依赖组件、Owner 和
+可独立构建 Target：
+
+```powershell
+pdr project impact pdr-project.yaml `
+  modules/SharedModel/include/Model.h services/InventoryService/src/Service.cpp `
+  --output build/change-impact.json
+```
+
+输出 JSON 可直接作为 CI matrix 输入。组件目录外的公共构建、配置或契约改动按
+framework-wide 处理，会选择全部组件，避免共享修改漏测其他团队的代码。
+
 路径必须在项目根目录内、不能重复，且清单中引用的目录必须真实存在。CMake 组件必须含
 `CMakeLists.txt`，ROS 2适配器必须同时含 `CMakeLists.txt` 与 `package.xml`，Web Bundle
 必须含 `CMakeLists.txt` 或 `package.json`：

@@ -14,8 +14,10 @@
 #include "Poco/OSP/Bundle.h"
 #include "Poco/OSP/BundleFactory.h"
 #include "Poco/OSP/BundleContextFactory.h"
+#include "Poco/OSP/BundleLifecycleGuard.h"
 #include "Poco/OSP/BundleLoader.h"
 #include "Poco/OSP/CodeCache.h"
+#include "Poco/OSP/Properties.h"
 #include "Poco/OSP/ServiceRegistry.h"
 #include "Poco/OSP/LanguageTag.h"
 #include "Poco/OSP/Version.h"
@@ -27,6 +29,8 @@
 #include "Poco/Logger.h"
 #include "Poco/ConsoleChannel.h"
 #include <memory>
+#include <stdexcept>
+#include <utility>
 
 
 using Poco::OSP::Bundle;
@@ -44,6 +48,42 @@ using Poco::Delegate;
 using Poco::Logger;
 
 
+namespace
+{
+class CountingLifecycleGuard: public Poco::OSP::BundleLifecycleGuard
+{
+public:
+	CountingLifecycleGuard(bool allowStart, std::string code):
+		_allowStart(allowStart),
+		_code(std::move(code))
+	{
+	}
+
+	Poco::OSP::BundleLifecycleDecision evaluateStart(
+		const std::string&) const override
+	{
+		++startCalls;
+		return {_allowStart, _allowStart ? std::string() : _code,
+			_allowStart ? std::string() : "test rejection", {}};
+	}
+
+	Poco::OSP::BundleLifecycleDecision evaluateStop(
+		const std::string&) const override
+	{
+		++stopCalls;
+		return {true, {}, {}, {}};
+	}
+
+	mutable int startCalls{0};
+	mutable int stopCalls{0};
+
+private:
+	bool _allowStart;
+	std::string _code;
+};
+}
+
+
 BundleTest::BundleTest(const std::string& name): CppUnit::TestCase(name)
 {
 }
@@ -51,6 +91,45 @@ BundleTest::BundleTest(const std::string& name): CppUnit::TestCase(name)
 
 BundleTest::~BundleTest()
 {
+}
+
+
+void BundleTest::testCompositeLifecycleGuards()
+{
+	CodeCache cc("codeCache");
+	ServiceRegistry reg;
+	LanguageTag lang("en", "US");
+	BundleFactory::Ptr pBundleFactory(new BundleFactory(lang));
+	Poco::OSP::SystemEvents systemEvents;
+	BundleContextFactory::Ptr pBundleContextFactory(
+		new BundleContextFactory(reg, systemEvents));
+	BundleLoader loader(cc, pBundleFactory, pBundleContextFactory);
+
+	Poco::AutoPtr<CountingLifecycleGuard> allow =
+		new CountingLifecycleGuard(true, "");
+	Poco::AutoPtr<CountingLifecycleGuard> reject =
+		new CountingLifecycleGuard(false, "SECOND_GUARD_REJECTED");
+	Poco::OSP::Properties properties;
+	properties.set("pdr.lifecycle.guard", "test");
+	reg.registerService("a.test.lifecycleGuard", allow, properties);
+	reg.registerService("b.test.lifecycleGuard", reject, properties);
+
+	Bundle::Ptr pBundle = loader.loadBundle(
+		findBundle("com.appinf.osp.bundle1_1.0.0"));
+	pBundle->resolve();
+	try
+	{
+		pBundle->start();
+		fail("second lifecycle guard must reject bundle start");
+	}
+	catch (const std::runtime_error& exception)
+	{
+		assert (std::string(exception.what()).find("SECOND_GUARD_REJECTED") !=
+			std::string::npos);
+	}
+	assert (allow->startCalls == 1);
+	assert (reject->startCalls == 1);
+	assert (pBundle->state() == Bundle::BUNDLE_RESOLVED);
 }
 
 
@@ -824,6 +903,7 @@ CppUnit::Test* BundleTest::suite()
 	CppUnit_addTest(pSuite, BundleTest, testResolve);
 	CppUnit_addTest(pSuite, BundleTest, testResolveModules);
 	CppUnit_addTest(pSuite, BundleTest, testStart);
+	CppUnit_addTest(pSuite, BundleTest, testCompositeLifecycleGuards);
 	CppUnit_addTest(pSuite, BundleTest, testActivator);
 	CppUnit_addTest(pSuite, BundleTest, testStopAll);
 	CppUnit_addTest(pSuite, BundleTest, testResolveStartStopUnloadAll);

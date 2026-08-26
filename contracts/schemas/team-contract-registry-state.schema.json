@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-state.schema.json",
+  "title": "Immutable package inventory and promotion state for a team contract Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "registryId", "revision", "previousStateSha256",
+    "trustPolicy", "channelOrder", "packages", "locks", "channels", "event"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryState"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "revision": {"type": "integer", "minimum": 0},
+    "previousStateSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "trustPolicy": {"$ref": "#/$defs/trustPolicy"},
+    "channelOrder": {
+      "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "packages": {
+      "type": "array", "maxItems": 100000,
+      "items": {"$ref": "#/$defs/package"}
+    },
+    "locks": {
+      "type": "array", "maxItems": 100000,
+      "items": {"$ref": "#/$defs/lock"}
+    },
+    "channels": {
+      "type": "array", "minItems": 1, "maxItems": 16,
+      "items": {"$ref": "#/$defs/channel"}
+    },
+    "event": {"$ref": "#/$defs/event"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "time": {"type": "string", "format": "date-time"},
+    "trustPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policyId", "policySha256"],
+      "properties": {
+        "policyId": {"$ref": "#/$defs/id"},
+        "policySha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "signature": {
+      "type": "object", "additionalProperties": false,
+      "required": ["keyId", "signatureSha256", "publicKeySha256"],
+      "properties": {
+        "keyId": {"$ref": "#/$defs/id"},
+        "signatureSha256": {"$ref": "#/$defs/sha256"},
+        "publicKeySha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "package": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "packageId", "version", "owner", "packageSha256", "manifestSha256",
+        "artifactSetSha256", "signature", "blob"
+      ],
+      "properties": {
+        "packageId": {"$ref": "#/$defs/id"},
+        "version": {"$ref": "#/$defs/version"},
+        "owner": {"$ref": "#/$defs/id"},
+        "packageSha256": {"$ref": "#/$defs/sha256"},
+        "manifestSha256": {"$ref": "#/$defs/sha256"},
+        "artifactSetSha256": {"$ref": "#/$defs/sha256"},
+        "signature": {"$ref": "#/$defs/signature"},
+        "blob": {"type": "string", "pattern": "^blobs/packages/[0-9a-f]{2}/[0-9a-f]{64}\\.pdrcontracts$"}
+      }
+    },
+    "lockPackage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["packageId", "version", "packageSha256"],
+      "properties": {
+        "packageId": {"$ref": "#/$defs/id"},
+        "version": {"$ref": "#/$defs/version"},
+        "packageSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "lock": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lockSha256", "trustPolicy", "packages", "blob"],
+      "properties": {
+        "lockSha256": {"$ref": "#/$defs/sha256"},
+        "trustPolicy": {"$ref": "#/$defs/trustPolicy"},
+        "packages": {
+          "type": "array", "minItems": 1, "maxItems": 4096,
+          "items": {"$ref": "#/$defs/lockPackage"}
+        },
+        "blob": {"type": "string", "pattern": "^blobs/locks/[0-9a-f]{2}/[0-9a-f]{64}\\.lock\\.json$"}
+      }
+    },
+    "channel": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "name", "generation", "lockSha256", "updatedAt", "actor", "action",
+        "sourceChannel", "sourceGeneration", "rollbackFromGeneration",
+        "impactGateSha256", "gateAuthorizationSha256", "reason"
+      ],
+      "properties": {
+        "name": {"$ref": "#/$defs/id"},
+        "generation": {"type": "integer", "minimum": 0},
+        "lockSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "updatedAt": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/time"}]},
+        "actor": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+        "action": {"enum": ["empty", "promote", "rollback"]},
+        "sourceChannel": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+        "sourceGeneration": {"type": ["integer", "null"], "minimum": 0},
+        "rollbackFromGeneration": {"type": ["integer", "null"], "minimum": 1},
+        "impactGateSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "gateAuthorizationSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "reason": {"type": ["string", "null"], "minLength": 1, "maxLength": 512}
+      }
+    },
+    "event": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "operation", "actor", "occurredAt", "packageSha256", "lockSha256",
+        "channel", "sourceChannel", "sourceGeneration", "rollbackFromGeneration",
+        "rollbackToGeneration", "impactGateSha256", "gateAuthorizationSha256", "reason"
+      ],
+      "properties": {
+        "operation": {"enum": ["init", "publish", "promote", "rollback"]},
+        "actor": {"$ref": "#/$defs/id"},
+        "occurredAt": {"$ref": "#/$defs/time"},
+        "packageSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "lockSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "channel": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+        "sourceChannel": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+        "sourceGeneration": {"type": ["integer", "null"], "minimum": 0},
+        "rollbackFromGeneration": {"type": ["integer", "null"], "minimum": 1},
+        "rollbackToGeneration": {"type": ["integer", "null"], "minimum": 1},
+        "impactGateSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "gateAuthorizationSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "reason": {"type": ["string", "null"], "minLength": 1, "maxLength": 512}
+      }
+    }
+  }
+}

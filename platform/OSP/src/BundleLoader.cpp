@@ -15,9 +15,11 @@
 #include "Poco/OSP/BundleLoader.h"
 #include "Poco/OSP/BundleContextFactory.h"
 #include "Poco/OSP/BundleActivator.h"
+#include "Poco/OSP/BundleLifecycleGuard.h"
 #include "Poco/OSP/BundleEvent.h"
 #include "Poco/OSP/CodeCache.h"
 #include "Poco/OSP/OSPException.h"
+#include "Poco/OSP/ServiceRegistry.h"
 #include "Poco/File.h"
 #include "Poco/Path.h"
 #include "Poco/Timestamp.h"
@@ -29,6 +31,7 @@
 #include <memory>
 #include <algorithm>
 #include <cctype>
+#include <stdexcept>
 
 
 using namespace std::string_literals;
@@ -43,6 +46,57 @@ using Poco::Logger;
 
 namespace Poco {
 namespace OSP {
+
+
+namespace
+{
+	void enforceLifecycleDecision(const BundleLifecycleDecision& decision,
+		const std::string& action, const std::string& symbolicName)
+	{
+		if (decision.allowed) return;
+		std::string message = decision.code.empty()
+			? "bundle lifecycle guard rejected " + action
+			: decision.code;
+		message += ": " + symbolicName;
+		if (!decision.detail.empty()) message += ": " + decision.detail;
+		throw std::runtime_error(message);
+	}
+
+	void enforceLifecycleGuard(const BundleContext::Ptr& context,
+		const std::string& action, const std::string& symbolicName)
+	{
+		// Independent policies (for example dependency safety and durable
+		// desired state) must all participate in lifecycle admission.
+		std::vector<ServiceRef::Ptr> references = context->registry().find(
+			"pdr.lifecycle.guard");
+		if (references.empty())
+		{
+			// Backwards compatibility for a legacy guard without the discovery
+			// property.
+			ServiceRef::ConstPtr legacy = context->registry().findByName(
+				BundleLifecycleGuard::SERVICE_NAME);
+			if (!legacy) return;
+			BundleLifecycleGuard::Ptr guard =
+				legacy->castedInstance<BundleLifecycleGuard>();
+			const BundleLifecycleDecision decision = action == "start"
+				? guard->evaluateStart(symbolicName)
+				: guard->evaluateStop(symbolicName);
+			enforceLifecycleDecision(decision, action, symbolicName);
+			return;
+		}
+
+		// ServiceRegistry stores entries by name, so this order is stable.
+		for (const auto& reference : references)
+		{
+			BundleLifecycleGuard::Ptr guard =
+				reference->castedInstance<BundleLifecycleGuard>();
+			const BundleLifecycleDecision decision = action == "start"
+				? guard->evaluateStart(symbolicName)
+				: guard->evaluateStop(symbolicName);
+			enforceLifecycleDecision(decision, action, symbolicName);
+		}
+	}
+}
 
 
 BundleLoader::BundleLoader(CodeCache& codeCache, BundleFactory::Ptr pBundleFactory, BundleContextFactory::Ptr pBundleContextFactory, const std::string& osName, const std::string& osArch, bool autoUpdateCodeCache):
@@ -316,6 +370,31 @@ void BundleLoader::startAllBundles()
 				error.pException = &exc;
 				bundleError(this, error);
 			}
+			catch (std::exception& exc)
+			{
+				std::string msg("Failed to start bundle ");
+				if (_lastBundleStarted != (*it)->symbolicName())
+				{
+					msg += _lastBundleStarted;
+					msg += " required by ";
+					msg += (*it)->symbolicName();
+					msg += ": ";
+				}
+				else
+				{
+					msg += (*it)->symbolicName();
+					msg += ": ";
+				}
+				msg += exc.what();
+				_logger.error(msg);
+
+				Poco::SystemException wrapped(exc.what());
+				BundleError error;
+				error.pBundle = *it;
+				error.targetState = Bundle::BUNDLE_ACTIVE;
+				error.pException = &wrapped;
+				bundleError(this, error);
+			}
 		}
 	}
 }
@@ -510,6 +589,7 @@ void BundleLoader::startBundle(Bundle* pBundle)
 	BundleMap::iterator it = _bundles.find(pBundle->symbolicName());
 	if (it != _bundles.end())
 	{
+		enforceLifecycleGuard(it->second.pContext, "start", pBundle->symbolicName());
 		startDependencies(pBundle);
 		_lastBundleStarted = pBundle->symbolicName();
 		BundleActivator* pActivator = loadActivator(it->second);
@@ -539,6 +619,7 @@ void BundleLoader::stopBundle(Bundle* pBundle)
 	BundleMap::iterator it = _bundles.find(pBundle->symbolicName());
 	if (it != _bundles.end())
 	{
+		enforceLifecycleGuard(it->second.pContext, "stop", pBundle->symbolicName());
 		BundleActivator* pActivator = pBundle->activator();
 		if (pActivator)
 		{

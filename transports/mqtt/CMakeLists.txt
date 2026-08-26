@@ -28,4 +28,15 @@ if(BUILD_TESTING)
     add_test(NAME mqtt-transport-smoke COMMAND pdr-mqtt-transport-smoke)
     set_tests_properties(mqtt-transport-smoke PROPERTIES
         LABELS "transport;mqtt;integration;fault-injection" TIMEOUT 15)
+
+    add_executable(pdr-mqtt-transport-recovery
+        tests/MqttTransportRecovery.cpp)
+    target_link_libraries(pdr-mqtt-transport-recovery
+        PRIVATE PocoDDS::MQTTTransport PocoDDS::RuntimeCore Poco::Net)
+    pdr_set_warnings(pdr-mqtt-transport-recovery)
+    add_test(NAME mqtt-transport-peer-recovery
+        COMMAND pdr-mqtt-transport-recovery)
+    set_tests_properties(mqtt-transport-peer-recovery PROPERTIES
+        LABELS "transport;mqtt;integration;fault-injection;recovery"
+        TIMEOUT 15)
 endif()

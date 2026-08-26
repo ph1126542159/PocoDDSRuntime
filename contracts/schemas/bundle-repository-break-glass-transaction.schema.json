@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/bundle-repository-break-glass-transaction.schema.json",
+  "title": "PocoDDSRuntime Bundle Repository Break-Glass Transaction Journal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "action", "approvalId", "state", "updatedAt",
+    "repository", "staging", "previous", "requestSha256", "sourceStateSha256",
+    "ticket", "source", "target", "approval", "transactionSha256"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "product": { "const": "PocoDDSBundleRepositoryBreakGlass" },
+    "action": { "const": "downgrade-high-water" },
+    "approvalId": { "type": "string", "format": "uuid" },
+    "state": {
+      "enum": [
+        "prepared", "authorized", "previousSaved", "activated", "highWaterCommitted",
+        "consumed", "completed", "rolledBack"
+      ]
+    },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "repository": { "type": "string", "minLength": 1 },
+    "staging": { "type": "string", "minLength": 1 },
+    "previous": { "type": "string", "minLength": 1 },
+    "requestSha256": { "$ref": "#/$defs/sha256" },
+    "sourceStateSha256": { "$ref": "#/$defs/sha256" },
+    "ticket": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$" },
+    "source": { "type": "object" },
+    "target": { "type": "object" },
+    "approval": { "type": "object" },
+    "authorizedAuditSha256": { "$ref": "#/$defs/sha256" },
+    "consumptionSha256": { "$ref": "#/$defs/sha256" },
+    "appliedAuditSha256": { "$ref": "#/$defs/sha256" },
+    "recoveryAuditSha256": { "$ref": "#/$defs/sha256" },
+    "recoveryResult": {
+      "enum": ["forward-completed", "rolled-back-before-high-water"]
+    },
+    "transactionSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

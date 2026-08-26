@@ -37,7 +37,7 @@ int main()
             "PDR_IDENTITY_TEST_OPERATOR");
         configuration->setString(
             "pdr.management.authentication.principals.0.permissions",
-            " protocol.manage, task.read, diagnostics.read ");
+            " protocol.manage, task.read, diagnostics.read, capability.read, resource.read ");
 
         auto store = PocoDDS::Security::PrincipalStore::fromManagementConfiguration(
             *configuration);
@@ -49,6 +49,10 @@ int main()
                 "legacy principal did not receive all management permissions");
         require(legacy->authorized("diagnostics.execute"),
                 "legacy administrator did not receive diagnostic execute permission");
+        require(legacy->authorized("capability.manage"),
+                "legacy administrator did not receive capability management permission");
+        require(legacy->authorized("resource.read"),
+                "legacy administrator did not receive resource governance read permission");
         const auto* operatorPrincipal = store.authenticateBearerToken("operator-secret");
         require(operatorPrincipal && operatorPrincipal->id() == "operator",
                 "indexed principal did not authenticate");
@@ -60,6 +64,12 @@ int main()
                 "configured permission missing");
         require(operatorPrincipal->authorized("diagnostics.read"),
                 "diagnostic terminal permission missing");
+        require(operatorPrincipal->authorized("capability.read"),
+                "capability read permission missing");
+        require(operatorPrincipal->authorized("resource.read"),
+                "resource governance read permission missing");
+        require(!operatorPrincipal->authorized("capability.manage"),
+                "read-only operator received capability management permission");
         require(!operatorPrincipal->authorized("diagnostics.execute"),
                 "read-only operator received diagnostic execute permission");
         require(!operatorPrincipal->authorized("bundle.manage"),

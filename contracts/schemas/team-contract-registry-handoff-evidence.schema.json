@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-handoff-evidence.schema.json",
+  "title": "Signed portable Registry handoff evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "handoffId", "registryId", "nodeId", "drainGeneration", "registryRevision", "registryStateSha256", "observedFencingToken", "observedGrantSha256", "pendingRequestCount", "pendingRequestSetSha256", "auditSequence", "auditHeadSha256", "issuedAt", "expiresAt", "signer"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryHandoffEvidence"},
+    "handoffId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "nodeId": {"$ref": "#/$defs/id"},
+    "drainGeneration": {"type": "integer", "minimum": 1},
+    "registryRevision": {"type": "integer", "minimum": 0},
+    "registryStateSha256": {"$ref": "#/$defs/sha256"},
+    "observedFencingToken": {"type": "integer", "minimum": 1},
+    "observedGrantSha256": {"$ref": "#/$defs/sha256"},
+    "pendingRequestCount": {"const": 0},
+    "pendingRequestSetSha256": {"const": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e377c95ce815a90eab65e8"},
+    "auditSequence": {"type": "integer", "minimum": 0},
+    "auditHeadSha256": {"$ref": "#/$defs/sha256"},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"},
+    "signer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["keyId", "algorithm", "signature"],
+      "properties": {"keyId": {"$ref": "#/$defs/id"}, "algorithm": {"const": "Ed25519"}, "signature": {"type": "string", "minLength": 88, "maxLength": 88}}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

@@ -27,6 +27,7 @@
 #include "Poco/Path.h"
 #include "Poco/Mutex.h"
 #include <map>
+#include <string>
 
 
 namespace Poco {
@@ -60,6 +61,12 @@ public:
 
 	void setConfiguration(const std::string& key, const std::string& value);
 		/// Updates one global application configuration value at runtime.
+
+	void replaceConfiguration(const std::map<std::string, std::string>& values);
+		/// Atomically replaces the complete global configuration snapshot.
+
+	std::map<std::string, std::string> configurationSnapshot();
+		/// Returns one internally consistent copy of all global properties.
 
 	static const std::string SERVICE_NAME;
 

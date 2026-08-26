@@ -41,4 +41,10 @@ if(BUILD_TESTING)
     set_tests_properties(webui-framework-model PROPERTIES
         LABELS "webui;contract;framework"
         PASS_REGULAR_EXPRESSION "PDR_WEBUI_FRAMEWORK_MODEL_PASS")
+    add_test(NAME webui-process-dependency-model
+        COMMAND "${PDR_WEBUI_NODE_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/process-dependency-model.test.mjs")
+    set_tests_properties(webui-process-dependency-model PROPERTIES
+        LABELS "webui;contract;process-management"
+        PASS_REGULAR_EXPRESSION "PDR_WEBUI_PROCESS_DEPENDENCY_MODEL_PASS")
 endif()

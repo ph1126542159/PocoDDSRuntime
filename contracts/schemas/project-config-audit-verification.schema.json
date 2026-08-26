@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-audit-verification.schema.json",
+  "title": "PocoDDSRuntime project configuration audit verification evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "verifiedAt", "stateDirectory", "recordCount",
+    "verifiedJournalCount", "lastSequence", "lastRecordSha256",
+    "auditFileSha256", "headSha256"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "project-config-audit-verify"},
+    "verifiedAt": {"type": "string", "format": "date-time"},
+    "stateDirectory": {"type": "string", "minLength": 1},
+    "recordCount": {"type": "integer", "minimum": 0},
+    "verifiedJournalCount": {"type": "integer", "minimum": 0},
+    "lastSequence": {"type": "integer", "minimum": 0},
+    "lastRecordSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "auditFileSha256": {"$ref": "#/$defs/sha256"},
+    "headSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

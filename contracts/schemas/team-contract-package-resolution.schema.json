@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-package-resolution.schema.json",
+  "title": "Cross-team contract package verification or resolution evidence",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "product", "operation", "passed"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractPackageResolution"},
+    "operation": {"enum": ["verify", "resolve"]},
+    "passed": {"const": true},
+    "packageSha256": {"$ref": "#/$defs/sha256"},
+    "manifestSha256": {"$ref": "#/$defs/sha256"},
+    "artifactSetSha256": {"$ref": "#/$defs/sha256"},
+    "lockSha256": {"$ref": "#/$defs/sha256"},
+    "signature": {"type": ["object", "null"]},
+    "trust": {"type": ["object", "null"]},
+    "trustPolicy": {"type": ["object", "null"]},
+    "packages": {"type": "array"},
+    "files": {"type": "array"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

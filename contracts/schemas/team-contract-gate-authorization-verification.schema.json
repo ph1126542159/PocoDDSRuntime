@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-gate-authorization-verification.schema.json",
+  "title": "Verification evidence for a Registry-scoped aggregate Gate authorization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "operation", "passed", "authorizationId",
+    "authorizationSha256", "gateReportSha256", "candidateLockSha256", "registryId",
+    "channels", "policyId", "policySha256", "authorizerId", "keyId",
+    "publicKeySha256", "issuedAt", "expiresAt"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractGateAuthorizationVerification"},
+    "operation": {"const": "team-contract-gate-authorization-verify"},
+    "passed": {"const": true},
+    "authorizationId": {"$ref": "#/$defs/id"},
+    "authorizationSha256": {"$ref": "#/$defs/sha256"},
+    "gateReportSha256": {"$ref": "#/$defs/sha256"},
+    "candidateLockSha256": {"$ref": "#/$defs/sha256"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "channels": {"type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "policyId": {"$ref": "#/$defs/id"},
+    "policySha256": {"$ref": "#/$defs/sha256"},
+    "authorizerId": {"$ref": "#/$defs/id"},
+    "keyId": {"$ref": "#/$defs/id"},
+    "publicKeySha256": {"$ref": "#/$defs/sha256"},
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

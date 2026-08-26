@@ -540,7 +540,7 @@ def manifest_and_composition_changes(manifest: Path, project: dict[str, Any],
                                      file_changes: dict[str, bytes | None]) -> dict[str, bytes | None]:
     import project_manager
 
-    manifest_content = pretty_json(project)
+    manifest_content = pretty_json(project_manager.project_manifest_document(project))
     composition = "\n".join(project_manager.composition_lines(
         project, sha256_bytes(manifest_content)
     )) + "\n"

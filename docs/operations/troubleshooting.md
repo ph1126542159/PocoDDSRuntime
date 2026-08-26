@@ -6,6 +6,7 @@
   `affected` 实例列表和 `remediation` 处置；不要只依赖可能变化的 `detail` 文本。
 - `PDR-HEALTH-SUBPROCESS-REQUIRED_NOT_RUNNING`：打开受影响子进程日志，修复启动条件后从进程管理页重启。
 - `PDR-HEALTH-SUBPROCESS-MANAGER_UNAVAILABLE`：检查 ProcessManagement Bundle 与 Runtime 启动配置。
+- `PDR-HEALTH-PROCESS-DESIRED-STATE-INTEGRITY`：保存主、`.previous`、`.new`、`.lock` 和 Runtime 日志；核对当前实际进程与授权后执行受控生命周期提交，无法核对时停机走离线恢复。
 - `PDR-HEALTH-PROTOCOL-REQUIRED_CLOSED`：查看协议实例最后错误和端点连通性，再执行实例重启。
 - `PDR-HEALTH-DEVICE-REQUIRED_NOT_READY`：查看设备最后错误，并核查供电、接线和底层传输。
 - `PDR-HEALTH-BUNDLE-NONE_ACTIVE`：检查 Bundle 启动日志、依赖版本和运行级别。

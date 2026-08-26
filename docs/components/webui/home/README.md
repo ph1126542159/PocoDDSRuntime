@@ -8,6 +8,8 @@ Bundle 是进程内的部署和生命周期单元；Service 是 Bundle 注册到
 
 Runtime 身份、权限、配置事务、管理审计、幂等保护和异步管理任务集中在“Runtime 治理”页面。普通“进程配置”仅表示所选进程实际加载的 properties；主进程也不能通过自身管理接口停止自己，外部服务管理器才是其生命周期所有者。
 
+进程依赖视图是 Runtime Process 级观测面：`main.jsx` 只负责请求和刷新，`ProcessDependencyView.jsx` 只负责渲染，`process-dependency-model.js` 负责稳定的状态解释和权威顺序映射，`process-dependency.css` 独立维护响应式布局。前端不从子进程列表重新计算 DAG，也不自行决定生命周期顺序。期望状态持久化卡同样只解释 ProcessGraph 返回的健康、租约、恢复来源、代次、主/上一代校验结果和最近巡检时间，不读取或推测本地状态文件。
+
 ## 用法
 
 启动 WebServer 相关 Bundle 和 `pdr-runtime` 后，从配置的 HTTP 地址进入主页。开发构建：
@@ -26,6 +28,8 @@ npm run build
 | --- | --- |
 | `GET /api/v1/topology` | 当前 Runtime 的 Host、进程、Bundle、Service 作用域和所有权拓扑 |
 | `GET /api/v1/process-detail?id=...&name=...` | 单个进程的资源、配置、Bundle、Service 及清单权威来源 |
+| `GET /api/v1/process-dependencies` | 受管子进程依赖边、阻塞原因、权威启动/关闭顺序，以及期望状态持久化健康、单写者租约、恢复来源、代次和在线完整性巡检；进程页按 Runtime Process 范围展示，不直接读取状态文件 |
+| `GET /api/v1/process-dependencies/impact?target=...&action=...` | 生命周期操作前的无副作用 DAG 影响计划；WebUI 展示依赖闭包、受影响下游和实际顺序后再要求确认 |
 | `POST /api/v1/process-config` | 事务式修改后端白名单中的 Runtime 配置项 |
 | `POST /api/v1/process-lifecycle` | 本机子进程生命周期操作 |
 | `POST /api/v1/bundle-lifecycle` | 可管理 Bundle 的启动、停止或重启 |

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "order-workflow",
+  "name": "OrderWorkflow",
+  "kind": "workflow",
+  "plane": "management",
+  "target": "order_workflow",
+  "owner": "team/orders",
+  "isolation": "in-process",
+  "requires": []
+}

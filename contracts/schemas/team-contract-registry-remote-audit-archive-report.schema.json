@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-audit-archive-report.schema.json",
+  "title": "Remote Registry audit archive operation report",
+  "type": "object",
+  "required": ["schemaVersion", "product", "passed", "operation", "registryId"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteAuditArchiveReport"},
+    "passed": {"const": true},
+    "operation": {"enum": ["create", "verify", "prune"]},
+    "registryId": {"$ref": "#/$defs/id"},
+    "archiveId": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+    "fromSequence": {"type": "integer", "minimum": 1},
+    "throughSequence": {"type": "integer", "minimum": 0},
+    "throughRecordSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "archiveFile": {"type": ["string", "null"]},
+    "archiveSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "affectedRecords": {"type": "integer", "minimum": 0},
+    "affectedBytes": {"type": "integer", "minimum": 0},
+    "completedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

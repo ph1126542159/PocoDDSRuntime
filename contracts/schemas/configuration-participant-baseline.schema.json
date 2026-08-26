@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/configuration-participant-baseline.schema.json",
+  "title": "Published configuration participant compatibility baseline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "runtimeVersion", "participants"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "product": {
+      "type": "string",
+      "const": "PocoDDSRuntimeConfigurationParticipantBaseline"
+    },
+    "runtimeVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "participants": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": { "$ref": "#/$defs/participant" }
+    }
+  },
+  "$defs": {
+    "participant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "id", "serviceName", "ownedPrefixes", "after"],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 192,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "id": {
+          "$ref": "configuration-participants.schema.json#/$defs/participantId"
+        },
+        "serviceName": {
+          "$ref": "configuration-participants.schema.json#/$defs/serviceName"
+        },
+        "ownedPrefixes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "configuration-participants.schema.json#/$defs/prefix"
+          }
+        },
+        "after": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "configuration-participants.schema.json#/$defs/participantId"
+          }
+        }
+      }
+    }
+  }
+}

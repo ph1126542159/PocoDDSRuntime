@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "provides": [
+    {
+      "contract": "pdr.capability-runtime",
+      "version": "1.0.0",
+      "serviceName": "pdr.service.capabilityRuntime"
+    }
+  ],
+  "requires": []
+}

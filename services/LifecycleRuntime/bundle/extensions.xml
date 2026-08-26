@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/lifecycle-maintenance"
+             class="PocoDDS::Lifecycle::LifecycleHandlerFactory"
+             library="pdr.service.lifecycleRuntime"
+             allowSpecialization="none"
+             hidden="true"/>
+</extensions>

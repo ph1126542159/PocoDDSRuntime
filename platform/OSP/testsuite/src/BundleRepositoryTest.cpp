@@ -25,6 +25,7 @@
 #include "Poco/OSP/SystemEvents.h"
 #include "Poco/Path.h"
 #include "Poco/File.h"
+#include "Poco/FileStream.h"
 #include "Poco/Logger.h"
 #include "Poco/ConsoleChannel.h"
 #include <sstream>
@@ -117,6 +118,57 @@ void BundleRepositoryTest::testLoad()
 	assert (!pBundle7.isNull());
 	assert (!pBundle8.isNull());
 	assert (!pBundle9.isNull());
+}
+
+
+void BundleRepositoryTest::testValidateWithoutMutation()
+{
+	CodeCache cc("codeCache");
+	ServiceRegistry reg;
+	LanguageTag lang("en", "US");
+	BundleFactory::Ptr pBundleFactory(new BundleFactory(lang));
+	Poco::OSP::SystemEvents systemEvents;
+	BundleContextFactory::Ptr pBundleContextFactory(new BundleContextFactory(reg, systemEvents));
+	BundleLoader loader(cc, pBundleFactory, pBundleContextFactory);
+	Poco::Path bundlePath(findBundleRepository());
+	bundlePath.makeDirectory();
+	bundlePath.pushDirectory("com.appinf.osp.bundle1_1.0.0");
+	BundleRepository repo(bundlePath.toString(), loader);
+
+	BundleRepository::Bundles bundles = repo.validateBundles();
+	assert (bundles.size() == 1);
+	std::vector<Bundle::Ptr> loaded;
+	loader.listBundles(loaded);
+	assert (loaded.empty());
+}
+
+
+void BundleRepositoryTest::testValidateRejectsMalformedCandidate()
+{
+	Poco::FileOutputStream broken("installed-bundles/broken.bndl");
+	broken << "not a bundle archive";
+	broken.close();
+
+	CodeCache cc("codeCache");
+	ServiceRegistry reg;
+	LanguageTag lang("en", "US");
+	BundleFactory::Ptr pBundleFactory(new BundleFactory(lang));
+	Poco::OSP::SystemEvents systemEvents;
+	BundleContextFactory::Ptr pBundleContextFactory(new BundleContextFactory(reg, systemEvents));
+	BundleLoader loader(cc, pBundleFactory, pBundleContextFactory);
+	BundleRepository repo("installed-bundles", loader);
+
+	try
+	{
+		repo.validateBundles();
+		fail("Malformed bundle candidate was accepted by strict repository preflight");
+	}
+	catch (Poco::OSP::BundleLoadException&)
+	{
+	}
+	std::vector<Bundle::Ptr> loaded;
+	loader.listBundles(loaded);
+	assert (loaded.empty());
 }
 
 
@@ -335,6 +387,8 @@ CppUnit::Test* BundleRepositoryTest::suite()
 	CppUnit::TestSuite* pSuite = new CppUnit::TestSuite("BundleRepositoryTest");
 
 	CppUnit_addTest(pSuite, BundleRepositoryTest, testLoad);
+	CppUnit_addTest(pSuite, BundleRepositoryTest, testValidateWithoutMutation);
+	CppUnit_addTest(pSuite, BundleRepositoryTest, testValidateRejectsMalformedCandidate);
 	CppUnit_addTest(pSuite, BundleRepositoryTest, testInstall);
 	CppUnit_addTest(pSuite, BundleRepositoryTest, testBundleFilterAcceptAll);
 	CppUnit_addTest(pSuite, BundleRepositoryTest, testBundleFilterRejectAll);

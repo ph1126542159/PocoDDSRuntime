@@ -37,6 +37,11 @@ class ReleaseManifestTests(unittest.TestCase):
             manifest = output / "SHA256SUMS.json"
             generated = json.loads(manifest.read_text(encoding="utf-8"))
             self.assertFalse(generated["cleanRequired"])
+            self.assertEqual(generated["sbom"]["spdxVersion"], "SPDX-2.3")
+            self.assertEqual(generated["provenance"]["source"]["gitCommit"],
+                             generated["gitCommit"])
+            self.assertEqual(generated["provenance"]["artifactSetSha256"],
+                             MODULE.artifact_set_digest(generated["files"]))
             verify_args = argparse.Namespace(manifest=manifest, artifacts=artifacts)
             self.assertEqual(MODULE.verify(verify_args), 0)
             sbom = json.loads((output / "pocoddsruntime.spdx.json").read_text(encoding="utf-8"))
@@ -44,6 +49,34 @@ class ReleaseManifestTests(unittest.TestCase):
             self.assertGreaterEqual(len(sbom["packages"]), 8)
             injected = artifacts / "untracked-plugin.dll"
             injected.write_bytes(b"injected")
+            self.assertNotEqual(MODULE.verify(verify_args), 0)
+
+    def test_signed_manifest_rejects_tampered_sbom_and_provenance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            artifacts, output = base / "artifacts", base / "release"
+            artifacts.mkdir()
+            (artifacts / "runtime.bin").write_bytes(b"release")
+            args = argparse.Namespace(
+                root=ROOT, artifacts=artifacts, output=output,
+                version="0.1.0", require_clean=False,
+                builder_id="ci.example/release", build_profile="server",
+            )
+            self.assertEqual(MODULE.generate(args), 0)
+            manifest = output / "SHA256SUMS.json"
+            verify_args = argparse.Namespace(manifest=manifest, artifacts=artifacts)
+            self.assertEqual(MODULE.verify(verify_args), 0)
+
+            sbom = output / "pocoddsruntime.spdx.json"
+            sbom_document = json.loads(sbom.read_text(encoding="utf-8"))
+            sbom_document["packages"][0]["versionInfo"] = "9.9.9"
+            sbom.write_text(json.dumps(sbom_document), encoding="utf-8")
+            self.assertNotEqual(MODULE.verify(verify_args), 0)
+
+            self.assertEqual(MODULE.generate(args), 0)
+            document = json.loads(manifest.read_text(encoding="utf-8"))
+            document["provenance"]["artifactSetSha256"] = "0" * 64
+            manifest.write_text(json.dumps(document), encoding="utf-8")
             self.assertNotEqual(MODULE.verify(verify_args), 0)
 
     def test_require_clean_rejects_dirty_worktree(self):

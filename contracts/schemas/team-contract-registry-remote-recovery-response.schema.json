@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-recovery-response.schema.json",
+  "title": "Durable result of an operator remote-request recovery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "registryId", "recoveryId", "recoverySha256", "targetRequestId", "targetRequestSha256", "startedRevision", "observedRevision", "observedStateSha256", "disposition", "operatorId", "reason"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteRecoveryResponse"},
+    "passed": {"const": true},
+    "registryId": {"$ref": "#/$defs/id"},
+    "recoveryId": {"$ref": "#/$defs/id"},
+    "recoverySha256": {"$ref": "#/$defs/sha256"},
+    "targetRequestId": {"$ref": "#/$defs/id"},
+    "targetRequestSha256": {"$ref": "#/$defs/sha256"},
+    "startedRevision": {"type": ["integer", "null"], "minimum": 0},
+    "observedRevision": {"type": ["integer", "null"], "minimum": 0},
+    "observedStateSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "disposition": {"enum": ["aborted", "uncertain"]},
+    "operatorId": {"$ref": "#/$defs/id"},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 512}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

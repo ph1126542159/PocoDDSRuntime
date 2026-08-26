@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-fencing-state.schema.json",
+  "title": "Locally observed Registry fencing-token high-water state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "authorityId", "registryId", "highestObservedFencingToken", "grantSha256", "observedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryFencingState"},
+    "authorityId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "highestObservedFencingToken": {"type": "integer", "minimum": 1},
+    "grantSha256": {"$ref": "#/$defs/sha256"},
+    "observedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

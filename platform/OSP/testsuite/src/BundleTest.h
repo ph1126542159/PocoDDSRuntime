@@ -35,6 +35,7 @@ public:
 	void testResolve();
 	void testResolveModules();
 	void testStart();
+	void testCompositeLifecycleGuards();
 	void testActivator();
 	void testStopAll();
 	void testResolveStartStopUnloadAll();

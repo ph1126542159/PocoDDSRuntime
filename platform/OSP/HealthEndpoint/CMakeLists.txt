@@ -3,6 +3,7 @@ myiot_add_osp_bundle(PDR_HealthEndpoint_Bundle "pdr.platform.health"
     LINK_LIBS
         Poco::OSPWeb
         PocoDDS::ProcessManagement
+        PocoDDS::ProcessGraph
         PocoDDS::Health
         PocoDDS::DeviceCore
         PocoDDS::Protocols

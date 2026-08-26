@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-recovery-manifest.schema.json",
+  "title": "Externally anchored Team Contract Registry recovery manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "recoveryPointId", "registryId", "registryRevision", "registryStateSha256", "registryPointerSha256", "registryTrustPolicy", "anchor", "anchorPolicy", "fileCount", "expandedBytes", "files", "createdAt", "operator"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRecoveryManifest"},
+    "recoveryPointId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "registryRevision": {"type": "integer", "minimum": 0},
+    "registryStateSha256": {"$ref": "#/$defs/sha256"},
+    "registryPointerSha256": {"$ref": "#/$defs/sha256"},
+    "registryTrustPolicy": {"$ref": "#/$defs/policy"},
+    "anchor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["anchorId", "sha256", "registryRevision", "registryStateSha256"],
+      "properties": {
+        "anchorId": {"$ref": "#/$defs/id"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "registryRevision": {"type": "integer", "minimum": 0},
+        "registryStateSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "anchorPolicy": {"$ref": "#/$defs/policy"},
+    "fileCount": {"type": "integer", "minimum": 2, "maximum": 200000},
+    "expandedBytes": {"type": "integer", "minimum": 1, "maximum": 8589934592},
+    "files": {
+      "type": "array", "minItems": 2, "maxItems": 200000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["role", "path", "sizeBytes", "sha256"],
+        "properties": {
+          "role": {"enum": ["pointer", "state", "package", "lock"]},
+          "path": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "sizeBytes": {"type": "integer", "minimum": 0, "maximum": 8589934592},
+          "sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "createdAt": {"type": "string", "format": "date-time"},
+    "operator": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policyId", "policySha256"],
+      "properties": {
+        "policyId": {"$ref": "#/$defs/id"},
+        "policySha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

@@ -37,7 +37,7 @@ install(TARGETS PDRConfiguration EXPORT PocoDDSRuntimeTargets
 install(TARGETS pdr-config-check RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
 add_executable(pdr-signature-check tools/ReleaseSignatureCheck.cpp)
-target_link_libraries(pdr-signature-check PRIVATE Poco::JSON Poco::Foundation OpenSSL::Crypto)
+target_link_libraries(pdr-signature-check PRIVATE PocoDDS::Security Poco::Foundation)
 pdr_set_warnings(pdr-signature-check)
 install(TARGETS pdr-signature-check RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY include/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

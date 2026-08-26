@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-status.schema.json",
+  "title": "PocoDDSRuntime project configuration collaboration status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "observedAt", "project", "stateDirectory",
+    "overallStatus", "canApply", "lock", "transactions", "audit", "issues"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "project-config-transaction-status"},
+    "observedAt": {"type": "string", "format": "date-time"},
+    "project": {"type": "string", "minLength": 1},
+    "stateDirectory": {"type": "string", "minLength": 1},
+    "overallStatus": {"enum": ["ready", "busy", "recovery-required", "invalid"]},
+    "canApply": {"type": "boolean"},
+    "lock": {"$ref": "#/$defs/lock"},
+    "transactions": {"$ref": "#/$defs/transactions"},
+    "audit": {"$ref": "#/$defs/audit"},
+    "issues": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/issue"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nullableSha256": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]
+    },
+    "nullableActor": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._@-]{0,127}$"}
+      ]
+    },
+    "nullableTime": {
+      "oneOf": [{"type": "null"}, {"type": "string", "format": "date-time"}]
+    },
+    "lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status", "path", "pid", "transactionId", "processIdentity", "actor", "error"
+      ],
+      "properties": {
+        "status": {"enum": ["free", "active", "stale", "invalid"]},
+        "path": {"type": "string", "minLength": 1},
+        "pid": {"oneOf": [{"type": "null"}, {"type": "integer", "minimum": 1}]},
+        "transactionId": {
+          "oneOf": [{"type": "null"}, {"type": "string", "format": "uuid"}]
+        },
+        "processIdentity": {
+          "oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]
+        },
+        "actor": {"$ref": "#/$defs/nullableActor"},
+        "error": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]}
+      }
+    },
+    "transactions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "terminal", "running", "recoveryRequired", "invalid", "items"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "terminal": {"type": "integer", "minimum": 0},
+        "running": {"type": "integer", "minimum": 0},
+        "recoveryRequired": {"type": "integer", "minimum": 0},
+        "invalid": {"type": "integer", "minimum": 0},
+        "items": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/transaction"}
+        }
+      }
+    },
+    "transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journal", "transactionId", "status", "initiatedBy", "startedAt",
+        "finishedAt", "disposition", "auditSequence", "error"
+      ],
+      "properties": {
+        "journal": {"type": "string", "minLength": 1},
+        "transactionId": {
+          "oneOf": [{"type": "null"}, {"type": "string", "format": "uuid"}]
+        },
+        "status": {
+          "oneOf": [
+            {"type": "null"},
+            {"enum": [
+              "preparing", "preflighting", "preflight-failed", "committing",
+              "activating", "rolling-back", "rolled-back", "rollback-failed", "committed"
+            ]}
+          ]
+        },
+        "initiatedBy": {"$ref": "#/$defs/nullableActor"},
+        "startedAt": {"$ref": "#/$defs/nullableTime"},
+        "finishedAt": {"$ref": "#/$defs/nullableTime"},
+        "disposition": {"enum": ["terminal", "running", "recovery-required", "invalid"]},
+        "auditSequence": {
+          "oneOf": [{"type": "null"}, {"type": "integer", "minimum": 1}]
+        },
+        "error": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]}
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status", "recordCount", "verifiedJournalCount", "lastSequence",
+        "lastRecordSha256", "auditFileSha256", "headSha256", "error"
+      ],
+      "properties": {
+        "status": {"enum": ["empty", "valid", "invalid"]},
+        "recordCount": {"type": "integer", "minimum": 0},
+        "verifiedJournalCount": {"type": "integer", "minimum": 0},
+        "lastSequence": {"type": "integer", "minimum": 0},
+        "lastRecordSha256": {"$ref": "#/$defs/nullableSha256"},
+        "auditFileSha256": {"$ref": "#/$defs/nullableSha256"},
+        "headSha256": {"$ref": "#/$defs/nullableSha256"},
+        "error": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]+$"},
+        "severity": {"enum": ["info", "warning", "blocker"]},
+        "message": {"type": "string", "minLength": 1},
+        "journal": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

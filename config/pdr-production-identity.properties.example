@@ -20,3 +20,15 @@ pdr.management.idempotency.requireRequestId = true
 auth.simple.enable = false
 osp.web.authServiceName = pdr.auth.management
 osp.web.tokenValidatorName = pdr.auth.management.tokens
+
+# Production also requires a Bundle repository publisher trust root outside the
+# candidate repository. Replace every example path, policy ID and SHA-256.
+# Publish schema v2 evidence with a centrally allocated monotonic rolloutSequence;
+# the Runtime state directory stores its durable anti-replay high-water mark.
+osp.bundleMonitor.authorization.required = true
+osp.bundleMonitor.authorization.repositoryId = runtime-main
+osp.bundleMonitor.authorization.evidenceDirectory = D:/PocoDDSRuntime/bundle-trust/evidence/
+osp.bundleMonitor.authorization.trustPolicyFile = D:/PocoDDSRuntime/bundle-trust/policy.json
+osp.bundleMonitor.authorization.expectedTrustPolicyId = REPLACE_WITH_POLICY_ID
+osp.bundleMonitor.authorization.expectedTrustPolicySha256 = REPLACE_WITH_64_LOWERCASE_HEX
+osp.bundleMonitor.authorization.trustedKeysDirectory = D:/PocoDDSRuntime/bundle-trust/keys/

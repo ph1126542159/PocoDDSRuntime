@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.local/schemas/framework-dependency-boundary.schema.json",
+  "title": "PocoDDSRuntime framework source dependency boundary report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "passed", "componentCount", "publicHeaderCount",
+    "privateHeaderCount", "scannedProductionFiles", "resolvedCrossComponentIncludes",
+    "resolvedCrossComponentPrivateIncludes", "declaredDependencies", "observedEdges",
+    "ambiguousPublicHeaders", "privateHeaderViolations", "violations"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "operation": {"const": "framework-source-dependency-boundary"},
+    "passed": {"type": "boolean"},
+    "componentCount": {"type": "integer", "minimum": 1},
+    "publicHeaderCount": {"type": "integer", "minimum": 0},
+    "privateHeaderCount": {"type": "integer", "minimum": 0},
+    "scannedProductionFiles": {"type": "integer", "minimum": 0},
+    "resolvedCrossComponentIncludes": {"type": "integer", "minimum": 0},
+    "resolvedCrossComponentPrivateIncludes": {"type": "integer", "minimum": 0},
+    "declaredDependencies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array", "uniqueItems": true,
+        "items": {"$ref": "#/$defs/componentId"}
+      }
+    },
+    "observedEdges": {"type": "array", "items": {"$ref": "#/$defs/edge"}},
+    "ambiguousPublicHeaders": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["include", "firstComponent", "firstHeader", "secondComponent", "secondHeader"],
+        "properties": {
+          "include": {"type": "string", "minLength": 1},
+          "firstComponent": {"$ref": "#/$defs/componentId"},
+          "firstHeader": {"$ref": "#/$defs/path"},
+          "secondComponent": {"$ref": "#/$defs/componentId"},
+          "secondHeader": {"$ref": "#/$defs/path"}
+        }
+      }
+    },
+    "privateHeaderViolations": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["consumer", "provider", "privateHeader", "evidence"],
+        "properties": {
+          "consumer": {"$ref": "#/$defs/componentId"},
+          "provider": {"$ref": "#/$defs/componentId"},
+          "privateHeader": {"$ref": "#/$defs/path"},
+          "evidence": {"$ref": "#/$defs/evidence"}
+        }
+      }
+    },
+    "violations": {"type": "array", "items": {"$ref": "#/$defs/edge"}}
+  },
+  "$defs": {
+    "componentId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*\\\\).+$"},
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "line", "include"],
+      "properties": {
+        "source": {"$ref": "#/$defs/path"},
+        "line": {"type": "integer", "minimum": 1},
+        "include": {"type": "string", "minLength": 1}
+      }
+    },
+    "edge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["consumer", "provider", "declared", "evidence"],
+      "properties": {
+        "consumer": {"$ref": "#/$defs/componentId"},
+        "provider": {"$ref": "#/$defs/componentId"},
+        "declared": {"type": "boolean"},
+        "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}}
+      }
+    }
+  }
+}

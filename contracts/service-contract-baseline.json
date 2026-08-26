@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "product": "PocoDDSRuntimeServiceContractBaseline",
+  "bundles": [
+    {
+      "owner": "pdr.service.capabilityRuntime",
+      "path": "services/CapabilityRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 109,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.capability-runtime", "version": "1.0.0", "serviceName": "pdr.service.capabilityRuntime"}
+      ],
+      "requires": []
+    },
+    {
+      "owner": "pdr.service.configurationRuntime",
+      "path": "services/ConfigurationRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 112,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.configuration-runtime", "version": "1.0.0", "serviceName": "pdr.service.configurationRuntime"}
+      ],
+      "requires": [
+        {"contract": "pdr.capability-runtime", "versionRange": "[1.0.0,2.0.0)", "required": true, "minimumProviders": 1}
+      ]
+    },
+    {
+      "owner": "pdr.service.httpInvocationProvider",
+      "path": "services/HttpInvocationProvider/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 110,
+      "lazyStart": false,
+      "provides": [],
+      "requires": [
+        {"contract": "pdr.service-client-runtime", "versionRange": "[1.0.0,2.0.0)", "required": true, "minimumProviders": 1}
+      ]
+    },
+    {
+      "owner": "pdr.service.lifecycleRuntime",
+      "path": "services/LifecycleRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 5,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.lifecycle-maintenance", "version": "1.0.0", "serviceName": "pdr.service.lifecycleRuntime"}
+      ],
+      "requires": [
+        {"contract": "pdr.service-dependency-runtime", "versionRange": "[1.0.0,2.0.0)", "required": true, "minimumProviders": 1}
+      ]
+    },
+    {
+      "owner": "pdr.service.membershipRuntime",
+      "path": "services/MembershipRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 106,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.runtime-membership", "version": "1.0.0", "serviceName": "pdr.service.membershipRuntime"}
+      ],
+      "requires": []
+    },
+    {
+      "owner": "pdr.service.outboxRuntime",
+      "path": "services/OutboxRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 127,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.store-forward-runtime", "version": "1.0.0", "serviceName": "pdr.service.outboxRuntime"}
+      ],
+      "requires": [
+        {"contract": "pdr.scheduling", "versionRange": "[1.0.0,2.0.0)", "required": true, "minimumProviders": 1}
+      ]
+    },
+    {
+      "owner": "pdr.service.resourceGovernor",
+      "path": "services/ResourceGovernor/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 108,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.resource-governance", "version": "1.0.0", "serviceName": "pdr.service.resourceGovernor"}
+      ],
+      "requires": []
+    },
+    {
+      "owner": "pdr.service.schedulerRuntime",
+      "path": "services/SchedulerRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 110,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.scheduling", "version": "1.0.0", "serviceName": "pdr.service.schedulerRuntime"}
+      ],
+      "requires": [
+        {"contract": "pdr.resource-governance", "versionRange": "[1.0.0,2.0.0)", "required": true, "minimumProviders": 1}
+      ]
+    },
+    {
+      "owner": "pdr.service.serviceClientRuntime",
+      "path": "services/ServiceClientRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 109,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.service-client-runtime", "version": "1.0.0", "serviceName": "pdr.service.serviceClientRuntime"}
+      ],
+      "requires": [
+        {"contract": "pdr.resource-governance", "versionRange": "[1.0.0,2.0.0)", "required": true, "minimumProviders": 1},
+        {"contract": "pdr.service-directory-runtime", "versionRange": "[1.0.0,2.0.0)", "required": true, "minimumProviders": 1}
+      ]
+    },
+    {
+      "owner": "pdr.service.serviceDependencyRuntime",
+      "path": "services/ServiceDependencyRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 107,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.service-dependency-runtime", "version": "1.0.0", "serviceName": "pdr.service.serviceDependencyRuntime"}
+      ],
+      "requires": []
+    },
+    {
+      "owner": "pdr.service.serviceDirectoryRuntime",
+      "path": "services/ServiceDirectoryRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 108,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.service-directory-runtime", "version": "1.0.0", "serviceName": "pdr.service.serviceDirectoryRuntime"}
+      ],
+      "requires": [
+        {"contract": "pdr.runtime-membership", "versionRange": "[1.0.0,2.0.0)", "required": true, "minimumProviders": 1}
+      ]
+    },
+    {
+      "owner": "pdr.service.workflowRuntime",
+      "path": "services/WorkflowRuntime/bundle/service-contracts.json",
+      "bundleVersion": "1.0.0",
+      "runLevel": 125,
+      "lazyStart": false,
+      "provides": [
+        {"contract": "pdr.workflow-runtime", "version": "1.0.0", "serviceName": "pdr.service.workflowRuntime"}
+      ],
+      "requires": [
+        {"contract": "pdr.scheduling", "versionRange": "[1.0.0,2.0.0)", "required": true, "minimumProviders": 1}
+      ]
+    }
+  ]
+}

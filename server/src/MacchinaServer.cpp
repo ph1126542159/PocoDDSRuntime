@@ -28,6 +28,9 @@
 #include "Poco/Util/OptionSet.h"
 #include "Poco/Util/ServerApplication.h"
 #include "PocoDDS/BundleManagement/BundleManager.h"
+#include "PocoDDS/BundleManagement/BundleRepositoryAuthorization.h"
+#include "PocoDDS/BundleManagement/BundleRepositoryFingerprint.h"
+#include "PocoDDS/BundleManagement/BundleRepositoryRolloutGuard.h"
 #include "PocoDDS/Configuration/ConfigurationValidator.h"
 #include "PocoDDS/ProcessManagement/SubprocessManager.h"
 #if defined(PDR_ENABLE_OBSERVABILITY)
@@ -54,6 +57,24 @@
 
 namespace
 {
+PocoDDS::BundleManagement::BundleRepositoryAuthorizationOptions
+bundleAuthorizationOptions(const Poco::Util::AbstractConfiguration& configuration,
+                           const std::string& prefix)
+{
+    PocoDDS::BundleManagement::BundleRepositoryAuthorizationOptions options;
+    options.required = configuration.getBool(prefix + "required", false);
+    options.repositoryId = configuration.getString(prefix + "repositoryId", "");
+    options.evidenceDirectory = configuration.getString(prefix + "evidenceDirectory", "");
+    options.trustPolicyFile = configuration.getString(prefix + "trustPolicyFile", "");
+    options.expectedTrustPolicyId =
+        configuration.getString(prefix + "expectedTrustPolicyId", "");
+    options.expectedTrustPolicySha256 =
+        configuration.getString(prefix + "expectedTrustPolicySha256", "");
+    options.trustedKeysDirectory =
+        configuration.getString(prefix + "trustedKeysDirectory", "");
+    return options;
+}
+
 class AlignedLogFormatter final : public Poco::Formatter
 {
   public:
@@ -182,6 +203,29 @@ class MacchinaServer final : public Poco::Util::ServerApplication
         // so formatter/channel changes apply to the server and every OSP bundle.
         Poco::Util::LoggingConfigurator loggingConfigurator;
         loggingConfigurator.configure(configPtr());
+
+        // Authenticate the repository before OSPSubsystem::initialize() can parse
+        // manifests, extract native libraries or execute Bundle activators.
+        const auto startupAuthorization = bundleAuthorizationOptions(
+            config(), "osp.bundleMonitor.authorization.");
+        if (startupAuthorization.required)
+        {
+            const std::string repository = config().getString(
+                "osp.bundleRepository", config().expand("${application.dir}bundles/"));
+            const std::string digest = PocoDDS::BundleManagement::BundleRepositoryFingerprint::
+                calculateDirectory(repository);
+            const auto evidence = PocoDDS::BundleManagement::BundleRepositoryAuthorization::verify(
+                repository, digest, startupAuthorization);
+            const std::string stateDirectory = config().getString(
+                "osp.bundleMonitor.stateDirectory",
+                config().expand("${application.dir}data/bundle-manager/"));
+            PocoDDS::BundleManagement::BundleRepositoryRolloutGuard::verifyCandidate(
+                stateDirectory, digest, evidence);
+            logger().information(
+                "Authorized Bundle repository %s rollout %s from publisher %s using key %s and policy %s.",
+                evidence.repositoryId, std::to_string(evidence.rolloutSequence),
+                evidence.publisherId, evidence.keyId, evidence.policyId);
+        }
 
         const int requestedCapacity = config().getInt("poco.threadPool.default.capacity", 32);
         const int capacityDelta = requestedCapacity - Poco::ThreadPool::defaultPool().capacity();
@@ -317,13 +361,22 @@ class MacchinaServer final : public Poco::Util::ServerApplication
         if (_showHelp)
             return Application::EXIT_OK;
 
-        if (config().getBool("osp.bundleMonitor.enabled", true))
+        if (config().getBool("osp.bundleMonitor.enabled", false))
         {
             PocoDDS::BundleManagement::BundleManagerOptions options;
             options.repositories = config().getString(
                 "osp.bundleRepository", config().expand("${application.dir}bundles/"));
+            options.stateDirectory = config().getString(
+                "osp.bundleMonitor.stateDirectory",
+                config().expand("${application.dir}data/bundle-manager/"));
             options.intervalMilliseconds =
                 config().getInt64("osp.bundleMonitor.intervalMilliseconds", 1000);
+            options.stableScanCount = static_cast<std::size_t>(
+                std::max(2, config().getInt("osp.bundleMonitor.stableScanCount", 2)));
+            options.inProcessReloadEnabled =
+                config().getBool("osp.bundleMonitor.inProcessReloadEnabled", false);
+            options.authorization = bundleAuthorizationOptions(
+                config(), "osp.bundleMonitor.authorization.");
             _bundleManager = std::make_unique<PocoDDS::BundleManagement::BundleManager>(
                 *_osp, logger(), std::move(options));
             _bundleManager->start();

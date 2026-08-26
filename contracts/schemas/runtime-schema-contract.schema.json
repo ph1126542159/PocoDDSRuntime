@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://pocodds.dev/schemas/runtime-schema-contract.schema.json",
+  "title": "PocoDDS Runtime Schema Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "subject", "version", "kind", "format", "compatibility", "owner", "definition"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "subject": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{2,127}$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "kind": {"enum": ["message", "event", "command", "configuration", "service"]},
+    "format": {"const": "json-schema-draft-07"},
+    "compatibility": {"enum": ["none", "backward", "forward", "full"]},
+    "owner": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{2,127}$"},
+    "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "deprecated": {"type": "boolean"},
+    "definition": {"type": "object"}
+  }
+}
+

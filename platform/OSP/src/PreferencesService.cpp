@@ -66,6 +66,20 @@ void PreferencesService::setConfiguration(const std::string& key, const std::str
 }
 
 
+void PreferencesService::replaceConfiguration(const std::map<std::string, std::string>& values)
+{
+	Poco::FastMutex::ScopedLock lock(_mutex);
+	_pConfig->replaceProperties(values);
+}
+
+
+std::map<std::string, std::string> PreferencesService::configurationSnapshot()
+{
+	Poco::FastMutex::ScopedLock lock(_mutex);
+	return _pConfig->properties();
+}
+
+
 const std::type_info& PreferencesService::type() const
 {
 	return typeid(PreferencesService);

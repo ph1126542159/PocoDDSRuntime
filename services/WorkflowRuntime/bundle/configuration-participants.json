@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "participants": [
+    {
+      "id": "workflow-scheduler",
+      "serviceName": "pdr.configuration.participant.workflowScheduler",
+      "ownedPrefixes": [
+        "pdr.workflow.schedulerEnabled",
+        "pdr.workflow.schedulerIntervalMilliseconds",
+        "pdr.workflow.schedulerJitterMilliseconds"
+      ],
+      "after": []
+    }
+  ]
+}

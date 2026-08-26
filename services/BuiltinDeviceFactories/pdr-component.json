@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin-device-factories",
+  "name": "BuiltinDeviceFactories",
+  "kind": "bundle",
+  "plane": "management",
+  "target": "PDR_BuiltinDeviceFactories_Bundle",
+  "owner": "device-team",
+  "isolation": "bundle",
+  "requires": ["device-core", "gateway-api"]
+}

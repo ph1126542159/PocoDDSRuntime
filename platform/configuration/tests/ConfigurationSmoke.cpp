@@ -21,6 +21,49 @@ int main()
     PocoDDS::Configuration::ConfigurationValidator validator;
     if (!validator.validate(valid).empty())
         return 1;
+    valid.setInt("pdr.capabilityRuntime.leaseDurationMilliseconds", 0);
+    if (validator.validate(valid).size() != 1)
+        return 64;
+    valid.setInt("pdr.capabilityRuntime.leaseDurationMilliseconds", 250);
+    valid.setString("pdr.capabilityRuntime.policy", "");
+    if (validator.validate(valid).size() != 1)
+        return 65;
+    valid.setString("pdr.capabilityRuntime.policy", "config/pdr-capability-policy.json");
+    valid.setInt("pdr.resourceGovernor.default.maximumConcurrency", 2);
+    valid.setInt("pdr.resourceGovernor.default.queueCapacity", 128);
+    valid.setInt("pdr.resourceGovernor.overrides.count", 1);
+    valid.setString("pdr.resourceGovernor.overrides.0.owner", "pdr.service.workflowRuntime");
+    valid.setInt("pdr.resourceGovernor.overrides.0.maximumConcurrency", 4);
+    if (!validator.validate(valid).empty())
+        return 66;
+    valid.setInt("pdr.resourceGovernor.overrides.0.maximumConcurrency", 0);
+    if (validator.validate(valid).size() != 1)
+        return 67;
+    valid.setInt("pdr.resourceGovernor.overrides.0.maximumConcurrency", 4);
+    valid.setInt("pdr.workflow.schedulerIntervalMilliseconds", 100);
+    valid.setInt("pdr.workflow.schedulerJitterMilliseconds", 25);
+    valid.setBool("pdr.workflow.schedulerEnabled", true);
+    valid.setInt("pdr.outbox.schedulerIntervalMilliseconds", 100);
+    valid.setInt("pdr.outbox.schedulerJitterMilliseconds", 10);
+    valid.setBool("pdr.outbox.schedulerEnabled", true);
+    valid.setInt("pdr.outbox.maintenanceIntervalSeconds", 60);
+    valid.setString("pdr.lifecycleRuntime.database",
+                    "data/lifecycle/maintenance.sqlite");
+    if (!validator.validate(valid).empty())
+        return 68;
+    valid.setInt("pdr.workflow.schedulerJitterMilliseconds", 101);
+    if (validator.validate(valid).size() != 1)
+        return 69;
+    valid.setInt("pdr.workflow.schedulerJitterMilliseconds", 25);
+    valid.setString("pdr.workflow.schedulerEnabled", "invalid");
+    if (validator.validate(valid).size() != 1)
+        return 70;
+    valid.setBool("pdr.workflow.schedulerEnabled", true);
+    valid.setString("pdr.lifecycleRuntime.database", "");
+    if (validator.validate(valid).size() != 1)
+        return 71;
+    valid.setString("pdr.lifecycleRuntime.database",
+                    "data/lifecycle/maintenance.sqlite");
     valid.setString("osp.web.server.port", "invalid");
     if (validator.validate(valid).size() != 1)
         return 2;
@@ -32,7 +75,7 @@ int main()
     valid.setString("osp.web.authServiceName", "");
     valid.setInt("osp.web.server.securePort", 0);
     valid.setBool("auth.simple.enable", true);
-    if (validator.validate(valid).size() != 5)
+    if (validator.validate(valid).size() != 6)
         return 4;
     Poco::Environment::set("PDR_CONFIGURATION_TEST_MANAGEMENT_TOKEN", "test-token");
     valid.setBool("pdr.management.authentication.required", true);
@@ -42,6 +85,14 @@ int main()
     valid.setString("osp.web.authServiceName", "oidc.auth");
     valid.setInt("osp.web.server.securePort", 9443);
     valid.setBool("auth.simple.enable", false);
+    valid.setBool("osp.bundleMonitor.authorization.required", true);
+    valid.setString("osp.bundleMonitor.authorization.repositoryId", "runtime-main");
+    valid.setString("osp.bundleMonitor.authorization.evidenceDirectory", "bundle-trust/evidence");
+    valid.setString("osp.bundleMonitor.authorization.trustPolicyFile", "bundle-trust/policy.json");
+    valid.setString("osp.bundleMonitor.authorization.expectedTrustPolicyId", "production-v1");
+    valid.setString("osp.bundleMonitor.authorization.expectedTrustPolicySha256",
+                    std::string(64, 'a'));
+    valid.setString("osp.bundleMonitor.authorization.trustedKeysDirectory", "bundle-trust/keys");
     if (!validator.validate(valid).empty())
         return 5;
     valid.setInt("pdr.alerts.debounceMilliseconds", 2000);
@@ -200,6 +251,14 @@ int main()
         return 21;
     multi.setString("pdr.mqtt.0.privateKey", "certificates/client.key");
     multi.setString("pdr.mqtt.0.keyStore", "certificates/client.crt");
+    multi.setBool("osp.bundleMonitor.authorization.required", true);
+    multi.setString("osp.bundleMonitor.authorization.repositoryId", "runtime-main");
+    multi.setString("osp.bundleMonitor.authorization.evidenceDirectory", "bundle-trust/evidence");
+    multi.setString("osp.bundleMonitor.authorization.trustPolicyFile", "bundle-trust/policy.json");
+    multi.setString("osp.bundleMonitor.authorization.expectedTrustPolicyId", "production-v1");
+    multi.setString("osp.bundleMonitor.authorization.expectedTrustPolicySha256",
+                    std::string(64, 'a'));
+    multi.setString("osp.bundleMonitor.authorization.trustedKeysDirectory", "bundle-trust/keys");
     multi.setString("security.profile", "production");
     multi.setBool("pdr.mqtt.0.verifyHostname", false);
     const auto productionIssues = validator.validate(multi);
@@ -339,7 +398,7 @@ int main()
     multi.setString("pdr.management.authentication.principals.0.tokenEnvironment",
                     "PDR_CONFIGURATION_TEST_OPERATOR_TOKEN");
     multi.setString("pdr.management.authentication.principals.0.permissions",
-                    "protocol.manage, process.manage, bundle.manage, diagnostics.read, diagnostics.execute");
+                    "protocol.manage, process.manage, bundle.manage, diagnostics.read, diagnostics.execute, capability.manage, resource.read");
     if (!validator.validate(multi).empty())
         return 43;
     multi.setString("pdr.management.authentication.principals.0.permissions",

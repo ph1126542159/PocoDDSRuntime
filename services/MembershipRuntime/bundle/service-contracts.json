@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "provides": [
+    {
+      "contract": "pdr.runtime-membership",
+      "version": "1.0.0",
+      "serviceName": "pdr.service.membershipRuntime"
+    }
+  ],
+  "requires": []
+}

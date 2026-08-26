@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-drain-status.schema.json",
+  "title": "Observed Registry drain status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "registryId", "nodeId", "handoffId", "mode", "generation", "registryRevision", "registryStateSha256", "pendingRequestCount", "pendingRequestSetSha256", "observedFencingToken", "handoffEvidenceSha256", "observedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractRegistryDrainStatus"}, "passed": {"const": true},
+    "registryId": {"$ref": "#/$defs/id"}, "nodeId": {"$ref": "#/$defs/id"}, "handoffId": {"$ref": "#/$defs/id"},
+    "mode": {"enum": ["accepting", "draining", "drained"]}, "generation": {"type": "integer", "minimum": 1},
+    "registryRevision": {"type": "integer", "minimum": 0}, "registryStateSha256": {"$ref": "#/$defs/sha256"},
+    "pendingRequestCount": {"type": "integer", "minimum": 0}, "pendingRequestSetSha256": {"$ref": "#/$defs/sha256"},
+    "observedFencingToken": {"type": ["integer", "null"], "minimum": 1},
+    "handoffEvidenceSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "observedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-approval-policy.schema.json",
+  "title": "PocoDDSRuntime project configuration approval policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "policyId", "maxApprovalLifetimeSeconds",
+    "rules", "allowedApprovers", "revokedKeys"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeProjectConfiguration"},
+    "policyId": {"$ref": "#/$defs/id"},
+    "maxApprovalLifetimeSeconds": {"type": "integer", "minimum": 60, "maximum": 86400},
+    "rules": {
+      "type": "array", "minItems": 1, "maxItems": 32,
+      "items": {"$ref": "#/$defs/rule"}
+    },
+    "allowedApprovers": {
+      "type": "array", "minItems": 1, "maxItems": 64,
+      "items": {"$ref": "#/$defs/approver"}
+    },
+    "revokedKeys": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/revocation"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"},
+    "identity": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._@-]{0,127}$"},
+    "keyId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "jsonPointer": {"type": "string", "pattern": "^/(?:[^~/]|~[01])+(?:/(?:[^~/]|~[01])+)*$"},
+    "rule": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "pathPrefixes", "minimumApprovals", "requiredRoles", "separateInitiator"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "pathPrefixes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/jsonPointer"}},
+        "minimumApprovals": {"type": "integer", "minimum": 1, "maximum": 16},
+        "requiredRoles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "separateInitiator": {"type": "boolean"}
+      }
+    },
+    "approver": {
+      "type": "object", "additionalProperties": false,
+      "required": ["approverId", "keyId", "role", "algorithm", "publicKeySha256", "ruleIds"],
+      "properties": {
+        "approverId": {"$ref": "#/$defs/identity"},
+        "keyId": {"$ref": "#/$defs/keyId"},
+        "role": {"$ref": "#/$defs/id"},
+        "algorithm": {"const": "Ed25519"},
+        "publicKeySha256": {"$ref": "#/$defs/sha256"},
+        "ruleIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "notBefore": {"type": "string", "format": "date-time"},
+        "notAfter": {"type": "string", "format": "date-time"}
+      }
+    },
+    "revocation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["keyId", "revokedAt", "reason"],
+      "properties": {
+        "keyId": {"$ref": "#/$defs/keyId"},
+        "revokedAt": {"type": "string", "format": "date-time"},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

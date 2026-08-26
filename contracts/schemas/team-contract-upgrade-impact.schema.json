@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-upgrade-impact.schema.json",
+  "title": "Signed team contract lock upgrade impact and consumer test plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "operation", "compatible", "reviewRequired",
+    "inputSetSha256", "currentLockSha256", "candidateLockSha256",
+    "consumerCatalogSha256", "currentTrustPolicy", "candidateTrustPolicy",
+    "trustPolicyChanged", "breakingChangeCount", "attentionChangeCount",
+    "affectedConsumerCount", "requiredTestLabels", "ctestLabelRegex",
+    "packages", "affectedConsumers"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractUpgradeImpact"},
+    "operation": {"const": "team-contract-upgrade-impact"},
+    "compatible": {"type": "boolean"},
+    "reviewRequired": {"type": "boolean"},
+    "inputSetSha256": {"$ref": "#/$defs/sha256"},
+    "currentLockSha256": {"$ref": "#/$defs/sha256"},
+    "candidateLockSha256": {"$ref": "#/$defs/sha256"},
+    "consumerCatalogSha256": {"$ref": "#/$defs/sha256"},
+    "currentTrustPolicy": {"$ref": "#/$defs/nullableTrust"},
+    "candidateTrustPolicy": {"$ref": "#/$defs/nullableTrust"},
+    "trustPolicyChanged": {"type": "boolean"},
+    "breakingChangeCount": {"type": "integer", "minimum": 0},
+    "attentionChangeCount": {"type": "integer", "minimum": 0},
+    "affectedConsumerCount": {"type": "integer", "minimum": 0},
+    "requiredTestLabels": {
+      "type": "array", "uniqueItems": true,
+      "items": {"$ref": "#/$defs/label"}
+    },
+    "ctestLabelRegex": {"type": ["string", "null"]},
+    "packages": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/packageImpact"}
+    },
+    "affectedConsumers": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/consumerImpact"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "packageId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "versionOrNull": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$"}
+      ]
+    },
+    "shaOrNull": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "label": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"},
+    "role": {
+      "enum": [
+        "package", "service-contract", "participant-declaration", "key-lifecycle",
+        "service-baseline", "participant-baseline", "key-lifecycle-baseline"
+      ]
+    },
+    "trust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policyId", "policySha256"],
+      "properties": {
+        "policyId": {"$ref": "#/$defs/identifier"},
+        "policySha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "nullableTrust": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/trust"}]},
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "role", "subject", "detail"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "severity": {"enum": ["compatible", "attention", "breaking"]},
+        "role": {"$ref": "#/$defs/role"},
+        "subject": {"type": "string", "minLength": 1, "maxLength": 256},
+        "detail": {"type": "string", "minLength": 1, "maxLength": 512}
+      }
+    },
+    "packageImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageId", "status", "severity", "currentVersion", "candidateVersion",
+        "currentPackageSha256", "candidatePackageSha256", "changedRoles", "changes"
+      ],
+      "properties": {
+        "packageId": {"$ref": "#/$defs/packageId"},
+        "status": {"enum": ["unchanged", "changed", "added", "removed"]},
+        "severity": {"enum": ["compatible", "attention", "breaking"]},
+        "currentVersion": {"$ref": "#/$defs/versionOrNull"},
+        "candidateVersion": {"$ref": "#/$defs/versionOrNull"},
+        "currentPackageSha256": {"$ref": "#/$defs/shaOrNull"},
+        "candidatePackageSha256": {"$ref": "#/$defs/shaOrNull"},
+        "changedRoles": {
+          "type": "array", "uniqueItems": true,
+          "items": {"$ref": "#/$defs/role"}
+        },
+        "changes": {"type": "array", "items": {"$ref": "#/$defs/change"}}
+      }
+    },
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packageId", "roles", "severity"],
+      "properties": {
+        "packageId": {"oneOf": [{"const": "*"}, {"$ref": "#/$defs/packageId"}]},
+        "roles": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/role"}},
+        "severity": {"enum": ["attention", "breaking"]}
+      }
+    },
+    "consumerImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "owner", "severity", "requiredTestLabels", "reasons"],
+      "properties": {
+        "id": {"$ref": "#/$defs/packageId"},
+        "owner": {"$ref": "#/$defs/identifier"},
+        "severity": {"enum": ["attention", "breaking"]},
+        "requiredTestLabels": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/label"}},
+        "reasons": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/reason"}}
+      }
+    }
+  }
+}

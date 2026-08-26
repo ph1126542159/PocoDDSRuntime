@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-audit-archive-base.schema.json",
+  "title": "Registered remote Registry audit archive continuity base",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "registryId", "throughSequence", "throughRecordSha256", "lastArchiveMarkerSha256", "updatedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteAuditArchiveBase"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "throughSequence": {"type": "integer", "minimum": 1},
+    "throughRecordSha256": {"$ref": "#/$defs/sha256"},
+    "lastArchiveMarkerSha256": {"$ref": "#/$defs/sha256"},
+    "updatedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

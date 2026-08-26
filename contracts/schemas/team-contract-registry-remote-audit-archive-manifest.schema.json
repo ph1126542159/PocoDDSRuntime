@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-remote-audit-archive-manifest.schema.json",
+  "title": "Deterministic remote Registry audit archive manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "archiveId", "registryId", "fromSequence", "throughSequence", "previousRecordSha256", "throughRecordSha256", "records", "checkpoint", "auditPolicy", "createdAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryRemoteAuditArchiveManifest"},
+    "archiveId": {"$ref": "#/$defs/id"},
+    "registryId": {"$ref": "#/$defs/id"},
+    "fromSequence": {"type": "integer", "minimum": 1},
+    "throughSequence": {"type": "integer", "minimum": 1},
+    "previousRecordSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "throughRecordSha256": {"$ref": "#/$defs/sha256"},
+    "records": {
+      "type": "array", "minItems": 1, "maxItems": 1000000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["sequence", "sha256", "path"],
+        "properties": {
+          "sequence": {"type": "integer", "minimum": 1},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "path": {"type": "string", "pattern": "^records/[0-9]{20}-[0-9a-f]{64}\\.json$"}
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["checkpointId", "sha256", "auditSequence", "auditRecordSha256"],
+      "properties": {
+        "checkpointId": {"$ref": "#/$defs/id"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "auditSequence": {"type": "integer", "minimum": 1},
+        "auditRecordSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "auditPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policyId", "sha256"],
+      "properties": {
+        "policyId": {"$ref": "#/$defs/id"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "createdAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

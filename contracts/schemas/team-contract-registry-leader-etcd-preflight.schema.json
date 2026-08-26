@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-etcd-preflight.schema.json",
+  "title": "Registry leader etcd cluster preflight evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "adapterId", "adapterConfigPath", "adapterConfigSha256", "etcdctlVersion", "keyPrefix", "endpoints", "clusterId", "memberIds", "leaderId", "minimumRevision", "checks", "startedAt", "completedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderEtcdPreflight"},
+    "passed": {"const": true},
+    "adapterId": {"$ref": "#/$defs/id"},
+    "adapterConfigPath": {"type": "string", "minLength": 1},
+    "adapterConfigSha256": {"$ref": "#/$defs/sha256"},
+    "etcdctlVersion": {"type": "string", "pattern": "^3\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$"},
+    "keyPrefix": {"type": "string", "minLength": 2},
+    "endpoints": {"type": "array", "minItems": 3, "maxItems": 9, "uniqueItems": true, "items": {"type": "string", "pattern": "^https://"}},
+    "clusterId": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+    "memberIds": {"type": "array", "minItems": 3, "maxItems": 9, "uniqueItems": true, "items": {"type": "string", "pattern": "^[1-9][0-9]*$"}},
+    "leaderId": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+    "minimumRevision": {"type": "integer", "minimum": 1},
+    "checks": {"type": "object", "additionalProperties": false, "required": ["allEndpointsHealthy", "singleCluster", "uniqueMembers", "singleLeader", "raftApplied", "linearizableRead"], "properties": {"allEndpointsHealthy": {"const": true}, "singleCluster": {"const": true}, "uniqueMembers": {"const": true}, "singleLeader": {"const": true}, "raftApplied": {"const": true}, "linearizableRead": {"const": true}}},
+    "startedAt": {"type": "string", "format": "date-time"},
+    "completedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

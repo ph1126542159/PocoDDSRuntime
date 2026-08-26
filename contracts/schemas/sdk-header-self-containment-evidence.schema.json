@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocodds.dev/contracts/sdk-header-self-containment-evidence.schema.json",
+  "title": "Installed SDK public-header self-containment evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "operation", "passed", "planSha256", "surfaceSha256",
+    "compiledHeaderCount", "usageTargetCount", "buildConfig"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "operation": { "const": "sdk-header-self-containment-evidence" },
+    "passed": { "const": true },
+    "planSha256": { "$ref": "#/$defs/sha256" },
+    "surfaceSha256": { "$ref": "#/$defs/sha256" },
+    "compiledHeaderCount": { "type": "integer", "minimum": 1 },
+    "usageTargetCount": { "type": "integer", "minimum": 1 },
+    "buildConfig": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

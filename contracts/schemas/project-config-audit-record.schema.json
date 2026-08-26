@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/project-config-audit-record.schema.json",
+  "title": "PocoDDSRuntime project configuration audit record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "product", "sequence", "recordedAt", "event",
+    "transactionId", "project", "actor", "status", "journalFile",
+    "terminalJournalSha256", "planSha256", "previousRecordSha256",
+    "recordSha256"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeProjectConfigurationAudit"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "recordedAt": {"type": "string", "format": "date-time"},
+    "event": {
+      "enum": [
+        "CONFIG_TRANSACTION_COMMITTED", "CONFIG_TRANSACTION_ROLLED_BACK",
+        "CONFIG_TRANSACTION_PREFLIGHT_FAILED", "CONFIG_TRANSACTION_ROLLBACK_FAILED",
+        "CONFIG_TRANSACTION_RECOVERED_ROLLBACK"
+      ]
+    },
+    "transactionId": {"type": "string", "format": "uuid"},
+    "project": {"type": "string", "minLength": 1},
+    "actor": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._@-]{0,127}$"},
+    "status": {"enum": ["committed", "rolled-back", "preflight-failed", "rollback-failed"]},
+    "journalFile": {"type": "string", "pattern": "^[^/\\\\]+\\.journal\\.json$"},
+    "terminalJournalSha256": {"$ref": "#/$defs/sha256"},
+    "planSha256": {"$ref": "#/$defs/sha256"},
+    "previousRecordSha256": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]
+    },
+    "recordSha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "subject": "pdr.runtime.topic-contract",
+  "version": "1.0.0",
+  "kind": "configuration",
+  "format": "json-schema-draft-07",
+  "compatibility": "backward",
+  "owner": "pdr.runtime-core",
+  "definition": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name", "messageType", "schemaVersion", "delivery", "durable"],
+    "properties": {
+      "name": {"type": "string", "minLength": 1},
+      "messageType": {"type": "string", "minLength": 1},
+      "schemaVersion": {"type": "string", "minLength": 1},
+      "delivery": {"type": "string", "enum": ["best-effort", "reliable"]},
+      "durable": {"type": "boolean"}
+    }
+  }
+}
+

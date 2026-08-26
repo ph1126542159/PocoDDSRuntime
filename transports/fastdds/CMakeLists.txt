@@ -35,4 +35,21 @@ if(BUILD_TESTING)
             ENVIRONMENT_MODIFICATION
                 "PATH=path_list_prepend:${PDR_INSTALL_PREFIX}/bin;PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
     endif()
+
+    add_executable(pdr-fastdds-transport-recovery
+        tests/FastDdsTransportRecovery.cpp)
+    target_link_libraries(pdr-fastdds-transport-recovery
+        PRIVATE PocoDDS::FastDDSTransport PocoDDS::RuntimeCore)
+    pdr_set_warnings(pdr-fastdds-transport-recovery)
+    add_test(NAME fastdds-transport-peer-recovery
+        COMMAND pdr-fastdds-transport-recovery)
+    set_tests_properties(fastdds-transport-peer-recovery PROPERTIES
+        LABELS "transport;fastdds;integration;fault-injection;recovery"
+        TIMEOUT 20)
+    if(WIN32)
+        set_tests_properties(fastdds-transport-peer-recovery PROPERTIES
+            ENVIRONMENT_MODIFICATION
+                "PATH=path_list_prepend:${PDR_INSTALL_PREFIX}/bin;PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
+    endif()
+
 endif()

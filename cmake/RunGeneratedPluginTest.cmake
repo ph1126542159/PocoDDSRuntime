@@ -181,7 +181,9 @@ set(runtime_smoke_command
         --timeout 20 --stability-window 1 --clear-code-cache
         --path "${PDR_DEPENDENCY_PREFIX}/bin" --path "${install}/bin"
         --endpoint "/health/live"
-        --require-log "ExamplePlugin plugin started")
+        --endpoint "/health/ready"
+        --require-log "ExamplePlugin plugin started"
+        --require-log "Configuration participant plugin-example-plugin attached")
 if(PDR_TEST_MANAGEMENT_API)
     list(APPEND runtime_smoke_command
         --endpoint "/api/v1/process-detail"

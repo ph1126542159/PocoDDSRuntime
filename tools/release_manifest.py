@@ -155,6 +155,13 @@ def artifacts(root: Path) -> list[dict[str, Any]]:
     return result
 
 
+def artifact_set_digest(entries: list[dict[str, Any]]) -> str:
+    """Bind the ordered artifact inventory independently of output formatting."""
+    payload = json.dumps(entries, ensure_ascii=False, sort_keys=True,
+                         separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def git_value(root: Path, *arguments: str) -> str:
     result = subprocess.run(
         ["git", *arguments], cwd=root, capture_output=True, text=True, check=False
@@ -175,6 +182,7 @@ def generate(args: argparse.Namespace) -> int:
     if args.require_clean and dirty:
         print("RELEASE_ERROR: worktree is dirty", file=sys.stderr)
         return 1
+    generated_at = datetime.now(timezone.utc).isoformat()
     manifest = {
         "schemaVersion": 1,
         "product": "PocoDDSRuntime",
@@ -182,7 +190,7 @@ def generate(args: argparse.Namespace) -> int:
         "gitCommit": commit,
         "dirty": dirty,
         "cleanRequired": args.require_clean,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": generated_at,
         "artifactRoot": str(artifact_root),
         "files": entries,
     }
@@ -231,17 +239,31 @@ def generate(args: argparse.Namespace) -> int:
         "SPDXID": "SPDXRef-DOCUMENT",
         "name": f"PocoDDSRuntime-{args.version}",
         "documentNamespace": f"https://pocodds.local/spdx/{namespace_hash}",
-        "creationInfo": {"created": datetime.now(timezone.utc).isoformat(), "creators": ["Tool: PocoDDSRuntime-release_manifest"]},
+        "creationInfo": {"created": generated_at, "creators": ["Tool: PocoDDSRuntime-release_manifest"]},
         "packages": packages,
         "relationships": relationships,
     }
     output.mkdir(parents=True, exist_ok=True)
     signature_output = output / "SHA256SUMS.sig.json"
     signature_output.unlink(missing_ok=True)
-    manifest_path = output / "SHA256SUMS.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8", newline="\n")
     sbom_path = output / "pocoddsruntime.spdx.json"
     sbom_path.write_text(json.dumps(sbom, indent=2), encoding="utf-8", newline="\n")
+    sbom_sha256 = digest(sbom_path)
+    manifest["sbom"] = {
+        "path": sbom_path.name,
+        "sha256": sbom_sha256,
+        "spdxVersion": "SPDX-2.3",
+        "documentNamespace": sbom["documentNamespace"],
+    }
+    manifest["provenance"] = {
+        "builderId": getattr(args, "builder_id", None) or
+                     "pocoddsruntime.release_manifest",
+        "buildProfile": getattr(args, "build_profile", None) or "unknown",
+        "artifactSetSha256": artifact_set_digest(entries),
+        "source": {"gitCommit": commit, "dirty": dirty},
+    }
+    manifest_path = output / "SHA256SUMS.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8", newline="\n")
     signing_environment = getattr(args, "signing_key_environment", None)
     ed25519_key_environment = getattr(args, "ed25519_private_key_environment", None)
     passphrase_environment = getattr(args, "private_key_passphrase_environment", None)
@@ -334,6 +356,50 @@ def verify(args: argparse.Namespace) -> int:
             print(f"RELEASE_ERROR: {error}", file=sys.stderr)
             return 1
     errors: list[str] = []
+    sbom_evidence = document.get("sbom")
+    provenance = document.get("provenance")
+    if not isinstance(sbom_evidence, dict):
+        errors.append("release manifest does not bind an SPDX SBOM")
+    else:
+        sbom_name = sbom_evidence.get("path")
+        if (not isinstance(sbom_name, str) or not sbom_name or
+                PurePosixPath(sbom_name).name != sbom_name):
+            errors.append("release manifest SBOM path is unsafe")
+        else:
+            explicit_sbom = getattr(args, "sbom", None)
+            sbom_path = (explicit_sbom.resolve() if explicit_sbom else
+                         (manifest_path.parent / sbom_name).resolve())
+            try:
+                sbom_document = json.loads(sbom_path.read_text(encoding="utf-8"))
+                if digest(sbom_path) != sbom_evidence.get("sha256"):
+                    errors.append("release SBOM SHA-256 does not match the signed manifest")
+                if (sbom_document.get("spdxVersion") != "SPDX-2.3" or
+                        sbom_document.get("documentNamespace") !=
+                        sbom_evidence.get("documentNamespace") or
+                        sbom_evidence.get("spdxVersion") != "SPDX-2.3"):
+                    errors.append("release SBOM identity does not match the signed manifest")
+                packages = sbom_document.get("packages")
+                if (not isinstance(packages, list) or not any(
+                        isinstance(package, dict) and
+                        package.get("name") == "PocoDDSRuntime" and
+                        package.get("versionInfo") == document.get("version")
+                        for package in packages)):
+                    errors.append("release SBOM does not identify the Runtime version")
+            except (OSError, UnicodeError, json.JSONDecodeError) as error:
+                errors.append(f"cannot read release SBOM: {error}")
+    if not isinstance(provenance, dict):
+        errors.append("release manifest does not contain build provenance")
+    else:
+        source = provenance.get("source")
+        if (not isinstance(provenance.get("builderId"), str) or
+                not provenance.get("builderId") or
+                not isinstance(provenance.get("buildProfile"), str) or
+                not provenance.get("buildProfile") or
+                provenance.get("artifactSetSha256") != artifact_set_digest(document["files"]) or
+                not isinstance(source, dict) or
+                source.get("gitCommit") != document.get("gitCommit") or
+                source.get("dirty") is not document.get("dirty")):
+            errors.append("release build provenance does not match the artifact manifest")
     expected_paths: set[str] = set()
     for entry in document["files"]:
         if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
@@ -381,6 +447,8 @@ def main() -> int:
     create.add_argument("--output", type=Path, required=True)
     create.add_argument("--version", default="0.1.0")
     create.add_argument("--require-clean", action="store_true")
+    create.add_argument("--builder-id", default="pocoddsruntime.release_manifest")
+    create.add_argument("--build-profile", default="unknown")
     create.add_argument("--signing-key-environment")
     create.add_argument("--ed25519-private-key-environment")
     create.add_argument("--private-key-passphrase-environment")
@@ -389,6 +457,7 @@ def main() -> int:
     check = commands.add_parser("verify")
     check.add_argument("--manifest", type=Path, required=True)
     check.add_argument("--artifacts", type=Path)
+    check.add_argument("--sbom", type=Path)
     check.add_argument("--signature", type=Path)
     check.add_argument("--trusted-key-environment")
     check.add_argument("--expected-key-id")

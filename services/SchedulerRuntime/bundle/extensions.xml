@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<extensions>
+  <extension point="osp.web.server.requesthandler"
+             path="/api/v1/scheduled-tasks"
+             class="PocoDDS::Scheduling::SchedulerRuntimeHandlerFactory"
+             library="pdr.service.schedulerRuntime"
+             allowSpecialization="all"
+             hidden="true"/>
+</extensions>
