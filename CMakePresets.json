@@ -104,8 +104,8 @@
       "name": "default",
       "inherits": "server",
       "displayName": "Default build",
-      "description": "Default desktop profile; builds in the repository's single build tree",
-      "binaryDir": "${sourceDir}/build",
+      "description": "Default desktop development profile in an isolated tree so a running runtime does not lock build outputs",
+      "binaryDir": "${sourceDir}/build/profiles/vscode",
       "cacheVariables": {
         "PDR_AUTO_BOOTSTRAP_DEPENDENCIES": "ON",
         "PDR_BUILD_QT3D": "ON"
@@ -117,6 +117,13 @@
       "displayName": "VS Code build",
       "description": "Default desktop profile in an isolated tree so the IDE can build while the runtime is running",
       "binaryDir": "${sourceDir}/build/profiles/vscode"
+    },
+    {
+      "name": "runtime",
+      "inherits": "default",
+      "displayName": "Runtime deployment build",
+      "description": "Explicit deployment build in the repository build tree; stop the running runtime before using it",
+      "binaryDir": "${sourceDir}/build"
     },
     {
       "name": "release",
@@ -165,6 +172,12 @@
     {
       "name": "vscode",
       "configurePreset": "vscode",
+      "configuration": "Release",
+      "jobs": 2
+    },
+    {
+      "name": "runtime",
+      "configurePreset": "runtime",
       "configuration": "Release",
       "jobs": 2
     },
