@@ -16,6 +16,7 @@ sys.path.insert(0, str(TOOLS))
 
 import team_contract_adapter_conformance as conformance_tool
 import team_contract_adapter_conformance_admission as admission_tool
+import team_contract_adapter_certifier_signer as signer_tool
 import team_contract_adapter_conformance_trust as trust_tool
 import team_contract_adapter_catalog_fleet as fleet_tool
 import team_contract_package as package_tool
@@ -39,7 +40,8 @@ class AdmissionTest(unittest.TestCase):
             "bundlePin=1 evidencePin=1 age=1 configDrift=1 capabilityDrift=1 "
             "scope=1 journal=1 hostVariance=1 noPaths=1 cli=1 planV7=1 "
             "signed=1 certifierScope=1 expiry=1 revocation=1 rotation=1 "
-            "trustGeneration=1"
+            "trustGeneration=1 externalSigner=1 signerCapability=1 "
+            "signerPin=1 localFallback=1"
         )
 
     def setUp(self) -> None:
@@ -424,6 +426,56 @@ class AdmissionTest(unittest.TestCase):
         })
         rotated_path = self.root / "rotated-policy.json"
         package_tool.write_json(rotated_path, rotated)
+        signer_mapping_path = self.root / "signer-mapping.json"
+        package_tool.write_json(signer_mapping_path, {
+            "schemaVersion": 1,
+            "product": "PocoDDSRuntimeTeamContractAdapterCertifierSignerLocalMapping",
+            "signerId": "runtime-adapter-kms",
+            "certifierId": "runtime-adapter-team",
+            "keys": [{
+                "keyId": "key-2026-b",
+                "privateKeyEnvironment":
+                    "PDR_TEST_ADAPTER_CERTIFIER_KEY_B",
+            }],
+        })
+        signer_adapter = Path(__file__).resolve().parents[2] / \
+            "examples/team-contract-adapter-certifier-signer-local" / \
+            "local_ed25519_certifier_signer_adapter.py"
+        signer_config_path = self.root / "signer-config.json"
+        package_tool.write_json(signer_config_path, {
+            "schemaVersion": 1, "product": signer_tool.CONFIG_PRODUCT,
+            "signerId": "runtime-adapter-kms",
+            "certifierId": "runtime-adapter-team",
+            "kind": "external-command", "protocolMajor": 1,
+            "minimumProtocolMinor": 0,
+            "requiredCapabilities": signer_tool.REQUIRED_CAPABILITIES,
+            "keys": [{
+                "keyId": "key-2026-b", "algorithm": "Ed25519",
+                "publicKey": str(public_b_path),
+                "publicKeySha256": package_tool.sha256_file(public_b_path),
+            }],
+            "executable": str(Path(sys.executable).resolve()),
+            "executableSha256": package_tool.sha256_file(
+                Path(sys.executable).resolve()
+            ),
+            "arguments": [
+                str(signer_adapter), "--mapping", str(signer_mapping_path),
+            ],
+            "artifactPins": [
+                {"path": str(signer_adapter),
+                 "sha256": package_tool.sha256_file(signer_adapter)},
+                {"path": str(signer_mapping_path),
+                 "sha256": package_tool.sha256_file(signer_mapping_path)},
+            ],
+            "environmentVariables": [],
+            "optionalEnvironmentVariables": [
+                "PDR_CERTIFIER_SIGNER_FAULT",
+                "PDR_TEST_ADAPTER_CERTIFIER_KEY_B",
+            ],
+            "timeoutSeconds": 5, "maxResponseBytes": 16384,
+            "maxPayloadBytes": 16384,
+        })
+        signer_config_sha = package_tool.sha256_file(signer_config_path)
         os.environ["PDR_TEST_ADAPTER_CERTIFIER_KEY_B"] = str(private_b_path)
         rotated_entries = []
         try:
@@ -435,9 +487,10 @@ class AdmissionTest(unittest.TestCase):
                     "expected_evidence_sha256": entry["evidenceSha256"],
                     "certifier_id": "runtime-adapter-team",
                     "key_id": "key-2026-b",
-                    "private_key_environment":
-                        "PDR_TEST_ADAPTER_CERTIFIER_KEY_B",
+                    "private_key_environment": None,
                     "private_key_passphrase_environment": None,
+                    "signer_config": str(signer_config_path),
+                    "expected_signer_config_sha256": signer_config_sha,
                     "issued_at": None, "lifetime_seconds": 3600,
                     "report": str(attestation_path),
                 })()
@@ -470,6 +523,41 @@ class AdmissionTest(unittest.TestCase):
             {item["keyId"] for item in rotated_admission._trust.values()},
             {"key-2026-b"},
         )
+        self.assertEqual(
+            {item["signerId"] for item in rotated_admission._trust.values()},
+            {"runtime-adapter-kms"},
+        )
+        for kind in admission_tool.REQUIRED_KINDS:
+            _, adapter_id = IDS[kind]
+            scope = {"primaryId": None, "secondaryId": None}
+            if kind == "registry-leader-backend":
+                scope = {"primaryId": "rollout-a", "secondaryId": "catalog-a"}
+            elif kind == "artifact-store":
+                scope = {"primaryId": "rollout-a", "secondaryId": None}
+            rotated_admission.precheck(
+                kind, self.configs[kind],
+                package_tool.sha256_bytes(package_tool.json_bytes(
+                    self.configs[kind]
+                )), adapter_id=adapter_id, scope=scope,
+            )
+            rotated_admission.postcheck(kind, self.capabilities[kind])
+        rotated_summary = rotated_admission.summary("signed-host-b")
+        admission_tool.validate_summary(rotated_summary)
+        self.assertEqual(
+            {item["signerId"] for item in rotated_summary["entries"]},
+            {"runtime-adapter-kms"},
+        )
+        self.assertNotIn(str(self.root), json.dumps(rotated_summary))
+        signer_audit = fleet_tool.signer_audit(rotated_summary)
+        self.assertEqual(
+            signer_audit["adapterConformanceSignerIds"],
+            ["runtime-adapter-kms"],
+        )
+        self.assertEqual(
+            len(signer_audit[
+                "adapterConformanceSignerCapabilityManifestSha256s"
+            ]), 1,
+        )
         confined = copy.deepcopy(rotated)
         confined["allowedCertifiers"][1]["adapterIds"] = [
             value for value in confined["allowedCertifiers"][1]["adapterIds"]
@@ -497,9 +585,10 @@ class AdmissionTest(unittest.TestCase):
                 "expected_evidence_sha256": first["evidenceSha256"],
                 "certifier_id": "runtime-adapter-team",
                 "key_id": "key-2026-b",
-                "private_key_environment":
-                    "PDR_TEST_ADAPTER_CERTIFIER_KEY_B",
+                "private_key_environment": None,
                 "private_key_passphrase_environment": None,
+                "signer_config": str(signer_config_path),
+                "expected_signer_config_sha256": signer_config_sha,
                 "issued_at": (now - timedelta(hours=2)).isoformat(),
                 "lifetime_seconds": 60,
                 "report": str(expired_attestation),

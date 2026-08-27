@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import team_contract_adapter_conformance as conformance_tool
+import team_contract_adapter_certifier_signer as signer_tool
 import team_contract_adapter_runtime as adapter_runtime
 import team_contract_package as package_tool
 import team_contract_registry as registry_tool
@@ -46,13 +47,16 @@ def signature_bytes(value: Any) -> bytes:
 
 
 def validate_attestation(document: Any) -> None:
-    fields = {
+    base_fields = {
         "schemaVersion", "product", "operation", "certifierId", "keyId",
         "evidenceSha256", "conformanceId", "adapterKind", "adapterId",
         "configSha256", "scope", "issuedAt", "expiresAt", "signature",
     }
-    if (not isinstance(document, dict) or set(document) != fields
-            or document.get("schemaVersion") != 1
+    if not isinstance(document, dict):
+        raise ValueError("Adapter conformance attestation is malformed")
+    version = document.get("schemaVersion")
+    fields = base_fields | ({"signer"} if version == 2 else set())
+    if (set(document) != fields or version not in {1, 2}
             or document.get("product") != ATTESTATION_PRODUCT
             or document.get("operation")
                 != "adapter-conformance-attest"
@@ -68,6 +72,21 @@ def validate_attestation(document: Any) -> None:
             or not isinstance(document.get("scope"), dict)
             or set(document["scope"]) != {"primaryId", "secondaryId"}):
         raise ValueError("Adapter conformance attestation is malformed")
+    if version == 2:
+        signer = document.get("signer")
+        if (not isinstance(signer, dict) or set(signer) != {
+                "signerId", "signerConfigSha256",
+                "signerCapabilityManifestSha256"
+                } or package_tool.IDENTIFIER.fullmatch(str(
+                    signer.get("signerId", ""))) is None
+                or any(package_tool.SHA256.fullmatch(str(
+                    signer.get(name, ""))) is None for name in (
+                        "signerConfigSha256",
+                        "signerCapabilityManifestSha256",
+                    ))):
+            raise ValueError(
+                "Adapter conformance attestation signer is malformed"
+            )
     conformance_tool._scope(
         document["scope"]["primaryId"],
         document["scope"]["secondaryId"], document["adapterKind"],
@@ -196,6 +215,33 @@ def private_key(args: argparse.Namespace) -> Any:
     return key
 
 
+def sign_document(args: argparse.Namespace,
+                  document: dict[str, Any]) -> bytes:
+    local = bool(getattr(args, "private_key_environment", None))
+    signer_values = (
+        getattr(args, "signer_config", None),
+        getattr(args, "expected_signer_config_sha256", None),
+    )
+    external = any(value is not None for value in signer_values)
+    if local == external or (external and not all(signer_values)):
+        raise ValueError(
+            "choose exactly one complete local key or external signer"
+        )
+    if (getattr(args, "private_key_passphrase_environment", None)
+            and not local):
+        raise ValueError("private key passphrase requires local key mode")
+    if local:
+        return private_key(args).sign(canonical_payload(document))
+    signer = signer_tool.ExternalCommandCertifierSigner(
+        signer_values[0], signer_values[1]
+    )
+    if signer.certifier_id != args.certifier_id:
+        raise ValueError("Adapter certifier signer identity changed")
+    document["schemaVersion"] = 2
+    document["signer"] = signer.descriptor()
+    return signer.sign(canonical_payload(document), args.key_id)
+
+
 def attest_command(args: argparse.Namespace) -> int:
     try:
         evidence, _, evidence_sha = adapter_runtime.load_pinned_json(
@@ -223,7 +269,7 @@ def attest_command(args: argparse.Namespace) -> int:
             "signature": "",
         }
         document["signature"] = base64.b64encode(
-            private_key(args).sign(canonical_payload(document))
+            sign_document(args, document)
         ).decode("ascii")
         validate_attestation(document)
         package_tool.write_json(Path(args.report).resolve(), document)
@@ -307,11 +353,14 @@ def verify_attestation(
         raise ValueError(
             "Adapter conformance attestation signature failed"
         ) from error
-    return {
+    result = {
         "attestationSha256": attestation_sha,
         "certifierId": attestation["certifierId"],
         "keyId": attestation["keyId"],
     }
+    if attestation["schemaVersion"] == 2:
+        result.update(attestation["signer"])
+    return result
 
 
 def parser() -> argparse.ArgumentParser:
@@ -320,8 +369,10 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--expected-evidence-sha256", required=True)
     result.add_argument("--certifier-id", required=True)
     result.add_argument("--key-id", required=True)
-    result.add_argument("--private-key-environment", required=True)
+    result.add_argument("--private-key-environment")
     result.add_argument("--private-key-passphrase-environment")
+    result.add_argument("--signer-config")
+    result.add_argument("--expected-signer-config-sha256")
     result.add_argument("--issued-at")
     result.add_argument("--lifetime-seconds", type=int, default=3600)
     result.add_argument("--report", required=True)

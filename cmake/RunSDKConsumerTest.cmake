@@ -63,6 +63,12 @@ foreach(required_bundle_supply_chain_artifact
         "${install_dir}/bin/team_contract_adapter_conformance.py"
         "${install_dir}/bin/team_contract_adapter_conformance_admission.py"
         "${install_dir}/bin/team_contract_adapter_conformance_trust.py"
+        "${install_dir}/bin/team_contract_adapter_certifier_signer.py"
+        "${install_dir}/bin/team_contract_adapter_certifier_trust_control.py"
+        "${install_dir}/bin/team_contract_adapter_certifier_trust_state_store.py"
+        "${install_dir}/bin/team_contract_governance_approval.py"
+        "${install_dir}/bin/team_contract_governance_approval_signer.py"
+        "${install_dir}/bin/team_contract_governance_approval_signer_admission.py"
         "${install_dir}/bin/team_contract_secret_provider.py"
         "${install_dir}/bin/team_contract_adapter_runtime.py"
         "${install_dir}/bin/team_contract_adapter_catalog.py"
@@ -98,6 +104,12 @@ foreach(required_bundle_supply_chain_artifact
         "${install_dir}/share/PocoDDSRuntime/examples/team-contract-secret-provider-environment/environment_secret_provider_adapter.py"
         "${install_dir}/share/PocoDDSRuntime/examples/team-contract-secret-provider-environment/create_secret_provider_config.py"
         "${install_dir}/share/PocoDDSRuntime/examples/team-contract-secret-provider-environment/README.md"
+        "${install_dir}/share/PocoDDSRuntime/examples/team-contract-adapter-certifier-signer-local/local_ed25519_certifier_signer_adapter.py"
+        "${install_dir}/share/PocoDDSRuntime/examples/team-contract-adapter-certifier-signer-local/create_signer_config.py"
+        "${install_dir}/share/PocoDDSRuntime/examples/team-contract-adapter-certifier-signer-local/README.md"
+        "${install_dir}/share/PocoDDSRuntime/examples/team-contract-governance-approval-signer-local/local_ed25519_governance_approval_signer_adapter.py"
+        "${install_dir}/share/PocoDDSRuntime/examples/team-contract-governance-approval-signer-local/create_signer_config.py"
+        "${install_dir}/share/PocoDDSRuntime/examples/team-contract-governance-approval-signer-local/README.md"
         "${install_dir}/share/PocoDDSRuntime/examples/team-contract-adapter-catalog/create_adapter_manifest.py"
         "${install_dir}/share/PocoDDSRuntime/examples/team-contract-adapter-catalog/create_adapter_catalog.py"
         "${install_dir}/share/PocoDDSRuntime/examples/team-contract-adapter-catalog/create_reconciler_config.py"
@@ -127,7 +139,36 @@ foreach(required_bundle_supply_chain_artifact
         "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-conformance-evidence.schema.json"
         "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-conformance-admission-bundle.schema.json"
         "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-conformance-attestation.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-governance.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-proposal.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-approval.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-activation.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-state-pointer.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-state.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-state-status.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-migration-preflight.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-migration-proposal.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-migration-approval.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-trust-migration-report.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-policy.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-subject.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signature.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-evidence.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signer-config.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signer-capability-request.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signer-capability-manifest.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signer-request.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signer-response.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signing-payload.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signer-admission-config.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signer-readmission-bundle.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-governance-approval-signer-readmission-evidence.schema.json"
         "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-conformance-trust-policy.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-signer-config.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-signer-capability-request.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-signer-capability-manifest.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-signer-request.schema.json"
+        "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-adapter-certifier-signer-response.schema.json"
         "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-secret-reference.schema.json"
         "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-secret-provider-config.schema.json"
         "${install_dir}/share/PocoDDSRuntime/contracts/schemas/team-contract-secret-provider-capability-request.schema.json"
@@ -346,6 +387,8 @@ set(adapter_config_resolver_example_dir
     "${install_dir}/share/PocoDDSRuntime/examples/team-contract-adapter-config-resolver-file")
 set(secret_provider_example_dir
     "${install_dir}/share/PocoDDSRuntime/examples/team-contract-secret-provider-environment")
+set(certifier_signer_example_dir
+    "${install_dir}/share/PocoDDSRuntime/examples/team-contract-adapter-certifier-signer-local")
 set(adapter_catalog_example_dir
     "${install_dir}/share/PocoDDSRuntime/examples/team-contract-adapter-catalog")
 set(leader_backend_example_work
@@ -464,6 +507,10 @@ set(adapter_catalog_fleet_trust_private_key
     "${leader_backend_example_work}/fleet-conformance-certifier-private.pem")
 set(adapter_catalog_fleet_trust_public_key
     "${adapter_catalog_fleet_trust_dir}/keys/certifier-a.pem")
+set(adapter_catalog_fleet_signer_mapping
+    "${leader_backend_example_work}/fleet-certifier-signer-mapping.json")
+set(adapter_catalog_fleet_signer_config
+    "${leader_backend_example_work}/fleet-certifier-signer.json")
 set(adapter_catalog_fleet_attestation_executor
     "${leader_backend_example_work}/attestation-fleet-executor.json")
 set(adapter_catalog_fleet_attestation_gate
@@ -884,7 +931,9 @@ function(pdr_attest_installed_adapter_conformance evidence_path report_path)
                 "${adapter_conformance_evidence_sha256}"
             --certifier-id installed-sdk-adapter-team
             --key-id installed-sdk-certifier-key-a
-            --private-key-environment PDR_INSTALLED_ADAPTER_CERTIFIER_KEY
+            --signer-config "${adapter_catalog_fleet_signer_config}"
+            --expected-signer-config-sha256
+                "${adapter_catalog_fleet_signer_config_sha256}"
             --lifetime-seconds 3600
             --report "${report_path}"
         RESULT_VARIABLE adapter_attestation_result
@@ -1121,6 +1170,33 @@ if(NOT adapter_catalog_fleet_trust_result EQUAL 0 OR
         "${adapter_catalog_fleet_trust_output}\n"
         "${adapter_catalog_fleet_trust_error}")
 endif()
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}"
+        "${certifier_signer_example_dir}/create_signer_config.py"
+        --python "${Python3_EXECUTABLE}"
+        --adapter
+            "${certifier_signer_example_dir}/local_ed25519_certifier_signer_adapter.py"
+        --signer-id installed-sdk-certifier-kms
+        --certifier-id installed-sdk-adapter-team
+        --key installed-sdk-certifier-key-a
+            "${adapter_catalog_fleet_trust_public_key}"
+            PDR_INSTALLED_ADAPTER_CERTIFIER_KEY
+        --mapping-output "${adapter_catalog_fleet_signer_mapping}"
+        --output "${adapter_catalog_fleet_signer_config}"
+    RESULT_VARIABLE adapter_catalog_fleet_signer_result
+    OUTPUT_VARIABLE adapter_catalog_fleet_signer_output
+    ERROR_VARIABLE adapter_catalog_fleet_signer_error)
+if(NOT adapter_catalog_fleet_signer_result EQUAL 0 OR
+        NOT adapter_catalog_fleet_signer_output MATCHES
+            "PDR_CERTIFIER_SIGNER_SAMPLE_CONFIG_PASS")
+    message(FATAL_ERROR
+        "Installed Fleet Certifier Signer generation failed: "
+        "${adapter_catalog_fleet_signer_result}\n"
+        "${adapter_catalog_fleet_signer_output}\n"
+        "${adapter_catalog_fleet_signer_error}")
+endif()
+file(SHA256 "${adapter_catalog_fleet_signer_config}"
+    adapter_catalog_fleet_signer_config_sha256)
 pdr_attest_installed_adapter_conformance(
     "${leader_backend_example_work}/conformance-fleet-executor.json"
     "${adapter_catalog_fleet_attestation_executor}")
@@ -1360,7 +1436,13 @@ if(NOT adapter_catalog_fleet_report_content MATCHES
         NOT adapter_catalog_fleet_report_content MATCHES
         "\"adapterConformanceTrustPolicyGeneration\"[ \t\r\n]*:[ \t\r\n]*1" OR
         NOT adapter_catalog_fleet_report_content MATCHES
-        "\"adapterConformanceTrustPolicySha256\"[ \t\r\n]*:")
+        "\"adapterConformanceTrustPolicySha256\"[ \t\r\n]*:" OR
+        NOT adapter_catalog_fleet_report_content MATCHES
+        "\"adapterConformanceSignerIds\"[ \t\r\n]*:[ \t\r\n]*\\[[ \t\r\n]*\"installed-sdk-certifier-kms\"" OR
+        NOT adapter_catalog_fleet_report_content MATCHES
+        "\"adapterConformanceSignerConfigSha256s\"[ \t\r\n]*:" OR
+        NOT adapter_catalog_fleet_report_content MATCHES
+        "\"adapterConformanceSignerCapabilityManifestSha256s\"[ \t\r\n]*:")
     message(FATAL_ERROR
         "Installed Fleet rollout evidence is incomplete: "
         "${adapter_catalog_fleet_report_content}")

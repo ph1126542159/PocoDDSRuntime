@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-governance-approval-signature.schema.json",
+  "title": "Governance approval signature",
+  "oneOf": [
+    {"$ref": "#/$defs/localApproval"},
+    {"$ref": "#/$defs/externalSignerApproval"},
+    {"$ref": "#/$defs/admittedSignerApproval"}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "baseProperties": {
+      "schemaVersion": {}, "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSignature"}, "algorithm": {"const": "Ed25519"},
+      "approverId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "subjectId": {"$ref": "#/$defs/id"}, "subjectSha256": {"$ref": "#/$defs/sha256"}, "signature": {"type": "string", "minLength": 88, "maxLength": 88}
+    },
+    "localApproval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "product", "algorithm", "approverId", "keyId", "subjectId", "subjectSha256", "signature"],
+      "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSignature"}, "algorithm": {"const": "Ed25519"}, "approverId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "subjectId": {"$ref": "#/$defs/id"}, "subjectSha256": {"$ref": "#/$defs/sha256"}, "signature": {"type": "string", "minLength": 88, "maxLength": 88}}
+    },
+    "externalSignerApproval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "product", "algorithm", "approverId", "keyId", "subjectId", "subjectSha256", "signature", "signerId", "signerConfigSha256", "signerCapabilityManifestSha256"],
+      "properties": {"schemaVersion": {"const": 2}, "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSignature"}, "algorithm": {"const": "Ed25519"}, "approverId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "subjectId": {"$ref": "#/$defs/id"}, "subjectSha256": {"$ref": "#/$defs/sha256"}, "signature": {"type": "string", "minLength": 88, "maxLength": 88}, "signerId": {"$ref": "#/$defs/id"}, "signerConfigSha256": {"$ref": "#/$defs/sha256"}, "signerCapabilityManifestSha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "admittedSignerApproval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "product", "algorithm", "approverId", "keyId", "subjectId", "subjectSha256", "signature", "signerId", "signerConfigSha256", "signerCapabilityManifestSha256", "signerConformanceId", "signerConformanceEvidenceSha256", "signerConformanceAttestationSha256", "signerConformanceCertifierId", "signerConformanceCertifierKeyId", "signerConformanceTrustPolicyId", "signerConformanceTrustPolicyGeneration", "signerConformanceTrustPolicySha256"],
+      "properties": {"schemaVersion": {"const": 3}, "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSignature"}, "algorithm": {"const": "Ed25519"}, "approverId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "subjectId": {"$ref": "#/$defs/id"}, "subjectSha256": {"$ref": "#/$defs/sha256"}, "signature": {"type": "string", "minLength": 88, "maxLength": 88}, "signerId": {"$ref": "#/$defs/id"}, "signerConfigSha256": {"$ref": "#/$defs/sha256"}, "signerCapabilityManifestSha256": {"$ref": "#/$defs/sha256"}, "signerConformanceId": {"$ref": "#/$defs/sha256"}, "signerConformanceEvidenceSha256": {"$ref": "#/$defs/sha256"}, "signerConformanceAttestationSha256": {"$ref": "#/$defs/sha256"}, "signerConformanceCertifierId": {"$ref": "#/$defs/id"}, "signerConformanceCertifierKeyId": {"$ref": "#/$defs/id"}, "signerConformanceTrustPolicyId": {"$ref": "#/$defs/id"}, "signerConformanceTrustPolicyGeneration": {"type": "integer", "minimum": 1, "maximum": 2147483647}, "signerConformanceTrustPolicySha256": {"$ref": "#/$defs/sha256"}}
+    }
+  }
+}

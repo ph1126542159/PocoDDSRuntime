@@ -214,3 +214,7 @@ Fleet Plan v7 可在 v6 evidence 准入上增加签名信任链。先用公共
 `adapter-conformance-admission-create --attestation <KIND> <PATH>` 生成 schema v2 bundle；执行 Fleet 时固定
 trust policy 文件 SHA。`create_conformance_trust_demo.py` 能生成仅供本地 SDK 验收的临时密钥和 policy，生产
 环境不得把该脚本当作 KMS/HSM 或证书发布系统。
+
+生产环境可用 `--signer-config` 与 `--expected-signer-config-sha256` 将签名委托给安装 SDK 中定义的 Certifier
+Signer Adapter 协议。核心只接收 capability/key set 和签名结果，并在本地用固定公钥复验；厂商 KMS/HSM
+认证、网络和 SDK 细节全部留在独立 Adapter 进程。

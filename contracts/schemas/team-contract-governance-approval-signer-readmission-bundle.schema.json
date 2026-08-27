@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-governance-approval-signer-readmission-bundle.schema.json",
+  "title": "Executor-local Governance Approval Signer readmission mapping",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "entries"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSignerReadmissionBundle"},
+    "entries": {
+      "type": "array", "minItems": 1, "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["approvalSha256", "admissionConfig", "expectedAdmissionConfigSha256"],
+        "properties": {
+          "approvalSha256": {"$ref": "#/$defs/sha256"},
+          "admissionConfig": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "expectedAdmissionConfigSha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    }
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

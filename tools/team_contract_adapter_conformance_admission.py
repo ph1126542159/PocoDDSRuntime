@@ -79,8 +79,15 @@ def validate_summary(document: Any) -> None:
         signed_entry = base_entry | {
             "attestationSha256", "certifierId", "keyId",
         }
+        external_signed_entry = signed_entry | {
+            "signerId", "signerConfigSha256",
+            "signerCapabilityManifestSha256",
+        }
         if (not isinstance(entry, dict)
-                or set(entry) != (signed_entry if signed else base_entry)
+                or set(entry) not in (
+                    (signed_entry, external_signed_entry)
+                    if signed else (base_entry,)
+                )
                 or entry.get("adapterKind") not in REQUIRED_KINDS
                 or package_tool.IDENTIFIER.fullmatch(str(
                     entry.get("adapterId", ""))) is None
@@ -100,6 +107,17 @@ def validate_summary(document: Any) -> None:
                     entry.get("attestationSha256", ""))) is None):
             raise ValueError(
                 "Adapter conformance admission signer entry is malformed"
+            )
+        if signed and set(entry) == external_signed_entry and (
+                package_tool.IDENTIFIER.fullmatch(str(
+                    entry.get("signerId", ""))) is None
+                or any(package_tool.SHA256.fullmatch(str(
+                    entry.get(name, ""))) is None for name in (
+                        "signerConfigSha256",
+                        "signerCapabilityManifestSha256",
+                    ))):
+            raise ValueError(
+                "Adapter conformance admission external signer is malformed"
             )
         kinds.append(entry["adapterKind"])
     if kinds != REQUIRED_KINDS:
@@ -339,11 +357,7 @@ class Admission:
         if self.trust_policy is not None:
             for entry in entries:
                 trust = self._trust[entry["adapterKind"]]
-                entry.update({
-                    "attestationSha256": trust["attestationSha256"],
-                    "certifierId": trust["certifierId"],
-                    "keyId": trust["keyId"],
-                })
+                entry.update(trust)
         binding = {
             "policyId": self.policy["policyId"],
             "coordinatorId": coordinator_id,

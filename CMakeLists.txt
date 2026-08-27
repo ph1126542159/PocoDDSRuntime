@@ -739,6 +739,72 @@ if(BUILD_TESTING)
         set_tests_properties(team-contract-adapter-conformance-admission PROPERTIES
             LABELS "sdk;team;contract;adapter;conformance;admission;fleet;portability;fault-injection;recovery;security;unit"
             TIMEOUT 30)
+        add_test(NAME team-contract-adapter-conformance-trust
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_conformance_trust.py")
+        set_tests_properties(team-contract-adapter-conformance-trust PROPERTIES
+            LABELS "sdk;team;contract;adapter;conformance;admission;fleet;portability;signature;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-certifier-signer
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_certifier_signer.py")
+        set_tests_properties(team-contract-adapter-certifier-signer PROPERTIES
+            LABELS "sdk;team;contract;adapter;certifier;signer;kms;hsm;capability;signature;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-certifier-trust-control
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_certifier_trust_control.py")
+        set_tests_properties(team-contract-adapter-certifier-trust-control PROPERTIES
+            LABELS "sdk;team;contract;adapter;certifier;trust;governance;approval;activation;break-glass;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-certifier-trust-state-store
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_certifier_trust_state_store.py")
+        set_tests_properties(team-contract-adapter-certifier-trust-state-store PROPERTIES
+            LABELS "sdk;team;contract;adapter;certifier;trust;state;backend;artifact;resolver;portability;cas;fencing;takeover;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-certifier-trust-portability
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_certifier_trust_portability.py")
+        set_tests_properties(team-contract-adapter-certifier-trust-portability PROPERTIES
+            LABELS "sdk;team;contract;adapter;certifier;trust;state;backend;artifact;resolver;portability;takeover;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-certifier-trust-migration
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_certifier_trust_migration.py")
+        set_tests_properties(team-contract-adapter-certifier-trust-migration PROPERTIES
+            LABELS "sdk;team;contract;adapter;certifier;trust;state;migration;governance;approval;backend;artifact;resolver;portability;cas;fencing;takeover;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-governance-approval
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_governance_approval.py")
+        set_tests_properties(team-contract-governance-approval PROPERTIES
+            LABELS "sdk;team;contract;governance;approval;quorum;role;signature;portability;redaction;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-governance-approval-signer
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_governance_approval_signer.py")
+        set_tests_properties(team-contract-governance-approval-signer PROPERTIES
+            LABELS "sdk;team;contract;governance;approval;signer;kms;hsm;purpose;capability;signature;portability;redaction;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-governance-approval-signer-conformance
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_governance_approval_signer_conformance.py")
+        set_tests_properties(team-contract-governance-approval-signer-conformance PROPERTIES
+            LABELS "sdk;team;contract;adapter;governance;approval;signer;conformance;certification;trust;capability;signature;portability;redaction;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-governance-approval-signer-admission
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_governance_approval_signer_admission.py")
+        set_tests_properties(team-contract-governance-approval-signer-admission PROPERTIES
+            LABELS "sdk;team;contract;adapter;governance;approval;signer;admission;conformance;certification;trust;attestation;capability;signature;portability;redaction;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-governance-approval-signer-readmission
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_governance_approval_signer_readmission.py")
+        set_tests_properties(team-contract-governance-approval-signer-readmission PROPERTIES
+            LABELS "sdk;team;contract;adapter;governance;approval;signer;readmission;execution;conformance;certification;trust;attestation;rotation;revocation;signature;portability;redaction;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
         add_test(NAME team-contract-secret-provider
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_secret_provider.py")
@@ -1791,6 +1857,12 @@ install(PROGRAMS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_conformance.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_conformance_admission.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_conformance_trust.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_certifier_signer.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_certifier_trust_control.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_certifier_trust_state_store.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_governance_approval.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_governance_approval_signer.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_governance_approval_signer_admission.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_secret_provider.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_runtime.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_catalog.py"
@@ -1866,6 +1938,16 @@ install(FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-secret-provider-environment/create_secret_provider_config.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-secret-provider-environment/README.md"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-secret-provider-environment")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-certifier-signer-local/local_ed25519_certifier_signer_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-certifier-signer-local/create_signer_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-certifier-signer-local/README.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-adapter-certifier-signer-local")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-governance-approval-signer-local/local_ed25519_governance_approval_signer_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-governance-approval-signer-local/create_signer_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-governance-approval-signer-local/README.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-governance-approval-signer-local")
 install(FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_adapter_manifest.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_adapter_catalog.py"

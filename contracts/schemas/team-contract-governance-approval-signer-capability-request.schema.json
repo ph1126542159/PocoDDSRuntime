@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-governance-approval-signer-capability-request.schema.json",
+  "title": "Governance Approval Signer capability request", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "signerId", "approverId"],
+  "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSignerCapabilityRequest"}, "requestId": {"$ref": "#/$defs/id"}, "signerId": {"$ref": "#/$defs/id"}, "approverId": {"$ref": "#/$defs/id"}},
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}}
+}

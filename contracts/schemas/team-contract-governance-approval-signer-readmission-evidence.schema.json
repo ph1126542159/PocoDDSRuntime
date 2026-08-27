@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-governance-approval-signer-readmission-evidence.schema.json",
+  "title": "Execution-time Governance Approval Signer readmission evidence",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "purpose", "subjectSha256", "executorId", "bundleSha256", "approvals", "verifiedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSignerReadmissionEvidence"},
+    "passed": {"const": true},
+    "purpose": {"enum": ["governance-approval", "adapter-certifier-trust-approval", "adapter-certifier-trust-migration-approval"]},
+    "subjectSha256": {"$ref": "#/$defs/sha256"},
+    "executorId": {"$ref": "#/$defs/id"},
+    "bundleSha256": {"$ref": "#/$defs/sha256"},
+    "approvals": {
+      "type": "array", "minItems": 1, "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["approvalSha256", "approverId", "keyId", "signerId", "signerConformanceId", "signerConformanceEvidenceSha256", "signerConformanceAttestationSha256", "signerConformanceCertifierId", "signerConformanceCertifierKeyId", "creationTrustPolicyId", "creationTrustPolicyGeneration", "creationTrustPolicySha256", "executionTrustPolicyId", "executionTrustPolicyGeneration", "executionTrustPolicySha256"],
+        "properties": {
+          "approvalSha256": {"$ref": "#/$defs/sha256"}, "approverId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "signerId": {"$ref": "#/$defs/id"},
+          "signerConformanceId": {"$ref": "#/$defs/sha256"}, "signerConformanceEvidenceSha256": {"$ref": "#/$defs/sha256"}, "signerConformanceAttestationSha256": {"$ref": "#/$defs/sha256"},
+          "signerConformanceCertifierId": {"$ref": "#/$defs/id"}, "signerConformanceCertifierKeyId": {"$ref": "#/$defs/id"},
+          "creationTrustPolicyId": {"$ref": "#/$defs/id"}, "creationTrustPolicyGeneration": {"type": "integer", "minimum": 1, "maximum": 2147483647}, "creationTrustPolicySha256": {"$ref": "#/$defs/sha256"},
+          "executionTrustPolicyId": {"$ref": "#/$defs/id"}, "executionTrustPolicyGeneration": {"type": "integer", "minimum": 1, "maximum": 2147483647}, "executionTrustPolicySha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "verifiedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

@@ -1179,8 +1179,8 @@ Resolver 请求绑定 `adapter-catalog-fleet -> rolloutId -> catalogId` scope，
 
 ## 统一 Adapter Conformance Kit
 
-`adapter-conformance` 为 Fleet Plan v5 使用的六类公共边界提供同一认证入口：Fleet Executor、Wave Gate、
-Control Authorizer、Registry Leader Backend、Artifact Store 和 Adapter Config Resolver。它复用各模块自己的
+`adapter-conformance` 为七类公共边界提供同一认证入口：Fleet Executor、Wave Gate、Control Authorizer、
+Registry Leader Backend、Artifact Store、Adapter Config Resolver 和 Governance Approval Signer。它复用各模块自己的
 严格 config loader 与 capability negotiation，不维护第二份协议解释。认证会重复协商以验证能力摘要稳定性，
 重新验证 executable/artifact/config pin，主动提交错误 config SHA 验证失败关闭，检查环境 allowlist 和进程
 timeout/response-size 策略，并生成自摘要 `PocoDDSRuntimeTeamContractAdapterConformanceEvidence`。
@@ -1191,6 +1191,13 @@ timeout/response-size 策略，并生成自摘要 `PocoDDSRuntimeTeamContractAda
 内容、命令参数或环境值，适合由 Adapter 团队交付给集成团队。`integration-readiness` 只证明公共适配层边界，
 不能替代 etcd/对象存储/IAM/节点部署的真实环境 acceptance。PDR-REC-0046 覆盖 pin、replay、scope、漂移、
 脱敏、自摘要和安装 CLI。
+
+Governance Approval Signer 使用 `--adapter-kind governance-approval-signer`，并通过 `--scope-primary` 固定
+唯一 `approverId`。证据绑定 signer ID、approver scope、配置 SHA、完整 purpose/key capability 摘要；签名器团队
+可重复生成稳定 conformance ID，独立认证团队再使用 `adapter-conformance-attest` 对精确 evidence SHA、kind/ID、
+config SHA 与 approver scope 签名。现有 Adapter Conformance Trust Policy 可把 Certifier 权限限制到
+`governance-approval-signer` 和明确 signer ID，并复用有效期、撤销、轮换和最低 generation 检查。
+该公共认证注册不会把 Signer 加入 Fleet v6 的六类强制 rollout admission；两种准入集合保持明确分离。
 
 ## Fleet v6 Adapter Conformance Admission
 
@@ -1232,3 +1239,114 @@ python pdr.py contract-package adapter-conformance-admission-create `
 `--adapter-conformance-trust-policy` 和 `--expected-adapter-conformance-trust-policy-sha256`。journal v7 只保留
 trust policy、attestation、certifier 和 key 的摘要身份，不保存公私钥路径或 evidence 路径。示例中的
 `create_conformance_trust_demo.py` 只用于本地 SDK 验收；生产私钥必须由团队自己的 KMS/HSM 和发布流程管理。
+
+### External Certifier Signer
+
+生产签名可将 `--private-key-environment` 替换为外部 Signer Adapter：
+
+```powershell
+$signerSha = (Get-FileHash C:\pdr\adapter-certifier-signer.json -Algorithm SHA256).Hash.ToLower()
+python pdr.py contract-package adapter-conformance-attest `
+  --evidence C:\pdr\fleet-executor-conformance.json `
+  --expected-evidence-sha256 $evidenceSha `
+  --certifier-id runtime-adapter-team --key-id adapter-certifier-2026-b `
+  --signer-config C:\pdr\adapter-certifier-signer.json `
+  --expected-signer-config-sha256 $signerSha `
+  --report C:\pdr\fleet-executor-attestation.json
+```
+
+Signer 配置固定 executable、arguments、supporting artifacts、公钥、key ID、环境变量 allowlist、timeout、
+payload/response 上限和 required capabilities。主进程先协商 protocol/capability/key set，再向隔离进程发送
+规范 payload 和 SHA；响应必须回显 request/signer/certifier/key/purpose，并由主进程用固定公钥再次验签。
+attestation schema v2 只记录 `signerId`、config SHA 和 capability manifest SHA，不记录 endpoint、本地路径或凭证。
+安装示例 `team-contract-adapter-certifier-signer-local` 使用本地 PEM 仅演示协议；生产 Adapter 应在进程内部调用
+KMS/HSM，且不得导出私钥字节。
+
+### Adapter Certifier Trust Control
+
+生产 trust policy 不应由单个开发者直接覆盖。公共 CLI 将变更拆成三个可审计阶段：
+`adapter-certifier-trust-propose` 固定当前/候选 policy 的 ID、generation、SHA 和治理策略；
+`adapter-certifier-trust-approve` 让审批人分别对 proposal 原始字节签名；
+`adapter-certifier-trust-activate` 重新验证全部 pin、有效期、Ed25519 签名和职责分离后，再原子替换活动 policy。
+
+治理策略的普通阈值至少为 2，审批人和 key 必须同时不同，proposal 发起人不能审批，激活人必须在独立
+allowlist 内且不能是发起人或本次审批人。`emergency-revocation` 使用独立、更短的有效期和审批阈值，
+候选策略除 generation 与新增 `revokedKeys` 外必须逐字段等于当前策略；因此紧急路径不能添加 certifier、
+扩大 Adapter kind/ID、换公钥、删除/改写旧吊销或放宽 attestation lifetime。激活报告只记录逻辑身份和
+摘要，不记录密钥或本地路径。
+
+多协调 Host 部署使用 `adapter-certifier-trust-remote-*` 命令。活动 policy、每次 activation evidence 和
+状态记录写入 Artifact Store，Registry Leader Backend 只保存当前 CAS pointer；pointer 的 `stateVersion`
+同时作为 fencing token，并固定前一 pointer SHA、当前 state SHA、operation ID 和 coordinator ID。Host 接管时
+必须重新读取并验证完整前驱、policy 和 activation 摘要链，再基于精确 state version/policy SHA 提交下一代。
+
+`remote-propose` 从远程权威状态读取当前 policy，不依赖某台 Host 的活动文件；审批文件仍是可移交的独立
+Ed25519 制品。`remote-activate` 复用与本机激活完全相同的双人审批和职责分离验证，随后才进行远程 CAS。
+Backend 返回结果不确定时只在当前 pointer 精确匹配预期 state/coordinator/operation 时确认成功；陈旧 Host、
+丢失历史、缺失 Artifact、内容漂移或 scope/config pin 变化均失败关闭。
+
+Pointer v2 使用 `--adapter-config-resolver-config`、对应 Resolver config SHA/ID，以及两份分别固定 SHA 的
+`--state-backend-config-ref`、`--artifact-store-config-ref`。此模式拒绝同时传入直接 Backend/Artifact config。
+远程 pointer 仅保存 Resolver ID 和逻辑 reference；每台 Host 可用不同 Resolver 配置把同一 reference 解析到
+自己的绝对路径、配置 SHA 和凭据 Provider。解析 scope 固定为 consumer type
+`adapter-certifier-trust-state`、`controlId` 和 `trustPolicyId`，并重新检查 reference 的 kind、Adapter ID、
+revision、返回配置 product/identity 与内容 pin。
+未提供 Resolver 参数时继续生成并验证 direct-config pointer v1。
+
+已有 direct-config pointer v1 不能通过切换启动参数静默变成 v2。迁移使用四个独立公共命令：
+`adapter-certifier-trust-remote-migration-preflight` 从 source direct Adapter 和 target Resolver Adapter 分别
+读取并验证完整权威链；`migration-propose` 固定源 pointer/state/policy SHA、config pin、目标逻辑引用和
+治理策略；`migration-approve` 由不同审批人对 proposal 原始字节签名；`migration-activate` 复核标准阈值、
+职责分离和全部 pin 后，写入不可变 migration evidence/state，并用下一 fencing token 一次 CAS 发布 pointer v2。
+
+迁移不改变活动 policy generation 或 SHA。CAS 前失败只会产生不可达的内容寻址对象，权威 pointer 仍为 v1；
+CAS 成功响应丢失时必须精确回读新 pointer，重复相同 proposal/operation 返回已验证结果。历史验证只允许
+`v1 --(signed migrate state)--> v2` 这一单向边界，普通 activation 不得改变配置作用域。迁移后可继续使用
+portable Host 激活下一代 policy，旧 direct Host 因 fencing/CAS 冲突不能覆盖新状态。
+
+### Governance Approval 公共协议
+
+新模块不得复制 Ed25519 法定人数验证。`governance-approval-subject` 将任意 JSON payload 的 product/SHA、
+业务 subject type、审批 role、initiator、治理 policy ID/SHA 和期限封装为可移交 subject；审批人使用
+`governance-approval-approve` 对 subject 原始字节签名；执行方使用 `governance-approval-verify` 同时提供
+原 payload、subject、policy、签名集合、公钥目录与 executor ID，生成摘要化 evidence。
+
+Policy 可声明多个 role，每个 role 拥有独立最小审批数和最长 subject 生命周期；approver 可被授予多个 role。
+验证要求 approver 人员和 key 同时唯一，检查按时间生效的 key revocation、公钥内容 pin 和 Ed25519 签名，
+并强制 initiator、所有 approver、executor 相互分离。Evidence 不记录 payload 内容、密钥、本地路径或环境变量。
+
+已有业务协议无需破坏性替换自己的 approval schema。公共 Python 引擎
+`team_contract_governance_approval.verify_ed25519_quorum()` 接收业务 validator 与 subject SHA 字段名，
+因此 Adapter Trust Policy 的 `proposalSha256` 和 pointer Migration 的同名字段继续兼容，但法定人数、角色、
+撤销、key pin 和职责分离由同一实现负责。业务模块仍负责验证 proposal 的业务语义，公共引擎不替代领域规则。
+
+审批命令支持两种互斥签名模式：兼容模式使用 `--private-key-environment` 在当前进程加载本地 PEM；生产模式
+使用 `--signer-config` 和 `--expected-signer-config-sha256` 调用外部 Governance Approval Signer。后者适用于
+KMS、HSM、Vault 或企业签名服务，主机进程不读取私钥。配置会固定 signer/approver 身份、Ed25519 公钥、
+key set、允许 purpose、执行制品与环境变量策略；能力协商返回值也必须与这些声明逐项一致。
+
+三个 purpose 分别是 `governance-approval`、`adapter-certifier-trust-approval` 和
+`adapter-certifier-trust-migration-approval`，不得跨业务重放。签名器返回后，主机仍使用配置中固定的公钥
+本地验签。v2 的域分离 signing payload 还同时签入 approval product、approver/key、subject SHA、purpose
+以及 signer/config/capability 摘要，因此替换信封中的 provenance 或跨 purpose 重放都会验签失败。
+外部模式生成 schema v2 approval envelope，只附带 `signerId`、`signerConfigSha256` 与
+`signerCapabilityManifestSha256`，不记录配置路径、私钥位置或凭据；本地模式继续生成 schema v1。
+安装示例 `team-contract-governance-approval-signer-local` 使用本地 PEM 演示协议和故障注入，不能替代生产密钥边界。
+
+生产环境可再向三个 approve 命令同时传入 `--signer-admission-config` 与
+`--expected-signer-admission-config-sha256`。准入配置固定 signer conformance evidence、独立 certifier
+attestation、trust policy、最低 policy generation 与证据最大年龄。签名开始前，主机会重新读取全部固定制品，
+验证证据未过期、certifier 未被撤销且获准认证精确 signer kind/ID，并要求证据中的 signer ID、approver scope、
+config SHA 和 capability SHA 与当前已加载 signer 一致。准入成功生成 schema v3 envelope；其中只包含 conformance、
+certifier 和 policy 的逻辑身份与摘要，所有字段都进入域分离 signing payload，修改任一 provenance 字段都会使验签失败。
+
+Schema v3 同时要求执行时重新准入。`governance-approval-verify`、`adapter-certifier-trust-activate` 和
+`adapter-certifier-trust-remote-migration-activate` 必须提供 `--signer-readmission-bundle`、对应 SHA pin 及
+`--signer-readmission-report`。Bundle 是 executor 本地配置，按 `approvalSha256` 精确映射到本机 Admission Config；
+它不进入共享 approval envelope。执行方重新检查 evidence 年龄、attestation 签名、Certifier scope/有效期/撤销以及
+signer/config/capability/approver provenance，并可在同一 policy ID 下接受仍授权该 Certifier 的更高 generation。
+
+Readmission Evidence 同时记录创建时和执行时 Trust Policy 的逻辑身份、generation 和 SHA，不记录任何本机路径；
+其摘要会进入通用 Verify Evidence、Trust Activation Report 或 Migration Report 的 schema v2，确保执行审计与实际
+信任判定绑定。Bundle 必须恰好覆盖全部 v3 approval，缺项、多项、错误 approval SHA 或缺少 evidence 输出均失败关闭。
+本地 PEM v1 与未采用创建时准入的外部 v2 继续按原路径执行，不要求 Bundle，也拒绝误传的 Bundle。

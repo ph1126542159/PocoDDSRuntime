@@ -13,6 +13,7 @@ import team_contract_adapter_catalog_control_authorizer as authorizer_tool
 import team_contract_adapter_catalog_fleet as fleet_tool
 import team_contract_adapter_catalog_wave_gate as wave_gate_tool
 import team_contract_adapter_config_resolver as resolver_tool
+import team_contract_governance_approval_signer as approval_signer_tool
 import team_contract_adapter_runtime as adapter_runtime
 import team_contract_artifact_store as artifact_store_tool
 import team_contract_package as package_tool
@@ -28,6 +29,7 @@ SUPPORTED_KINDS = {
     "artifact-store": "storeId",
     "control-authorizer": "authorizerId",
     "fleet-executor": "executorId",
+    "governance-approval-signer": "signerId",
     "registry-leader-backend": "backendId",
     "wave-gate": "gateId",
 }
@@ -58,6 +60,12 @@ def _scope(primary_id: str | None, secondary_id: str | None,
         if primary_id is None or secondary_id is not None:
             raise ValueError(
                 "Artifact Store conformance requires only a primary scope ID"
+            )
+    elif adapter_kind == "governance-approval-signer":
+        if primary_id is None or secondary_id is not None:
+            raise ValueError(
+                "Governance Approval Signer conformance requires only an "
+                "approver scope ID"
             )
     elif primary_id is not None or secondary_id is not None:
         raise ValueError(
@@ -116,6 +124,20 @@ def _load_adapter(adapter_kind: str, config_path: str | Path,
         if adapter.capability_manifest_sha256 is None:
             raise ValueError(
                 "Backend conformance requires capability-aware config v2+"
+            )
+        capability_sha256 = adapter.capability_manifest_sha256
+    elif adapter_kind == "governance-approval-signer":
+        primary_id = scope["primaryId"]
+        assert primary_id is not None
+        adapter = approval_signer_tool.ExternalCommandGovernanceApprovalSigner(
+            config_path, expected_sha256
+        )
+        config, path, digest = (
+            adapter.config, adapter.config_path, adapter.config_sha256
+        )
+        if adapter.approver_id != primary_id:
+            raise ValueError(
+                "Governance Approval Signer approver scope changed"
             )
         capability_sha256 = adapter.capability_manifest_sha256
     else:

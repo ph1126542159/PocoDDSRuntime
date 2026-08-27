@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-governance-approval-signer-admission-config.schema.json",
+  "title": "Governance Approval Signer creation- and execution-time admission configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "evidence", "expectedEvidenceSha256", "attestation", "expectedAttestationSha256", "trustPolicy", "expectedTrustPolicyId", "minimumTrustPolicyGeneration", "expectedTrustPolicySha256", "maximumEvidenceAgeSeconds"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSignerAdmissionConfig"},
+    "evidence": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "expectedEvidenceSha256": {"$ref": "#/$defs/sha256"},
+    "attestation": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "expectedAttestationSha256": {"$ref": "#/$defs/sha256"},
+    "trustPolicy": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "expectedTrustPolicyId": {"$ref": "#/$defs/id"},
+    "minimumTrustPolicyGeneration": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+    "expectedTrustPolicySha256": {"$ref": "#/$defs/sha256"},
+    "maximumEvidenceAgeSeconds": {"type": "integer", "minimum": 60, "maximum": 2678400}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

@@ -125,7 +125,7 @@ class AdapterConformanceTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "malformed"):
                 conformance_tool.validate_evidence(invalid_capability)
         print(
-            "PDR_ADAPTER_CONFORMANCE_KIT_PASS kinds=6 live=1 pins=1 "
+            "PDR_ADAPTER_CONFORMANCE_KIT_PASS kinds=7 live=1 pins=1 "
             "replay=1 capability=1 stableId=1 drift=1 scope=1 "
             "redaction=1 selfDigest=1 cli=1"
         )
@@ -134,6 +134,7 @@ class AdapterConformanceTest(unittest.TestCase):
         self.assertEqual(set(conformance_tool.SUPPORTED_KINDS), {
             "adapter-config-resolver", "artifact-store",
             "control-authorizer", "fleet-executor",
+            "governance-approval-signer",
             "registry-leader-backend", "wave-gate",
         })
         self.assertEqual(

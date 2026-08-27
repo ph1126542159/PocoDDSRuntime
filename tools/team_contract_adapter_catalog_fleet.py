@@ -1091,6 +1091,24 @@ def drive(plan: dict[str, Any], config: dict[str, Any], path: JournalTarget,
     write_journal(path, journal)
 
 
+def signer_audit(admission: dict[str, Any]) -> dict[str, Any]:
+    external = [entry for entry in admission["entries"]
+                if "signerId" in entry]
+    if not external:
+        return {}
+    return {
+        "adapterConformanceSignerIds": sorted(set(
+            entry["signerId"] for entry in external
+        )),
+        "adapterConformanceSignerConfigSha256s": sorted(set(
+            entry["signerConfigSha256"] for entry in external
+        )),
+        "adapterConformanceSignerCapabilityManifestSha256s": sorted(set(
+            entry["signerCapabilityManifestSha256"] for entry in external
+        )),
+    }
+
+
 def report_for(journal: dict[str, Any], capability_sha: str,
                gate_capability_sha: str | None = None,
                authorizer_capability_sha: str | None = None,
@@ -1177,6 +1195,7 @@ def report_for(journal: dict[str, Any], capability_sha: str,
                     "adapterConformanceTrustPolicySha256":
                         latest["trustPolicySha256"],
                 })
+                report.update(signer_audit(latest))
     return report
 
 
@@ -2001,6 +2020,7 @@ def status_command(args: argparse.Namespace) -> int:
                             "adapterConformanceTrustPolicySha256":
                                 latest["trustPolicySha256"],
                         })
+                        report.update(signer_audit(latest))
         if args.report:
             package_tool.write_json(Path(args.report).resolve(), report)
         print(

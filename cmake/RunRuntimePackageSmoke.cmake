@@ -177,6 +177,12 @@ set(installed_python_tools
     team_contract_adapter_conformance.py
     team_contract_adapter_conformance_admission.py
     team_contract_adapter_conformance_trust.py
+    team_contract_adapter_certifier_signer.py
+    team_contract_adapter_certifier_trust_control.py
+    team_contract_adapter_certifier_trust_state_store.py
+    team_contract_governance_approval.py
+    team_contract_governance_approval_signer.py
+    team_contract_governance_approval_signer_admission.py
     team_contract_secret_provider.py
     team_contract_adapter_runtime.py
     team_contract_adapter_catalog.py
@@ -248,6 +254,35 @@ foreach(config_resolver_schema
     team-contract-adapter-conformance-admission-bundle.schema.json
     team-contract-adapter-conformance-attestation.schema.json
     team-contract-adapter-conformance-trust-policy.schema.json
+    team-contract-adapter-certifier-signer-config.schema.json
+    team-contract-adapter-certifier-signer-capability-request.schema.json
+    team-contract-adapter-certifier-signer-capability-manifest.schema.json
+    team-contract-adapter-certifier-signer-request.schema.json
+    team-contract-adapter-certifier-signer-response.schema.json
+    team-contract-adapter-certifier-trust-governance.schema.json
+    team-contract-adapter-certifier-trust-proposal.schema.json
+    team-contract-adapter-certifier-trust-approval.schema.json
+    team-contract-adapter-certifier-trust-activation.schema.json
+    team-contract-adapter-certifier-trust-state-pointer.schema.json
+    team-contract-adapter-certifier-trust-state.schema.json
+    team-contract-adapter-certifier-trust-state-status.schema.json
+    team-contract-adapter-certifier-trust-migration-preflight.schema.json
+    team-contract-adapter-certifier-trust-migration-proposal.schema.json
+    team-contract-adapter-certifier-trust-migration-approval.schema.json
+    team-contract-adapter-certifier-trust-migration-report.schema.json
+    team-contract-governance-approval-policy.schema.json
+    team-contract-governance-approval-subject.schema.json
+    team-contract-governance-approval-signature.schema.json
+    team-contract-governance-approval-evidence.schema.json
+    team-contract-governance-approval-signer-config.schema.json
+    team-contract-governance-approval-signer-capability-request.schema.json
+    team-contract-governance-approval-signer-capability-manifest.schema.json
+    team-contract-governance-approval-signer-request.schema.json
+    team-contract-governance-approval-signer-response.schema.json
+    team-contract-governance-approval-signing-payload.schema.json
+    team-contract-governance-approval-signer-admission-config.schema.json
+    team-contract-governance-approval-signer-readmission-bundle.schema.json
+    team-contract-governance-approval-signer-readmission-evidence.schema.json
     team-contract-secret-reference.schema.json
     team-contract-secret-provider-config.schema.json
     team-contract-secret-provider-capability-request.schema.json
@@ -269,6 +304,25 @@ foreach(secret_provider_example_file
         message(FATAL_ERROR
             "Installed Runtime package is missing Secret Provider SDK example: "
             "${secret_provider_example_file}")
+    endif()
+endforeach()
+foreach(certifier_signer_example_file
+        local_ed25519_certifier_signer_adapter.py create_signer_config.py README.md)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/examples/team-contract-adapter-certifier-signer-local/${certifier_signer_example_file}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Certifier Signer SDK example: "
+            "${certifier_signer_example_file}")
+    endif()
+endforeach()
+foreach(governance_approval_signer_example_file
+        local_ed25519_governance_approval_signer_adapter.py
+        create_signer_config.py README.md)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/examples/team-contract-governance-approval-signer-local/${governance_approval_signer_example_file}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Governance Approval Signer SDK example: "
+            "${governance_approval_signer_example_file}")
     endif()
 endforeach()
 foreach(adapter_catalog_example_file

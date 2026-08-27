@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-certifier-trust-governance.schema.json",
+  "title": "Adapter certifier trust-policy governance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "policyId", "standardMinimumApprovals", "emergencyMinimumApprovals", "maxStandardLifetimeSeconds", "maxEmergencyLifetimeSeconds", "allowedApprovers", "activatorIds", "revokedKeys"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractAdapterCertifierTrustControlGovernancePolicy"},
+    "policyId": {"$ref": "#/$defs/id"},
+    "standardMinimumApprovals": {"type": "integer", "minimum": 2, "maximum": 64},
+    "emergencyMinimumApprovals": {"type": "integer", "minimum": 1, "maximum": 64},
+    "maxStandardLifetimeSeconds": {"type": "integer", "minimum": 300, "maximum": 86400},
+    "maxEmergencyLifetimeSeconds": {"type": "integer", "minimum": 60, "maximum": 3600},
+    "allowedApprovers": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"type": "object", "additionalProperties": false, "required": ["approverId", "keyId", "algorithm", "publicKeySha256", "roles"], "properties": {"approverId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "algorithm": {"const": "Ed25519"}, "publicKeySha256": {"$ref": "#/$defs/sha256"}, "roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["emergency-revocation", "standard"]}}}}},
+    "activatorIds": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "revokedKeys": {"type": "array", "maxItems": 64, "items": {"type": "object", "additionalProperties": false, "required": ["keyId", "revokedAt", "reason"], "properties": {"keyId": {"$ref": "#/$defs/id"}, "revokedAt": {"type": "string", "format": "date-time"}, "reason": {"type": "string", "minLength": 1, "maxLength": 512}}}}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

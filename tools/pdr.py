@@ -1025,6 +1025,74 @@ def attest_team_contract_adapter(args: argparse.Namespace) -> int:
     return load_team_contract_adapter_conformance_trust().attest_command(args)
 
 
+def load_team_contract_governance_approval():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_governance_approval.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_governance_approval_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Governance Approval tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_governance_approval(args: argparse.Namespace) -> int:
+    module = load_team_contract_governance_approval()
+    return getattr(
+        module, f"{args.governance_approval_operation}_command"
+    )(args)
+
+
+def load_team_contract_adapter_certifier_trust_control():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_adapter_certifier_trust_control.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_adapter_certifier_trust_control_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Adapter certifier trust control tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_adapter_certifier_trust(args: argparse.Namespace) -> int:
+    module = load_team_contract_adapter_certifier_trust_control()
+    return getattr(module, f"{args.adapter_certifier_trust_operation}_command")(args)
+
+
+def load_team_contract_adapter_certifier_trust_state_store():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_adapter_certifier_trust_state_store.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_adapter_certifier_trust_state_store_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Adapter certifier trust state tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_adapter_certifier_trust_state(
+        args: argparse.Namespace) -> int:
+    module = load_team_contract_adapter_certifier_trust_state_store()
+    return getattr(
+        module, f"{args.adapter_certifier_trust_state_operation}_command"
+    )(args)
+
+
 def load_team_contract_registry_leader_backend_conformance():
     path = Path(__file__).resolve().with_name(
         "team_contract_registry_leader_backend_conformance.py"
@@ -5787,6 +5855,7 @@ def parser() -> argparse.ArgumentParser:
         "--adapter-kind", required=True, choices=(
             "adapter-config-resolver", "artifact-store",
             "control-authorizer", "fleet-executor",
+            "governance-approval-signer",
             "registry-leader-backend", "wave-gate",
         ),
     )
@@ -5830,10 +5899,14 @@ def parser() -> argparse.ArgumentParser:
     adapter_attestation.add_argument("--certifier-id", required=True)
     adapter_attestation.add_argument("--key-id", required=True)
     adapter_attestation.add_argument(
-        "--private-key-environment", required=True
+        "--private-key-environment"
     )
     adapter_attestation.add_argument(
         "--private-key-passphrase-environment"
+    )
+    adapter_attestation.add_argument("--signer-config")
+    adapter_attestation.add_argument(
+        "--expected-signer-config-sha256"
     )
     adapter_attestation.add_argument("--issued-at")
     adapter_attestation.add_argument(
@@ -5841,6 +5914,462 @@ def parser() -> argparse.ArgumentParser:
     )
     adapter_attestation.add_argument("--report", required=True)
     adapter_attestation.set_defaults(handler=attest_team_contract_adapter)
+
+    governance_subject = team_contract_commands.add_parser(
+        "governance-approval-subject",
+        help="bind a payload and policy into a portable approval subject",
+    )
+    governance_subject.add_argument("--payload", required=True)
+    governance_subject.add_argument("--expected-payload-sha256", required=True)
+    governance_subject.add_argument("--expected-payload-product", required=True)
+    governance_subject.add_argument("--policy", required=True)
+    governance_subject.add_argument("--expected-policy-id", required=True)
+    governance_subject.add_argument("--expected-policy-sha256", required=True)
+    governance_subject.add_argument("--subject-id")
+    governance_subject.add_argument("--subject-type", required=True)
+    governance_subject.add_argument("--role", required=True)
+    governance_subject.add_argument("--initiator-id", required=True)
+    governance_subject.add_argument("--reason", required=True)
+    governance_subject.add_argument("--issued-at")
+    governance_subject.add_argument(
+        "--lifetime-seconds", type=int, default=3600
+    )
+    governance_subject.add_argument("--output", required=True)
+    governance_subject.set_defaults(
+        handler=manage_team_contract_governance_approval,
+        governance_approval_operation="subject",
+    )
+
+    governance_approve = team_contract_commands.add_parser(
+        "governance-approval-approve",
+        help="sign an exact portable governance approval subject",
+    )
+    governance_approve.add_argument("--subject", required=True)
+    governance_approve.add_argument("--expected-subject-sha256", required=True)
+    governance_approve.add_argument("--approver-id", required=True)
+    governance_approve.add_argument("--key-id", required=True)
+    governance_approve.add_argument("--private-key-environment")
+    governance_approve.add_argument("--signer-config")
+    governance_approve.add_argument("--expected-signer-config-sha256")
+    governance_approve.add_argument("--signer-admission-config")
+    governance_approve.add_argument(
+        "--expected-signer-admission-config-sha256"
+    )
+    governance_approve.add_argument("--verification-time")
+    governance_approve.add_argument("--output", required=True)
+    governance_approve.set_defaults(
+        handler=manage_team_contract_governance_approval,
+        governance_approval_operation="approve",
+    )
+
+    governance_verify = team_contract_commands.add_parser(
+        "governance-approval-verify",
+        help="verify payload-bound M-of-N approvals and duty separation",
+    )
+    governance_verify.add_argument("--subject", required=True)
+    governance_verify.add_argument("--expected-subject-sha256", required=True)
+    governance_verify.add_argument("--payload", required=True)
+    governance_verify.add_argument("--expected-payload-sha256", required=True)
+    governance_verify.add_argument("--policy", required=True)
+    governance_verify.add_argument("--expected-policy-id", required=True)
+    governance_verify.add_argument("--expected-policy-sha256", required=True)
+    governance_verify.add_argument("--approval", action="append", required=True)
+    governance_verify.add_argument("--trusted-keys-directory", required=True)
+    governance_verify.add_argument("--executor-id", required=True)
+    governance_verify.add_argument("--verification-time")
+    governance_verify.add_argument("--signer-readmission-bundle")
+    governance_verify.add_argument(
+        "--expected-signer-readmission-bundle-sha256"
+    )
+    governance_verify.add_argument("--signer-readmission-report")
+    governance_verify.add_argument("--report")
+    governance_verify.set_defaults(
+        handler=manage_team_contract_governance_approval,
+        governance_approval_operation="verify",
+    )
+
+    adapter_trust_propose = team_contract_commands.add_parser(
+        "adapter-certifier-trust-propose",
+        help="stage an exact successor Adapter certifier trust policy",
+    )
+    adapter_trust_propose.add_argument("--active-policy", required=True)
+    adapter_trust_propose.add_argument("--expected-current-policy-sha256", required=True)
+    adapter_trust_propose.add_argument("--candidate-policy", required=True)
+    adapter_trust_propose.add_argument("--expected-candidate-policy-sha256", required=True)
+    adapter_trust_propose.add_argument("--governance-policy", required=True)
+    adapter_trust_propose.add_argument("--expected-governance-policy-id", required=True)
+    adapter_trust_propose.add_argument("--expected-governance-policy-sha256", required=True)
+    adapter_trust_propose.add_argument(
+        "--mode", choices=("standard", "emergency-revocation"), default="standard"
+    )
+    adapter_trust_propose.add_argument("--proposer-id", required=True)
+    adapter_trust_propose.add_argument("--ticket", required=True)
+    adapter_trust_propose.add_argument("--reason", required=True)
+    adapter_trust_propose.add_argument("--issued-at")
+    adapter_trust_propose.add_argument("--lifetime-seconds", type=int, default=3600)
+    adapter_trust_propose.add_argument("--output", required=True)
+    adapter_trust_propose.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust,
+        adapter_certifier_trust_operation="propose",
+    )
+
+    adapter_trust_approve = team_contract_commands.add_parser(
+        "adapter-certifier-trust-approve",
+        help="sign one staged Adapter certifier trust proposal",
+    )
+    adapter_trust_approve.add_argument("--proposal", required=True)
+    adapter_trust_approve.add_argument("--expected-proposal-sha256", required=True)
+    adapter_trust_approve.add_argument("--approver-id", required=True)
+    adapter_trust_approve.add_argument("--key-id", required=True)
+    adapter_trust_approve.add_argument("--private-key-environment")
+    adapter_trust_approve.add_argument("--signer-config")
+    adapter_trust_approve.add_argument("--expected-signer-config-sha256")
+    adapter_trust_approve.add_argument("--signer-admission-config")
+    adapter_trust_approve.add_argument(
+        "--expected-signer-admission-config-sha256"
+    )
+    adapter_trust_approve.add_argument("--verification-time")
+    adapter_trust_approve.add_argument("--output", required=True)
+    adapter_trust_approve.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust,
+        adapter_certifier_trust_operation="approve",
+    )
+
+    adapter_trust_activate = team_contract_commands.add_parser(
+        "adapter-certifier-trust-activate",
+        help="verify quorum and atomically activate a trust-policy successor",
+    )
+    adapter_trust_activate.add_argument("--active-policy", required=True)
+    adapter_trust_activate.add_argument("--expected-current-policy-sha256", required=True)
+    adapter_trust_activate.add_argument("--candidate-policy", required=True)
+    adapter_trust_activate.add_argument("--expected-candidate-policy-sha256", required=True)
+    adapter_trust_activate.add_argument("--proposal", required=True)
+    adapter_trust_activate.add_argument("--expected-proposal-sha256", required=True)
+    adapter_trust_activate.add_argument("--approval", action="append", required=True)
+    adapter_trust_activate.add_argument("--governance-policy", required=True)
+    adapter_trust_activate.add_argument("--expected-governance-policy-id", required=True)
+    adapter_trust_activate.add_argument("--expected-governance-policy-sha256", required=True)
+    adapter_trust_activate.add_argument("--trusted-keys-directory", required=True)
+    adapter_trust_activate.add_argument("--activator-id", required=True)
+    adapter_trust_activate.add_argument("--verification-time")
+    adapter_trust_activate.add_argument("--signer-readmission-bundle")
+    adapter_trust_activate.add_argument(
+        "--expected-signer-readmission-bundle-sha256"
+    )
+    adapter_trust_activate.add_argument("--signer-readmission-report")
+    adapter_trust_activate.add_argument("--report")
+    adapter_trust_activate.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust,
+        adapter_certifier_trust_operation="activate",
+    )
+
+    def add_adapter_trust_remote_store_arguments(
+        command: argparse.ArgumentParser, *, coordinator: bool) -> None:
+        command.add_argument("--state-backend-config")
+        command.add_argument(
+            "--expected-state-backend-config-sha256"
+        )
+        command.add_argument("--expected-state-backend-id", required=True)
+        command.add_argument("--artifact-store-config")
+        command.add_argument(
+            "--expected-artifact-store-config-sha256"
+        )
+        command.add_argument("--expected-artifact-store-id", required=True)
+        command.add_argument("--adapter-config-resolver-config")
+        command.add_argument(
+            "--expected-adapter-config-resolver-config-sha256"
+        )
+        command.add_argument("--expected-adapter-config-resolver-id")
+        command.add_argument("--state-backend-config-ref")
+        command.add_argument(
+            "--expected-state-backend-config-ref-sha256"
+        )
+        command.add_argument("--artifact-store-config-ref")
+        command.add_argument(
+            "--expected-artifact-store-config-ref-sha256"
+        )
+        command.add_argument("--control-id", required=True)
+        command.add_argument("--trust-policy-id", required=True)
+        if coordinator:
+            command.add_argument("--coordinator-id", required=True)
+
+    adapter_trust_remote_initialize = team_contract_commands.add_parser(
+        "adapter-certifier-trust-remote-initialize",
+        help="initialize a CAS-fenced remote certifier trust state",
+    )
+    add_adapter_trust_remote_store_arguments(
+        adapter_trust_remote_initialize, coordinator=True
+    )
+    adapter_trust_remote_initialize.add_argument("--policy", required=True)
+    adapter_trust_remote_initialize.add_argument(
+        "--expected-policy-sha256", required=True
+    )
+    adapter_trust_remote_initialize.add_argument("--operation-id", required=True)
+    adapter_trust_remote_initialize.add_argument("--actor", required=True)
+    adapter_trust_remote_initialize.add_argument("--report")
+    adapter_trust_remote_initialize.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust_state,
+        adapter_certifier_trust_state_operation="initialize",
+    )
+
+    adapter_trust_remote_status = team_contract_commands.add_parser(
+        "adapter-certifier-trust-remote-status",
+        help="verify and inspect the remote certifier trust state chain",
+    )
+    add_adapter_trust_remote_store_arguments(
+        adapter_trust_remote_status, coordinator=False
+    )
+    adapter_trust_remote_status.add_argument("--expected-state-version", type=int)
+    adapter_trust_remote_status.add_argument("--expected-policy-sha256")
+    adapter_trust_remote_status.add_argument("--export-policy")
+    adapter_trust_remote_status.add_argument("--report")
+    adapter_trust_remote_status.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust_state,
+        adapter_certifier_trust_state_operation="status",
+    )
+
+    adapter_trust_remote_propose = team_contract_commands.add_parser(
+        "adapter-certifier-trust-remote-propose",
+        help="stage a proposal against an exact remote trust state",
+    )
+    add_adapter_trust_remote_store_arguments(
+        adapter_trust_remote_propose, coordinator=False
+    )
+    adapter_trust_remote_propose.add_argument(
+        "--expected-state-version", type=int, required=True
+    )
+    adapter_trust_remote_propose.add_argument(
+        "--expected-current-policy-sha256", required=True
+    )
+    adapter_trust_remote_propose.add_argument("--candidate-policy", required=True)
+    adapter_trust_remote_propose.add_argument(
+        "--expected-candidate-policy-sha256", required=True
+    )
+    adapter_trust_remote_propose.add_argument("--governance-policy", required=True)
+    adapter_trust_remote_propose.add_argument(
+        "--expected-governance-policy-id", required=True
+    )
+    adapter_trust_remote_propose.add_argument(
+        "--expected-governance-policy-sha256", required=True
+    )
+    adapter_trust_remote_propose.add_argument(
+        "--mode", choices=("standard", "emergency-revocation"),
+        default="standard",
+    )
+    adapter_trust_remote_propose.add_argument("--proposer-id", required=True)
+    adapter_trust_remote_propose.add_argument("--ticket", required=True)
+    adapter_trust_remote_propose.add_argument("--reason", required=True)
+    adapter_trust_remote_propose.add_argument("--issued-at")
+    adapter_trust_remote_propose.add_argument(
+        "--lifetime-seconds", type=int, default=3600
+    )
+    adapter_trust_remote_propose.add_argument("--output", required=True)
+    adapter_trust_remote_propose.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust_state,
+        adapter_certifier_trust_state_operation="propose",
+    )
+
+    adapter_trust_remote_activate = team_contract_commands.add_parser(
+        "adapter-certifier-trust-remote-activate",
+        help="verify approvals and CAS-activate a remote trust successor",
+    )
+    add_adapter_trust_remote_store_arguments(
+        adapter_trust_remote_activate, coordinator=True
+    )
+    adapter_trust_remote_activate.add_argument(
+        "--expected-state-version", type=int, required=True
+    )
+    adapter_trust_remote_activate.add_argument(
+        "--expected-current-policy-sha256", required=True
+    )
+    adapter_trust_remote_activate.add_argument("--candidate-policy", required=True)
+    adapter_trust_remote_activate.add_argument(
+        "--expected-candidate-policy-sha256", required=True
+    )
+    adapter_trust_remote_activate.add_argument("--proposal", required=True)
+    adapter_trust_remote_activate.add_argument(
+        "--expected-proposal-sha256", required=True
+    )
+    adapter_trust_remote_activate.add_argument(
+        "--approval", action="append", required=True
+    )
+    adapter_trust_remote_activate.add_argument("--governance-policy", required=True)
+    adapter_trust_remote_activate.add_argument(
+        "--expected-governance-policy-id", required=True
+    )
+    adapter_trust_remote_activate.add_argument(
+        "--expected-governance-policy-sha256", required=True
+    )
+    adapter_trust_remote_activate.add_argument(
+        "--trusted-keys-directory", required=True
+    )
+    adapter_trust_remote_activate.add_argument("--activator-id", required=True)
+    adapter_trust_remote_activate.add_argument("--verification-time")
+    adapter_trust_remote_activate.add_argument("--operation-id", required=True)
+    adapter_trust_remote_activate.add_argument("--report")
+    adapter_trust_remote_activate.add_argument("--status-report")
+    adapter_trust_remote_activate.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust_state,
+        adapter_certifier_trust_state_operation="activate",
+    )
+
+    def add_adapter_trust_migration_arguments(
+            command: argparse.ArgumentParser, *, coordinator: bool) -> None:
+        command.add_argument("--source-state-backend-config", required=True)
+        command.add_argument(
+            "--expected-source-state-backend-config-sha256", required=True
+        )
+        command.add_argument("--source-artifact-store-config", required=True)
+        command.add_argument(
+            "--expected-source-artifact-store-config-sha256", required=True
+        )
+        command.add_argument("--expected-state-backend-id", required=True)
+        command.add_argument("--expected-artifact-store-id", required=True)
+        command.add_argument(
+            "--target-adapter-config-resolver-config", required=True
+        )
+        command.add_argument(
+            "--expected-target-adapter-config-resolver-config-sha256",
+            required=True,
+        )
+        command.add_argument(
+            "--expected-target-adapter-config-resolver-id", required=True
+        )
+        command.add_argument("--target-state-backend-config-ref", required=True)
+        command.add_argument(
+            "--expected-target-state-backend-config-ref-sha256", required=True
+        )
+        command.add_argument(
+            "--target-artifact-store-config-ref", required=True
+        )
+        command.add_argument(
+            "--expected-target-artifact-store-config-ref-sha256", required=True
+        )
+        command.add_argument("--control-id", required=True)
+        command.add_argument("--trust-policy-id", required=True)
+        command.add_argument("--expected-state-version", type=int, required=True)
+        command.add_argument(
+            "--expected-current-policy-sha256", required=True
+        )
+        if coordinator:
+            command.add_argument("--coordinator-id", required=True)
+
+    adapter_trust_migration_preflight = team_contract_commands.add_parser(
+        "adapter-certifier-trust-remote-migration-preflight",
+        help="preflight an atomic trust pointer v1 to v2 migration",
+    )
+    add_adapter_trust_migration_arguments(
+        adapter_trust_migration_preflight, coordinator=False
+    )
+    adapter_trust_migration_preflight.add_argument("--verification-time")
+    adapter_trust_migration_preflight.add_argument("--report")
+    adapter_trust_migration_preflight.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust_state,
+        adapter_certifier_trust_state_operation="migration_preflight",
+    )
+
+    adapter_trust_migration_propose = team_contract_commands.add_parser(
+        "adapter-certifier-trust-remote-migration-propose",
+        help="stage an exact governed trust pointer migration proposal",
+    )
+    add_adapter_trust_migration_arguments(
+        adapter_trust_migration_propose, coordinator=False
+    )
+    adapter_trust_migration_propose.add_argument(
+        "--governance-policy", required=True
+    )
+    adapter_trust_migration_propose.add_argument(
+        "--expected-governance-policy-id", required=True
+    )
+    adapter_trust_migration_propose.add_argument(
+        "--expected-governance-policy-sha256", required=True
+    )
+    adapter_trust_migration_propose.add_argument("--proposer-id", required=True)
+    adapter_trust_migration_propose.add_argument("--ticket", required=True)
+    adapter_trust_migration_propose.add_argument("--reason", required=True)
+    adapter_trust_migration_propose.add_argument("--issued-at")
+    adapter_trust_migration_propose.add_argument("--verification-time")
+    adapter_trust_migration_propose.add_argument(
+        "--lifetime-seconds", type=int, default=3600
+    )
+    adapter_trust_migration_propose.add_argument("--output", required=True)
+    adapter_trust_migration_propose.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust_state,
+        adapter_certifier_trust_state_operation="migration_propose",
+    )
+
+    adapter_trust_migration_approve = team_contract_commands.add_parser(
+        "adapter-certifier-trust-remote-migration-approve",
+        help="sign an exact trust pointer migration proposal",
+    )
+    adapter_trust_migration_approve.add_argument("--proposal", required=True)
+    adapter_trust_migration_approve.add_argument(
+        "--expected-proposal-sha256", required=True
+    )
+    adapter_trust_migration_approve.add_argument("--approver-id", required=True)
+    adapter_trust_migration_approve.add_argument("--key-id", required=True)
+    adapter_trust_migration_approve.add_argument("--private-key-environment")
+    adapter_trust_migration_approve.add_argument("--signer-config")
+    adapter_trust_migration_approve.add_argument(
+        "--expected-signer-config-sha256"
+    )
+    adapter_trust_migration_approve.add_argument(
+        "--signer-admission-config"
+    )
+    adapter_trust_migration_approve.add_argument(
+        "--expected-signer-admission-config-sha256"
+    )
+    adapter_trust_migration_approve.add_argument("--verification-time")
+    adapter_trust_migration_approve.add_argument("--output", required=True)
+    adapter_trust_migration_approve.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust_state,
+        adapter_certifier_trust_state_operation="migration_approve",
+    )
+
+    adapter_trust_migration_activate = team_contract_commands.add_parser(
+        "adapter-certifier-trust-remote-migration-activate",
+        help="verify quorum and CAS-migrate a trust pointer to v2",
+    )
+    add_adapter_trust_migration_arguments(
+        adapter_trust_migration_activate, coordinator=True
+    )
+    adapter_trust_migration_activate.add_argument("--proposal", required=True)
+    adapter_trust_migration_activate.add_argument(
+        "--expected-proposal-sha256", required=True
+    )
+    adapter_trust_migration_activate.add_argument(
+        "--approval", action="append", required=True
+    )
+    adapter_trust_migration_activate.add_argument(
+        "--governance-policy", required=True
+    )
+    adapter_trust_migration_activate.add_argument(
+        "--expected-governance-policy-id", required=True
+    )
+    adapter_trust_migration_activate.add_argument(
+        "--expected-governance-policy-sha256", required=True
+    )
+    adapter_trust_migration_activate.add_argument(
+        "--trusted-keys-directory", required=True
+    )
+    adapter_trust_migration_activate.add_argument("--activator-id", required=True)
+    adapter_trust_migration_activate.add_argument("--operation-id", required=True)
+    adapter_trust_migration_activate.add_argument("--verification-time")
+    adapter_trust_migration_activate.add_argument(
+        "--signer-readmission-bundle"
+    )
+    adapter_trust_migration_activate.add_argument(
+        "--expected-signer-readmission-bundle-sha256"
+    )
+    adapter_trust_migration_activate.add_argument(
+        "--signer-readmission-report"
+    )
+    adapter_trust_migration_activate.add_argument("--report")
+    adapter_trust_migration_activate.add_argument("--status-report")
+    adapter_trust_migration_activate.set_defaults(
+        handler=manage_team_contract_adapter_certifier_trust_state,
+        adapter_certifier_trust_state_operation="migration_activate",
+    )
 
     backend_config_resolve = team_contract_commands.add_parser(
         "backend-config-resolve",

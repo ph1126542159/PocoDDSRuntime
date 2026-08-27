@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-governance-approval-evidence.schema.json",
+  "title": "Verified governance approval quorum evidence",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "subjectId", "subjectType", "subjectSha256", "payloadProduct", "payloadSha256", "role", "policyId", "policySha256", "initiatorId", "executorId", "minimumApprovals", "approvals", "verifiedAt"],
+  "properties": {
+    "schemaVersion": {"enum": [1, 2]}, "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalEvidence"}, "passed": {"const": true}, "subjectId": {"$ref": "#/$defs/id"}, "subjectType": {"$ref": "#/$defs/id"}, "subjectSha256": {"$ref": "#/$defs/sha256"}, "payloadProduct": {"$ref": "#/$defs/id"}, "payloadSha256": {"$ref": "#/$defs/sha256"}, "role": {"$ref": "#/$defs/id"}, "policyId": {"$ref": "#/$defs/id"}, "policySha256": {"$ref": "#/$defs/sha256"}, "initiatorId": {"$ref": "#/$defs/id"}, "executorId": {"$ref": "#/$defs/id"}, "minimumApprovals": {"type": "integer", "minimum": 1, "maximum": 64},
+    "approvals": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"type": "object", "additionalProperties": false, "required": ["approverId", "keyId", "approvalSha256"], "properties": {"approverId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "approvalSha256": {"$ref": "#/$defs/sha256"}}}}, "verifiedAt": {"type": "string", "format": "date-time"}, "signerReadmissionEvidenceSha256": {"$ref": "#/$defs/sha256"}
+  },
+  "allOf": [{"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"required": ["signerReadmissionEvidenceSha256"]}, "else": {"not": {"required": ["signerReadmissionEvidenceSha256"]}}}],
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

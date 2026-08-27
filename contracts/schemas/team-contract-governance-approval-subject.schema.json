@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-governance-approval-subject.schema.json",
+  "title": "Payload-bound governance approval subject",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "subjectId", "subjectType", "role", "payloadProduct", "payloadSha256", "policyId", "policySha256", "initiatorId", "reason", "issuedAt", "expiresAt"],
+  "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSubject"}, "subjectId": {"$ref": "#/$defs/id"}, "subjectType": {"$ref": "#/$defs/id"}, "role": {"$ref": "#/$defs/id"}, "payloadProduct": {"$ref": "#/$defs/id"}, "payloadSha256": {"$ref": "#/$defs/sha256"}, "policyId": {"$ref": "#/$defs/id"}, "policySha256": {"$ref": "#/$defs/sha256"}, "initiatorId": {"$ref": "#/$defs/id"}, "reason": {"type": "string", "minLength": 1, "maxLength": 512}, "issuedAt": {"type": "string", "format": "date-time"}, "expiresAt": {"type": "string", "format": "date-time"}},
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

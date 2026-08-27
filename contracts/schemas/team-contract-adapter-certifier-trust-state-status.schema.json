@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-certifier-trust-state-status.schema.json",
+  "title": "Adapter certifier trust remote state status",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "controlId", "trustPolicyId", "stateVersion", "fencingToken", "policyGeneration", "policySha256", "operationId", "coordinatorId", "actor", "mode", "activationProposalId", "pointerSchemaVersion", "adapterConfigResolverId", "stateBackendConfigRef", "artifactStoreConfigRef", "adapterConfigResolverCapabilityManifestSha256", "updatedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCertifierTrustStateStatus"}, "passed": {"const": true},
+    "controlId": {"$ref": "#/$defs/id"}, "trustPolicyId": {"$ref": "#/$defs/id"}, "stateVersion": {"type": "integer", "minimum": 1, "maximum": 100000}, "fencingToken": {"type": "integer", "minimum": 1, "maximum": 100000}, "policyGeneration": {"type": "integer", "minimum": 1}, "policySha256": {"$ref": "#/$defs/sha256"}, "operationId": {"$ref": "#/$defs/id"}, "coordinatorId": {"$ref": "#/$defs/id"}, "actor": {"$ref": "#/$defs/id"}, "mode": {"enum": ["initialize", "standard", "emergency-revocation", "portable-config-migration"]}, "activationProposalId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+    "pointerSchemaVersion": {"enum": [1, 2]}, "adapterConfigResolverId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}, "stateBackendConfigRef": {"oneOf": [{"$ref": "#/$defs/adapterConfigRef"}, {"type": "null"}]}, "artifactStoreConfigRef": {"oneOf": [{"$ref": "#/$defs/adapterConfigRef"}, {"type": "null"}]}, "adapterConfigResolverCapabilityManifestSha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "updatedAt": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {"if": {"properties": {"pointerSchemaVersion": {"const": 1}}}, "then": {"properties": {"adapterConfigResolverId": {"type": "null"}, "stateBackendConfigRef": {"type": "null"}, "artifactStoreConfigRef": {"type": "null"}, "adapterConfigResolverCapabilityManifestSha256": {"type": "null"}}}},
+    {"if": {"properties": {"pointerSchemaVersion": {"const": 2}}}, "then": {"properties": {"adapterConfigResolverId": {"$ref": "#/$defs/id"}, "stateBackendConfigRef": {"allOf": [{"$ref": "#/$defs/adapterConfigRef"}, {"properties": {"adapterKind": {"const": "registry-leader-backend"}}}]}, "artifactStoreConfigRef": {"allOf": [{"$ref": "#/$defs/adapterConfigRef"}, {"properties": {"adapterKind": {"const": "artifact-store"}}}]}, "adapterConfigResolverCapabilityManifestSha256": {"$ref": "#/$defs/sha256"}}}}
+  ],
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "adapterConfigRef": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "adapterKind", "adapterId", "revision"], "properties": {"kind": {"const": "adapter-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "adapterKind": {"enum": ["artifact-store", "registry-leader-backend"]}, "adapterId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}}}
+}

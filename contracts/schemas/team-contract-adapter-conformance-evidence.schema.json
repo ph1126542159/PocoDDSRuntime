@@ -12,7 +12,7 @@
     "certificationLevel": {"const": "integration-readiness"},
     "checkSetVersion": {"const": "1.0.0"},
     "conformanceId": {"$ref": "#/$defs/sha256"},
-    "adapterKind": {"enum": ["adapter-config-resolver", "artifact-store", "control-authorizer", "fleet-executor", "registry-leader-backend", "wave-gate"]},
+    "adapterKind": {"enum": ["adapter-config-resolver", "artifact-store", "control-authorizer", "fleet-executor", "governance-approval-signer", "registry-leader-backend", "wave-gate"]},
     "adapterId": {"$ref": "#/$defs/id"},
     "configSchemaVersion": {"type": "integer", "minimum": 1},
     "configSha256": {"$ref": "#/$defs/sha256"},
@@ -57,6 +57,7 @@
   "allOf": [
     {"if": {"properties": {"adapterKind": {"const": "registry-leader-backend"}}}, "then": {"properties": {"scope": {"properties": {"primaryId": {"$ref": "#/$defs/id"}, "secondaryId": {"$ref": "#/$defs/id"}}}}}},
     {"if": {"properties": {"adapterKind": {"const": "artifact-store"}}}, "then": {"properties": {"scope": {"properties": {"primaryId": {"$ref": "#/$defs/id"}, "secondaryId": {"type": "null"}}}}}},
+    {"if": {"properties": {"adapterKind": {"const": "governance-approval-signer"}}}, "then": {"properties": {"scope": {"properties": {"primaryId": {"$ref": "#/$defs/id"}, "secondaryId": {"type": "null"}}}}}},
     {"if": {"properties": {"adapterKind": {"enum": ["adapter-config-resolver", "control-authorizer", "fleet-executor", "wave-gate"]}}}, "then": {"properties": {"scope": {"properties": {"primaryId": {"type": "null"}, "secondaryId": {"type": "null"}}}}}}
   ],
   "$defs": {

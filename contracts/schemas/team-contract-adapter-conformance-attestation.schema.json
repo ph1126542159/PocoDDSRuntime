@@ -5,11 +5,13 @@
   "type": "object", "additionalProperties": false,
   "required": ["schemaVersion", "product", "operation", "certifierId", "keyId", "evidenceSha256", "conformanceId", "adapterKind", "adapterId", "configSha256", "scope", "issuedAt", "expiresAt", "signature"],
   "properties": {
-    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterConformanceAttestation"}, "operation": {"const": "adapter-conformance-attest"},
+    "schemaVersion": {"enum": [1, 2]}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterConformanceAttestation"}, "operation": {"const": "adapter-conformance-attest"},
     "certifierId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "evidenceSha256": {"$ref": "#/$defs/sha256"}, "conformanceId": {"$ref": "#/$defs/sha256"},
-    "adapterKind": {"enum": ["adapter-config-resolver", "artifact-store", "control-authorizer", "fleet-executor", "registry-leader-backend", "wave-gate"]}, "adapterId": {"$ref": "#/$defs/id"}, "configSha256": {"$ref": "#/$defs/sha256"},
+    "adapterKind": {"enum": ["adapter-config-resolver", "artifact-store", "control-authorizer", "fleet-executor", "governance-approval-signer", "registry-leader-backend", "wave-gate"]}, "adapterId": {"$ref": "#/$defs/id"}, "configSha256": {"$ref": "#/$defs/sha256"},
     "scope": {"type": "object", "additionalProperties": false, "required": ["primaryId", "secondaryId"], "properties": {"primaryId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}, "secondaryId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}}},
-    "issuedAt": {"type": "string", "format": "date-time"}, "expiresAt": {"type": "string", "format": "date-time"}, "signature": {"type": "string", "minLength": 88, "maxLength": 88}
+    "issuedAt": {"type": "string", "format": "date-time"}, "expiresAt": {"type": "string", "format": "date-time"}, "signature": {"type": "string", "minLength": 88, "maxLength": 88},
+    "signer": {"type": "object", "additionalProperties": false, "required": ["signerId", "signerConfigSha256", "signerCapabilityManifestSha256"], "properties": {"signerId": {"$ref": "#/$defs/id"}, "signerConfigSha256": {"$ref": "#/$defs/sha256"}, "signerCapabilityManifestSha256": {"$ref": "#/$defs/sha256"}}}
   },
+  "allOf": [{"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"required": ["signer"]}, "else": {"not": {"required": ["signer"]}}}],
   "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
 }

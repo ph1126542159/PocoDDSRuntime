@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-certifier-trust-activation.schema.json",
+  "title": "Adapter certifier trust-policy activation evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "proposalId", "mode", "trustPolicyId", "previousGeneration", "previousPolicySha256", "generation", "policySha256", "governancePolicyId", "governancePolicySha256", "proposerId", "activatorId", "approvals", "emergencyRevokedKeyIds", "activatedAt"],
+  "properties": {
+    "schemaVersion": {"enum": [1, 2]}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCertifierTrustControlActivationReport"}, "passed": {"const": true}, "proposalId": {"$ref": "#/$defs/id"}, "mode": {"enum": ["standard", "emergency-revocation"]}, "trustPolicyId": {"$ref": "#/$defs/id"},
+    "previousGeneration": {"type": "integer", "minimum": 1}, "previousPolicySha256": {"$ref": "#/$defs/sha256"}, "generation": {"type": "integer", "minimum": 2}, "policySha256": {"$ref": "#/$defs/sha256"},
+    "governancePolicyId": {"$ref": "#/$defs/id"}, "governancePolicySha256": {"$ref": "#/$defs/sha256"}, "proposerId": {"$ref": "#/$defs/id"}, "activatorId": {"$ref": "#/$defs/id"},
+    "approvals": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"type": "object", "additionalProperties": false, "required": ["approverId", "keyId", "approvalSha256"], "properties": {"approverId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "approvalSha256": {"$ref": "#/$defs/sha256"}}}},
+    "emergencyRevokedKeyIds": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}, "activatedAt": {"type": "string", "format": "date-time"}, "signerReadmissionEvidenceSha256": {"$ref": "#/$defs/sha256"}
+  },
+  "allOf": [{"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"required": ["signerReadmissionEvidenceSha256"]}, "else": {"not": {"required": ["signerReadmissionEvidenceSha256"]}}}],
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

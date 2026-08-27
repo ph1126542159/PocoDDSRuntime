@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-certifier-trust-migration-preflight.schema.json",
+  "title": "Adapter certifier trust pointer v1 to v2 migration preflight",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "controlId", "trustPolicyId", "sourcePointerSchemaVersion", "targetPointerSchemaVersion", "sourceStateVersion", "targetStateVersion", "sourcePointerSha256", "sourceStateSha256", "policyGeneration", "policySha256", "stateBackendId", "artifactStoreId", "sourceStateBackendConfigSha256", "sourceArtifactStoreConfigSha256", "targetAdapterConfigResolverId", "targetStateBackendConfigRef", "targetArtifactStoreConfigRef", "targetAdapterConfigResolverCapabilityManifestSha256", "checkedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCertifierTrustStateMigrationPreflight"}, "passed": {"const": true},
+    "controlId": {"$ref": "#/$defs/id"}, "trustPolicyId": {"$ref": "#/$defs/id"}, "sourcePointerSchemaVersion": {"const": 1}, "targetPointerSchemaVersion": {"const": 2},
+    "sourceStateVersion": {"type": "integer", "minimum": 1, "maximum": 99999}, "targetStateVersion": {"type": "integer", "minimum": 2, "maximum": 100000}, "sourcePointerSha256": {"$ref": "#/$defs/sha256"}, "sourceStateSha256": {"$ref": "#/$defs/sha256"}, "policyGeneration": {"type": "integer", "minimum": 1}, "policySha256": {"$ref": "#/$defs/sha256"},
+    "stateBackendId": {"$ref": "#/$defs/id"}, "artifactStoreId": {"$ref": "#/$defs/id"}, "sourceStateBackendConfigSha256": {"$ref": "#/$defs/sha256"}, "sourceArtifactStoreConfigSha256": {"$ref": "#/$defs/sha256"}, "targetAdapterConfigResolverId": {"$ref": "#/$defs/id"},
+    "targetStateBackendConfigRef": {"allOf": [{"$ref": "#/$defs/adapterConfigRef"}, {"properties": {"adapterKind": {"const": "registry-leader-backend"}}}]}, "targetArtifactStoreConfigRef": {"allOf": [{"$ref": "#/$defs/adapterConfigRef"}, {"properties": {"adapterKind": {"const": "artifact-store"}}}]}, "targetAdapterConfigResolverCapabilityManifestSha256": {"$ref": "#/$defs/sha256"}, "checkedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "adapterConfigRef": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "adapterKind", "adapterId", "revision"], "properties": {"kind": {"const": "adapter-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "adapterKind": {"enum": ["artifact-store", "registry-leader-backend"]}, "adapterId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}}}
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-certifier-signer-request.schema.json",
+  "title": "Adapter certifier signer request", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "signerId", "certifierId", "operation", "purpose", "keyId", "algorithm", "payloadBase64", "payloadSha256"],
+  "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCertifierSignerRequest"}, "requestId": {"$ref": "#/$defs/id"}, "signerId": {"$ref": "#/$defs/id"}, "certifierId": {"$ref": "#/$defs/id"}, "operation": {"const": "sign"}, "purpose": {"const": "adapter-conformance-attestation"}, "keyId": {"$ref": "#/$defs/id"}, "algorithm": {"const": "Ed25519"}, "payloadBase64": {"type": "string", "minLength": 1, "maxLength": 87384}, "payloadSha256": {"$ref": "#/$defs/sha256"}},
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

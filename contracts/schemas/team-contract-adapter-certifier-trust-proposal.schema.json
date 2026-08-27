@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-certifier-trust-proposal.schema.json",
+  "title": "Staged Adapter certifier trust-policy proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "operation", "proposalId", "mode", "trustPolicyId", "currentGeneration", "currentPolicySha256", "candidateGeneration", "candidatePolicySha256", "governancePolicyId", "governancePolicySha256", "proposerId", "ticket", "reason", "issuedAt", "expiresAt"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCertifierTrustControlProposal"}, "operation": {"const": "adapter-certifier-trust-propose"},
+    "proposalId": {"$ref": "#/$defs/id"}, "mode": {"enum": ["standard", "emergency-revocation"]}, "trustPolicyId": {"$ref": "#/$defs/id"},
+    "currentGeneration": {"type": "integer", "minimum": 1, "maximum": 2147483646}, "currentPolicySha256": {"$ref": "#/$defs/sha256"},
+    "candidateGeneration": {"type": "integer", "minimum": 2, "maximum": 2147483647}, "candidatePolicySha256": {"$ref": "#/$defs/sha256"},
+    "governancePolicyId": {"$ref": "#/$defs/id"}, "governancePolicySha256": {"$ref": "#/$defs/sha256"}, "proposerId": {"$ref": "#/$defs/id"}, "ticket": {"$ref": "#/$defs/id"},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 512}, "issuedAt": {"type": "string", "format": "date-time"}, "expiresAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

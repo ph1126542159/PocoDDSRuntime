@@ -47,9 +47,20 @@
   Authorizer、Registry Leader Backend 和 Artifact Store 不再把主机本地配置路径或配置摘要写入 Plan、远程 journal
   与 Pointer。不同 Host 可用各自固定的 Resolver/Mapping 解析同一逻辑引用，解析后仍由所属 Adapter 契约复核身份、
   revision、scope、制品 pin 和配置内容；PDR-REC-0045 覆盖 Host 差异、漂移与跨协调恢复。
-- 新增统一 Adapter Conformance Kit，使用各 Adapter 的权威解析器和能力协商实现认证六类 Fleet Adapter 边界，
+- 统一 Adapter Conformance Kit 现在认证七类公共边界：六类 Fleet Adapter 加 Governance Approval Signer。
+  Signer evidence 固定 signer ID、approver scope、config/capability SHA；独立 Certifier 可复用现有 Ed25519
+  attestation 与 Trust Policy 对精确 signer kind/ID 签名、限权、到期和吊销。Fleet v6 的六类强制准入集合保持不变。
+  Kit 使用各 Adapter 的权威解析器和能力协商，
   生成稳定 conformance ID、自摘要且脱敏的 integration-readiness 证据。安装 SDK 和公共 `pdr` CLI 均提供同一入口；
-  PDR-REC-0046 覆盖配置漂移、能力重放、scope 误用、环境逃逸、本地路径泄露与证据篡改。
+  PDR-REC-0046 覆盖公共 Kit；PDR-REC-0056 覆盖 Signer 实测、证据交付、独立认证、scope、到期与吊销。
+- 三类 Governance Approval 外部签名命令现在可选用 SHA 固定的 Signer Admission 配置。每次创建审批前都会重新
+  验证当前 signer/config/capability 与未过期 conformance evidence、独立 certifier attestation 和最低 generation
+  trust policy；通过后生成无路径 schema v3 envelope，并把 conformance/certifier/policy provenance 纳入域分离签名。
+  未启用准入的外部 v2 与显式本地 PEM v1 保持兼容。PDR-REC-0057 覆盖固定、时效、吊销、篡改与三类命令。
+- Schema v3 现在同时是强制“执行时重新准入”契约。三个 verify/activate 命令必须提供 SHA 固定的本地
+  Readmission Bundle 和 evidence 输出；Bundle 按 approval SHA 精确映射 Admission Config。执行方会用当前
+  Trust Policy 重新检查 evidence 年龄、attestation、Certifier scope/有效期/撤销，并允许仍获授权的 policy
+  generation 前进。无路径 Readmission Evidence 的 SHA 会写入 schema v2 业务报告。PDR-REC-0058 覆盖三条链路。
 - Fleet Plan v6 将认证证据升级为执行前强制准入：Plan 固定认证等级、check-set、最大证据年龄和六类必需
   Adapter；每个 Host 使用 SHA 固定的本地 admission bundle，运行时再绑定实际配置、scope 与能力摘要。
   远程 journal 只保存 admission ID 和六项摘要，不保存本地路径；安装 SDK 已验证 Host A 暂停后 Host B
@@ -58,6 +69,38 @@
   Adapter kind/ID、密钥有效期、最大证明寿命和最低 generation，并支持显式吊销及密钥轮换；远程 journal
   仅保存 policy/attestation/certifier/key 摘要身份。安装 SDK 验证 Host A 暂停后 Host B 使用独立签名 bundle
   恢复；PDR-REC-0048 覆盖过期、越权、吊销、轮换和策略 generation。
+- Adapter Certifier Signer 新增固定配置与能力协商的外部进程协议，使 KMS/HSM/企业签名客户端不进入 Fleet
+  核心。Signer 可按 key ID 路由，接收 SHA 绑定的规范 payload，私钥不返回主进程；主机用固定公钥再次验证
+  Ed25519 签名。attestation v2 与 journal 记录脱敏 signer/config/capability 摘要；本地私钥模式继续兼容。
+  PDR-REC-0049 覆盖配置/制品漂移、错误 key、拒绝和损坏签名。
+- Adapter Certifier Trust Control 为 trust policy 变更新增 proposal、Ed25519 approval 与 activation 三阶段协议。
+  普通变更至少需要两名不同审批人，并要求发起人、审批人、激活人职责分离；短期紧急模式只能新增 key
+  吊销，不能增加 certifier、扩大 Adapter scope、改写旧吊销或放宽证明寿命。PDR-REC-0050 覆盖单人替换、
+  重复审批、过期/陈旧 proposal、职责混用和紧急扩权。
+- Adapter Certifier Trust Remote State 将活动策略、激活证据和状态记录保存为内容寻址的不可变 Artifact，
+  并用 Registry Backend 的线性 CAS 指针、fencing token 和前驱 SHA 建立跨 Host 状态链。Host B/C 可在
+  协调器丢失后接管；陈旧 Host 写入被拒绝，CAS 成功响应丢失时按精确提交身份读回消歧。公共 CLI 提供
+  remote initialize/propose/activate/status；PDR-REC-0051 覆盖双人审批后的远程激活、接管、并发冲突、
+  提交歧义和 Artifact 篡改。
+- Adapter Certifier Trust State pointer v2 改用 Adapter Config Resolver 的强类型逻辑引用。Host A/B/C 可使用
+  不同 Resolver 配置 SHA、不同 Backend/Artifact 配置路径和本机凭据 Provider，同时远程 pointer 不保存路径或
+  Host 配置 SHA。Resolver 绑定 control ID、trust policy ID、Adapter kind/ID 和 revision；错误 revision/scope、
+  引用漂移或解析身份不一致均失败关闭。pointer v1 继续兼容；PDR-REC-0052 覆盖三 Host 路径差异。
+- Adapter Certifier Trust State 新增受治理的 pointer v1→v2 在线迁移。迁移 preflight 要求 direct 与 portable
+  Adapter 对完整 v1 历史形成逐字节一致视图；proposal 固定源 pointer/state/policy、direct config pin 和目标
+  Resolver 引用，两名不同 Ed25519 审批人与独立 activator 才能提交单次 CAS。迁移保持 policy generation/SHA
+  不变，丢失成功响应按精确 pointer 回读，重复操作幂等；无签名迁移证据的混合历史、降级和旧 Host 写入均
+  失败关闭。PDR-REC-0053 覆盖 Host B 迁移、Host C 接管、迁移后继续激活与证据篡改。
+- 新增公共 Governance Approval 协议与验证引擎。通用 subject 固定 payload product/SHA、role、initiator、
+  policy ID/SHA 和有效期；独立 signature 使用 Ed25519，verify 统一检查角色准入、不同人/不同 key 法定人数、
+  撤销时间、公钥 pin 及 initiator/approver/executor 职责分离，并输出无本地路径的 evidence。Adapter Trust
+  Policy 与 pointer Migration 保留既有 approval JSON 格式但已复用同一引擎；PDR-REC-0054 覆盖通用流程和
+  两种兼容信封。
+- Governance Approval 新增目的绑定的外部 Signer SPI。通用审批、Adapter Certifier Trust Policy 审批和
+  pointer Migration 审批可使用配置/制品/公钥固定的 KMS、HSM、Vault 或企业签名进程；能力协商精确绑定
+  signer、approver、key set 与允许 purpose；域分离签名载荷同时绑定 approval product、subject SHA 和
+  signer/config/capability 摘要，主机对返回的 Ed25519 签名再次本地验证。外部模式输出无路径
+  v2 approval envelope，本地 PEM 模式继续兼容 v1；PDR-REC-0055 覆盖三类信封及失败关闭。
 
 - 跨仓库团队契约交付新增确定性、内容寻址的 `.pdrcontracts` 包和无路径锁文件：Service、配置
   Participant、配置键生命周期及其已发布基线可按包 ID/版本/Owner/SHA 协作；安装 SDK 提供离线

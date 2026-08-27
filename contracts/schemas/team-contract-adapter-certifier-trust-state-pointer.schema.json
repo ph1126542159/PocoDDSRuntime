@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-certifier-trust-state-pointer.schema.json",
+  "title": "CAS-fenced Adapter certifier trust remote state pointer",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "controlId", "trustPolicyId", "stateBackendId", "artifactStoreId", "stateVersion", "fencingToken", "previousPointerSha256", "stateRef", "stateSha256", "operationId", "coordinatorId", "updatedAt"],
+  "properties": {
+    "schemaVersion": {"enum": [1, 2]}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCertifierTrustStatePointer"},
+    "controlId": {"$ref": "#/$defs/id"}, "trustPolicyId": {"$ref": "#/$defs/id"}, "stateBackendId": {"$ref": "#/$defs/id"}, "artifactStoreId": {"$ref": "#/$defs/id"},
+    "stateBackendConfigSha256": {"$ref": "#/$defs/sha256"}, "artifactStoreConfigSha256": {"$ref": "#/$defs/sha256"},
+    "adapterConfigResolverId": {"$ref": "#/$defs/id"}, "stateBackendConfigRef": {"$ref": "#/$defs/adapterConfigRef"}, "artifactStoreConfigRef": {"$ref": "#/$defs/adapterConfigRef"},
+    "stateVersion": {"type": "integer", "minimum": 1, "maximum": 100000}, "fencingToken": {"type": "integer", "minimum": 1, "maximum": 100000},
+    "previousPointerSha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "stateRef": {"$ref": "#/$defs/stateRef"}, "stateSha256": {"$ref": "#/$defs/sha256"},
+    "operationId": {"$ref": "#/$defs/id"}, "coordinatorId": {"$ref": "#/$defs/id"}, "updatedAt": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"required": ["stateBackendConfigSha256", "artifactStoreConfigSha256"], "not": {"anyOf": [{"required": ["adapterConfigResolverId"]}, {"required": ["stateBackendConfigRef"]}, {"required": ["artifactStoreConfigRef"]}]}}},
+    {"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"required": ["adapterConfigResolverId", "stateBackendConfigRef", "artifactStoreConfigRef"], "not": {"anyOf": [{"required": ["stateBackendConfigSha256"]}, {"required": ["artifactStoreConfigSha256"]}]}, "properties": {"stateBackendConfigRef": {"properties": {"adapterKind": {"const": "registry-leader-backend"}}}, "artifactStoreConfigRef": {"properties": {"adapterKind": {"const": "artifact-store"}}}}}},
+    {"if": {"properties": {"stateVersion": {"const": 1}}}, "then": {"properties": {"previousPointerSha256": {"type": "null"}}}},
+    {"if": {"properties": {"stateVersion": {"minimum": 2}}}, "then": {"properties": {"previousPointerSha256": {"$ref": "#/$defs/sha256"}}}}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "stateRef": {"type": "object", "additionalProperties": false, "required": ["kind", "storeId", "namespaceId", "sha256", "sizeBytes", "mediaType"], "properties": {"kind": {"const": "content-addressed"}, "storeId": {"$ref": "#/$defs/id"}, "namespaceId": {"$ref": "#/$defs/id"}, "sha256": {"$ref": "#/$defs/sha256"}, "sizeBytes": {"type": "integer", "minimum": 1}, "mediaType": {"const": "application/vnd.pocodds.adapter-certifier-trust-state+json"}}},
+    "adapterConfigRef": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "adapterKind", "adapterId", "revision"], "properties": {"kind": {"const": "adapter-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "adapterKind": {"enum": ["artifact-store", "registry-leader-backend"]}, "adapterId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}}
+  }
+}

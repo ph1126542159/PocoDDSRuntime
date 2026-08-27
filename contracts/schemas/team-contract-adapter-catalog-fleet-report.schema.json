@@ -127,6 +127,9 @@
         "adapterConformanceTrustPolicyId": {"$ref": "#/$defs/id"},
         "adapterConformanceTrustPolicyGeneration": {"type": "integer", "minimum": 1},
         "adapterConformanceTrustPolicySha256": {"$ref": "#/$defs/sha256"},
+        "adapterConformanceSignerIds": {"type": "array", "minItems": 1, "maxItems": 6, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "adapterConformanceSignerConfigSha256s": {"type": "array", "minItems": 1, "maxItems": 6, "uniqueItems": true, "items": {"$ref": "#/$defs/sha256"}},
+        "adapterConformanceSignerCapabilityManifestSha256s": {"type": "array", "minItems": 1, "maxItems": 6, "uniqueItems": true, "items": {"$ref": "#/$defs/sha256"}},
         "stateVersion": {
             "type": "integer",
             "minimum": 1

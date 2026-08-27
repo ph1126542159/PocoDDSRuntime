@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-governance-approval-signer-response.schema.json",
+  "title": "Governance Approval Signer response", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "signerId", "approverId", "operation", "purpose", "keyId", "algorithm", "passed", "signatureBase64", "errorCode"],
+  "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractGovernanceApprovalSignerResponse"}, "requestId": {"$ref": "#/$defs/id"}, "signerId": {"$ref": "#/$defs/id"}, "approverId": {"$ref": "#/$defs/id"}, "operation": {"const": "sign"}, "purpose": {"enum": ["governance-approval", "adapter-certifier-trust-approval", "adapter-certifier-trust-migration-approval"]}, "keyId": {"$ref": "#/$defs/id"}, "algorithm": {"const": "Ed25519"}, "passed": {"type": "boolean"}, "signatureBase64": {"oneOf": [{"type": "string", "minLength": 88, "maxLength": 88}, {"type": "null"}]}, "errorCode": {"oneOf": [{"enum": ["key-unavailable", "policy-denied", "signing-failed"]}, {"type": "null"}]}},
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}}
+}
