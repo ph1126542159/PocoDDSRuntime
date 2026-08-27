@@ -2,7 +2,7 @@
     "cmake.useCMakePresets": "always",
     "cmake.configureOnOpen": true,
     "cmake.configureArgs": [],
-    "cmake.configurePreset": "full",
-    "cmake.buildPreset": "full",
+    "cmake.configurePreset": "vscode",
+    "cmake.buildPreset": "vscode",
     "git.ignoreLimitWarning": true
 }

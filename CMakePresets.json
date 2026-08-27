@@ -112,6 +112,13 @@
       }
     },
     {
+      "name": "vscode",
+      "inherits": "default",
+      "displayName": "VS Code build",
+      "description": "Default desktop profile in an isolated tree so the IDE can build while the runtime is running",
+      "binaryDir": "${sourceDir}/build/profiles/vscode"
+    },
+    {
       "name": "release",
       "inherits": "server",
       "displayName": "Governed release",
@@ -152,6 +159,12 @@
     {
       "name": "default",
       "configurePreset": "default",
+      "configuration": "Release",
+      "jobs": 2
+    },
+    {
+      "name": "vscode",
+      "configurePreset": "vscode",
       "configuration": "Release",
       "jobs": 2
     },
