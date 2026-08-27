@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-conformance-admission-bundle.schema.json",
+  "title": "Host-local pinned Adapter conformance admission bundle",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "bundleId", "rolloutId", "catalogId", "entries"],
+  "properties": {
+    "schemaVersion": {"enum": [1, 2]}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterConformanceAdmissionBundle"}, "bundleId": {"$ref": "#/$defs/id"}, "rolloutId": {"$ref": "#/$defs/id"}, "catalogId": {"$ref": "#/$defs/id"},
+    "entries": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"type": "object", "properties": {"adapterKind": {"enum": ["adapter-config-resolver", "artifact-store", "control-authorizer", "fleet-executor", "registry-leader-backend", "wave-gate"]}, "evidencePath": {"type": "string", "minLength": 1}, "evidenceSha256": {"$ref": "#/$defs/sha256"}, "attestationPath": {"type": "string", "minLength": 1}, "attestationSha256": {"$ref": "#/$defs/sha256"}}}}
+  },
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"properties": {"entries": {"items": {"additionalProperties": false, "required": ["adapterKind", "evidencePath", "evidenceSha256"]}}}}},
+    {"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"properties": {"entries": {"items": {"additionalProperties": false, "required": ["adapterKind", "evidencePath", "evidenceSha256", "attestationPath", "attestationSha256"]}}}}}
+  ],
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-conformance-evidence.schema.json",
+  "title": "Pinned Adapter integration-readiness conformance evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "certificationLevel", "checkSetVersion", "conformanceId", "adapterKind", "adapterId", "configSchemaVersion", "configSha256", "scope", "protocol", "requiredCapabilities", "capabilityManifestSha256", "checks", "certifiedAt", "reportSha256"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractAdapterConformanceEvidence"},
+    "passed": {"const": true},
+    "certificationLevel": {"const": "integration-readiness"},
+    "checkSetVersion": {"const": "1.0.0"},
+    "conformanceId": {"$ref": "#/$defs/sha256"},
+    "adapterKind": {"enum": ["adapter-config-resolver", "artifact-store", "control-authorizer", "fleet-executor", "registry-leader-backend", "wave-gate"]},
+    "adapterId": {"$ref": "#/$defs/id"},
+    "configSchemaVersion": {"type": "integer", "minimum": 1},
+    "configSha256": {"$ref": "#/$defs/sha256"},
+    "scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["primaryId", "secondaryId"],
+      "properties": {
+        "primaryId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "secondaryId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
+      }
+    },
+    "protocol": {
+      "type": "object", "additionalProperties": false,
+      "required": ["major", "minimumMinor"],
+      "properties": {
+        "major": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "minimumMinor": {"type": "integer", "minimum": 0, "maximum": 65535}
+      }
+    },
+    "requiredCapabilities": {
+      "type": "array", "minItems": 1, "maxItems": 32,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"}
+    },
+    "capabilityManifestSha256": {"$ref": "#/$defs/sha256"},
+    "checks": {
+      "type": "array", "minItems": 9, "maxItems": 9,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["checkId", "passed", "evidenceSha256", "diagnostic"],
+        "properties": {
+          "checkId": {"enum": ["adapter-identity-bound", "artifact-pins-revalidated", "capability-negotiated", "capability-replay-stable", "config-pin-enforced", "config-revalidated", "environment-confined", "evidence-redacted", "process-policy-bounded"]},
+          "passed": {"const": true},
+          "evidenceSha256": {"$ref": "#/$defs/sha256"},
+          "diagnostic": {"type": "null"}
+        }
+      }
+    },
+    "certifiedAt": {"type": "string", "format": "date-time"},
+    "reportSha256": {"$ref": "#/$defs/sha256"}
+  },
+  "allOf": [
+    {"if": {"properties": {"adapterKind": {"const": "registry-leader-backend"}}}, "then": {"properties": {"scope": {"properties": {"primaryId": {"$ref": "#/$defs/id"}, "secondaryId": {"$ref": "#/$defs/id"}}}}}},
+    {"if": {"properties": {"adapterKind": {"const": "artifact-store"}}}, "then": {"properties": {"scope": {"properties": {"primaryId": {"$ref": "#/$defs/id"}, "secondaryId": {"type": "null"}}}}}},
+    {"if": {"properties": {"adapterKind": {"enum": ["adapter-config-resolver", "control-authorizer", "fleet-executor", "wave-gate"]}}}, "then": {"properties": {"scope": {"properties": {"primaryId": {"type": "null"}, "secondaryId": {"type": "null"}}}}}}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

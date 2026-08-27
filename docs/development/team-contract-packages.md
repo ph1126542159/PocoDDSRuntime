@@ -98,7 +98,7 @@ Owner、包范围、公钥和签名。Provider 升级必须先生成新包，经
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "product": "PocoDDSRuntimeTeamContractConsumerCatalog",
   "consumers": [{
     "id": "team.workflow",
@@ -714,6 +714,15 @@ python tools/pdr.py contract-package registry-leader-activate `
   "product": "PocoDDSRuntimeTeamContractRegistryLeaderBackendConfig",
   "backendId": "product-contracts-etcd",
   "kind": "external-command",
+  "protocolMajor": 1,
+  "minimumProtocolMinor": 0,
+  "requiredCapabilities": [
+    "atomic-compare-and-swap",
+    "commit-outcome-reconciliation",
+    "immutable-history",
+    "linearizable-read-current",
+    "scope-confinement"
+  ],
   "authorityIds": ["product-contracts-leader"],
   "registryIds": ["product-contracts"],
   "executable": "C:/Program Files/PDR/pdr-etcd-leader-adapter.exe",
@@ -725,6 +734,11 @@ python tools/pdr.py contract-package registry-leader-activate `
   "maxResponseBytes": 65536
 }
 ```
+
+schema v2 在任何存储操作前发送独立 Capability Request，严格校验 request/backend 身份、协议 major、最低
+minor 和语义能力集合。major 不一致、minor 低于策略或缺少任一 required capability 都会停止；不会把
+“命令能运行”误当成“事务语义兼容”。旧 schema v1 仍可显式加载，便于已有团队迁移，但它没有协商证据，
+不能通过 `registry-leader-backend-capabilities` 放行。新 SDK 生成器只产生 v2。
 
 签发和激活都固定配置原始字节 SHA。外部绑定使用 schema v2，只保存 backend ID、配置路径/SHA 和
 当前 grant SHA，不保存共享 `current-grant.json` 路径；每次 publish/promote/rollback 及提交前复核都会
@@ -770,7 +784,19 @@ CAS 必须同时比较 `expectedCurrentToken` 和 `expectedCurrentGrantSha256`�
 
 ### Leader Backend 独立验收
 
-适配器仓库无需复制 Runtime 测试或取得 authority 签名私钥。安装 SDK 提供正式 Conformance 命令；它会
+适配器仓库无需复制 Runtime 测试或取得 authority 签名私钥。先生成独立的能力协商证据：
+
+```powershell
+python tools/pdr.py contract-package registry-leader-backend-capabilities `
+  --backend-config E:/adapter-validation/backend.json `
+  --expected-backend-config-sha256 $backendConfigSha256 `
+  --authority-id adapter-team-conformance-authority-0001 `
+  --registry-id adapter-team-conformance-registry-0001 `
+  --report E:/adapter-validation/capability-evidence.json
+```
+
+报告绑定实现 ID、协议版本、声明/要求的能力集合、配置 SHA-256 和规范化能力清单 SHA-256。随后运行安装 SDK
+提供的正式 Conformance 命令；它会
 在指定 scope 写入合成 token 1，执行缺失历史、逐字节 current/history、陈旧 CAS、两个不同 token 2 候选
 并发竞争和 loser 不落盘检查，并输出摘要绑定证据：
 
@@ -789,7 +815,8 @@ python tools/pdr.py contract-package registry-leader-backend-conformance `
 
 该命令会真实提交 token 1 和一个竞争胜出的 token 2，不提供 delete/cleanup 操作。authority ID 与 Registry ID
 必须是专门为本次验收分配的空 scope；已有 current 时直接拒绝，成功后的 scope 应连同报告保留为适配器版本
-证据，下一版本使用新的 scope。通过只证明适配器满足 PDR 的存储/CAS 协议，不替代实际 etcd/Consul 集群的
+证据，下一版本使用新的 scope。v2 Conformance 报告同时绑定协商后的协议版本和能力清单摘要。通过只证明
+适配器满足 PDR 的存储/CAS 协议，不替代实际 etcd/Consul 集群的
 TLS、ACL、quorum、快照恢复、跨故障域和长稳验收。
 
 安装 SDK 还提供
@@ -798,6 +825,160 @@ TLS、ACL、quorum、快照恢复、跨故障域和长稳验收。
 跨进程锁、逐字节不可变历史、`fsync` 和原子 current 替换的最小实现。SDK 外部 Consumer 会从安装目录
 实际生成配置并执行上述 Conformance，因此示例不是仅存在于源码树中的伪样例。该文件实现仍是单机教学
 后端；生产适配器团队应保留 JSON 边界和验收测试，只替换持久化/CAS 层，并补充目标集群验收。
+
+### Leader Backend 受控迁移与回滚
+
+普通 renewal 继续禁止改变 `authorityBackend`。后端升级必须先把不可变 grant 链在线同步到具备 v2 能力协商
+的独立 target：
+
+```powershell
+python tools/pdr.py contract-package registry-leader-backend-migration-sync `
+  --migration-id product-contracts-etcd-v2 `
+  --authority-id product-contracts-leader --registry-id product-contracts `
+  --source-backend-config E:/leader-control/etcd-v1.json `
+  --expected-source-backend-config-sha256 $sourceSha `
+  --target-backend-config E:/leader-control/etcd-v2.json `
+  --expected-target-backend-config-sha256 $targetSha `
+  --confirm-target-migration-scope `
+  --transaction-backend-config E:/leader-control/migration/transaction-store.json `
+  --expected-transaction-backend-config-sha256 $transactionStoreSha `
+  --artifact-store-config E:/leader-control/migration/artifact-store.json `
+  --expected-artifact-store-config-sha256 $artifactStoreSha `
+  --actor ha.operator `
+  --output E:/leader-control/migration/online-sync.json
+```
+
+Sync 只接受空 target 或与 source 逐字节相同的完整前缀；target 超前、历史分叉或同步期间 source 变化都会
+停止。事务存储复用 Leader Backend SPI：本地可以继续使用 `--transaction <绝对路径>` 和进程租约，跨主机则
+使用上述固定配置。该配置必须把 `migrationId` 放入 `authorityIds`、把 Registry ID 放入 `registryIds`；每个
+Migration ID 因而拥有独立 current/history scope。外部存储要求 schema v2 能力协商，事务 `stateVersion` 同时
+作为单调 fencing token，`previousGrantSha256` 固定前一状态；etcd 适配器以同一个原子事务比较 current、确认
+history 不存在并写入两者。配置 Artifact Store 后，事务升级为 schema v3：证据字段只保存
+`storeId/namespaceId/sha256/sizeBytes/mediaType`，不再保存操作者主机路径；每次 Put 都执行写后读和逐字节摘要
+校验。交接人员必须先读取当前 SHA，而不是覆盖前一位操作者的状态：
+
+```powershell
+python tools/pdr.py contract-package registry-leader-backend-migration-status `
+  --transaction-backend-config E:/leader-control/migration/transaction-store.json `
+  --expected-transaction-backend-config-sha256 $transactionStoreSha `
+  --artifact-store-config E:/leader-control/migration/artifact-store.json `
+  --expected-artifact-store-config-sha256 $artifactStoreSha `
+  --migration-id product-contracts-etcd-v2 --registry-id product-contracts `
+  --registry D:/primary/product-contract-registry `
+  --report E:/leader-control/migration/status.json
+```
+
+完成在线预热后，在 source 签发下一 `purpose=fence` grant，再以 Status 返回的
+`transactionSha256` 续作到新的证据路径：
+
+```powershell
+python tools/pdr.py contract-package registry-leader-backend-migration-resume `
+  --transaction-backend-config E:/leader-control/migration/transaction-store.json `
+  --expected-transaction-backend-config-sha256 $transactionStoreSha `
+  --artifact-store-config E:/leader-control/migration/artifact-store.json `
+  --expected-artifact-store-config-sha256 $artifactStoreSha `
+  --migration-id product-contracts-etcd-v2 --registry-id product-contracts `
+  --expected-transaction-sha256 $transactionSha `
+  --actor handoff.operator --confirm-target-migration-scope `
+  --output E:/leader-control/migration/fence-sync.json
+```
+
+旧 SHA 会被拒绝，因此两位操作者不能各自基于过期状态推进。若 Backend 已完成同步并写出证据、但进程在更新
+事务前中断，可用 `registry-leader-backend-migration-reconcile --sync-evidence ...
+--expected-sync-evidence-sha256 ...` 接纳该孤儿 checkpoint；工具会重新读取双方链，只有固定前缀仍逐字节一致
+时才更新事务。随后在 target
+基于该 fence 签发直接后继的 leadership grant，并生成切换证据：
+
+```powershell
+python tools/pdr.py contract-package registry-leader-backend-migration-finalize `
+  --migration-id product-contracts-etcd-v2 `
+  --registry D:/primary/product-contract-registry `
+  --authority-id product-contracts-leader --registry-id product-contracts `
+  --sync-evidence E:/leader-control/migration/fence-sync.json `
+  --expected-sync-evidence-sha256 $syncSha `
+  --expected-target-grant-sha256 $targetLeadershipSha `
+  --trust-policy contracts/team-contract-trust-policy.json `
+  --expected-trust-policy-id product-team-contracts `
+  --expected-trust-policy-sha256 $packagePolicySha `
+  --transaction-backend-config E:/leader-control/migration/transaction-store.json `
+  --expected-transaction-backend-config-sha256 $transactionStoreSha `
+  --artifact-store-config E:/leader-control/migration/artifact-store.json `
+  --expected-artifact-store-config-sha256 $artifactStoreSha `
+  --expected-transaction-sha256 $transactionShaAfterResume `
+  --actor ha.operator `
+  --output E:/leader-control/migration/cutover.json
+
+python tools/pdr.py contract-package registry-leader-activate `
+  --registry D:/primary/product-contract-registry --node-id contracts-oslo-01 `
+  --authority-backend-config E:/leader-control/etcd-v2.json `
+  --expected-authority-backend-config-sha256 $targetSha `
+  --authority-id product-contracts-leader `
+  --expected-current-grant-sha256 $targetLeadershipSha `
+  --backend-migration-evidence E:/leader-control/migration/cutover.json `
+  --expected-backend-migration-evidence-sha256 $cutoverSha `
+  <其余 Registry 与 Leader trust 参数>
+```
+
+Activate 在 Registry process lease 内再次检查旧 binding、source fence、target leadership、Registry baseline、
+同步证据和全部摘要，然后写 schema v3 binding。切换不是危险的双主双写：它保留一个短暂但明确的 fence
+间隙。Activate 成功后再以 cutover 证据运行 `registry-leader-backend-migration-reconcile`，事务才从
+`prepared` 进入 `completed`；这使接手人员能够区分“证据已准备”和“binding 已切换”。
+
+`--output` 仍会保留一份便于人工检查和激活的本地导出，但 schema v3 事务的权威证据是 Artifact Store 引用；
+删除本地 sync 导出后，Status、Resume 和 Abort 仍从内容寻址存储验证证据。需要在另一主机生成激活/Finalize
+输入时，可以只传递引用文件：
+
+```powershell
+python tools/pdr.py contract-package artifact-store-get `
+  --config E:/leader-control/migration/artifact-store.json `
+  --expected-config-sha256 $artifactStoreSha `
+  --namespace-id product-contracts-etcd-v2 `
+  --reference E:/handoff/fence-sync.reference.json `
+  --output E:/handoff/fence-sync.json
+```
+
+安装 SDK 的 `examples/team-contract-artifact-store-file/` 是协议参考实现，适合单机或共享文件系统。生产团队可
+在不修改迁移工具的情况下实现 S3、MinIO 或 Blob 适配器；仍须通过命名空间隔离、不可变创建、写后读、缺失
+对象和篡改失败关闭验收。Artifact Store 不承担事务 CAS，Transaction Store 也不承担大对象传输，两者职责独立。
+
+跨主机接管还不能把 source/target 的本机 `configPath` 写入共享事务。安装 SDK 的
+`examples/team-contract-backend-config-resolver-file/` 为此提供第三个独立 SPI：共享状态只保存
+`resolverId/configId/backendId/revision`，每台操作者主机用自己固定摘要的 resolver config 和 mapping 解析到
+本机 backend config。相同逻辑引用允许解析到不同安装目录和不同 backend config SHA，但解析后的 backend ID、
+authority/Registry scope、能力清单和本地制品 pin 仍须全部通过。mapping 不得保存秘密值；凭据继续由后端配置
+声明的环境变量或专用凭据提供器注入。
+
+```powershell
+$sourceRefSha = (Get-FileHash E:/handoff/source-ref.json -Algorithm SHA256).Hash.ToLower()
+$targetRefSha = (Get-FileHash E:/handoff/target-ref.json -Algorithm SHA256).Hash.ToLower()
+$resolverSha = (Get-FileHash E:/leader-control/backend-resolver.json -Algorithm SHA256).Hash.ToLower()
+
+python tools/pdr.py contract-package registry-leader-backend-migration-sync `
+  --migration-id product-contracts-etcd-v3 `
+  --authority-id product-contracts-authority --registry-id product-contracts `
+  --source-backend-ref E:/handoff/source-ref.json `
+  --expected-source-backend-ref-sha256 $sourceRefSha `
+  --target-backend-ref E:/handoff/target-ref.json `
+  --expected-target-backend-ref-sha256 $targetRefSha `
+  --backend-config-resolver-config E:/leader-control/backend-resolver.json `
+  --expected-backend-config-resolver-config-sha256 $resolverSha `
+  --transaction-backend-config E:/leader-control/transaction-backend.json `
+  --expected-transaction-backend-config-sha256 $transactionStoreSha `
+  --artifact-store-config E:/leader-control/artifact-store.json `
+  --expected-artifact-store-config-sha256 $artifactStoreSha `
+  --confirm-target-migration-scope --actor ha.operator `
+  --output E:/handoff/initial-sync.json
+```
+
+该组合生成 schema v4 transaction 和 schema v2 sync/cutover evidence。Status、Resume、Finalize、Reconcile、Abort
+以及使用 v2 cutover evidence 的 Activate 都必须传入当前主机的 resolver config；共享 transaction/evidence 中不再
+出现 backend config 路径。`backend-config-resolve` 可在正式操作前单独检查某个引用的本机解析结果和摘要证据。
+
+只有 Status 显示 source 仍是绑定的 `leadership` 且 target 只是其精确前缀时，
+`registry-leader-backend-migration-abort` 才会写不可变终止证据并把事务置为 `aborted`。目标历史为审计而保留，
+不会删除。source 一旦 Fence、双方分叉或 binding 已切换，Abort 必须拒绝；此时只能完成切换，或创建新事务
+交换 source/target 走受控回滚。`completed` 和 `aborted` 都是终态，Resume 会拒绝。回滚使用完全相同的流程，
+只需交换 source/target；不能通过复制配置或普通 renewal 绕过。
 
 ### etcd 生产适配路径
 
@@ -808,7 +989,7 @@ TLS、ACL、quorum、快照恢复、跨故障域和长稳验收。
 确认目标 history 不存在，并原子写 history/current。并发者无法基于同一前驱提交不同的新 grant。
 
 真实集群必须先启用客户端证书认证和 RBAC，并让证书 CN 对应的 etcd 用户只拥有该 `keyPrefix`；etcd 默认
-不会自动启用这些安全能力。生成配置后先运行只读预检：
+不会自动启用这些安全能力。生成配置后可单独运行只读预检：
 
 ```powershell
 $adapterConfigSha256 = (Get-FileHash `
@@ -821,8 +1002,29 @@ python E:/PocoDDSRuntime/build/install/bin/pdr.py contract-package registry-lead
 ```
 
 预检查询所有 endpoint 的 health/status，要求它们属于同一 cluster、member ID 唯一、观察到同一个已选
-Leader、Raft applied index 不超过 commit index，并执行命名空间内的线性只读探测。之后仍须在专用空 scope
-执行 Backend Conformance；上线前还应完成真实三节点断网、失主、证书/RBAC 拒绝、快照恢复及长稳测试。
+Leader、Raft applied index 不超过 commit index，并执行命名空间内的线性只读探测。版本放行时推荐改用
+一次性 Acceptance，把写入前预检、专用空 scope 的 Backend Conformance 和写入后预检绑定到同一目录：
+
+```powershell
+$backendConfigSha256 = (Get-FileHash `
+  E:/leader-control/etcd-backend.json -Algorithm SHA256).Hash.ToLower()
+
+python E:/PocoDDSRuntime/build/install/bin/pdr.py contract-package registry-leader-etcd-acceptance `
+  --adapter-config E:/leader-control/etcd-adapter.json `
+  --expected-adapter-config-sha256 $adapterConfigSha256 `
+  --backend-config E:/leader-control/etcd-backend.json `
+  --expected-backend-config-sha256 $backendConfigSha256 `
+  --authority-id product-contracts-etcd-acceptance-0001 `
+  --registry-id product-contracts-etcd-acceptance-0001 `
+  --confirm-dedicated-empty-scope `
+  --output-directory E:/leader-control/acceptance/product-contracts-etcd-v1
+```
+
+输出目录必须是尚不存在的绝对路径。成功后保留 `preflight-before.json`、`conformance.json`、
+`preflight-after.json` 和绑定前三者 SHA-256 的 `acceptance.json`，不自动清理已提交的 token 1/token 2。
+写入前失败返回 2；一旦可能已经提交但后置检查或证据收敛失败，则保留现场、写
+`acceptance-failure.json` 并返回 3，操作者必须先对账，不能直接换目录重跑。上线前还应完成真实三节点
+断网、失主、证书/RBAC 拒绝、快照恢复及长稳测试。
 
 跨节点切换使用 drain + fence + handoff 的显式流程。先持久关闭远程命令入口；状态写入远程 control
 directory，服务端会在创建 idempotency request 之前拒绝包括只读命令在内的所有新 command：
@@ -897,3 +1099,136 @@ python tools/pdr.py contract-package registry-remote-drain-finalize `
 返回 `replayed=true`，finalize 重试下载原有字节，不会再次签名。不同前置条件、非 operator、未排空、
 存在 pending request、未观察新 fence、Registry 状态漂移或旧节点已被 fence 都会 fail-closed。resume 同样
 走远程接口，但仅适用于尚未失去有效同节点 leadership grant 的取消切换场景。
+
+## Secret Provider v2 与 Backend schema v3/v4
+
+Backend 不再需要把认证材料写入配置或共享迁移事务。schema v3 增加固定的 `secretProvider` 描述符和
+`credentialBindings`；每个 binding 只携带目标子进程环境变量名以及
+`{kind:"secret-ref", providerId, secretId, version}`。调用路径先重新校验 Provider 配置、可执行程序、适配器
+和 mapping SHA，再协商 `bounded-secret/no-secret-persistence/scoped-read/version-pinned-read`，最后按请求解析。
+解析值必须为非空 UTF-8、不能含 NUL，并只存在于当前 Backend 子进程环境；能力协商不会读取凭据。
+
+`pdr.py contract-package secret-provider-check` 提供运维预检，但报告故意不包含秘密值、摘要或长度，避免低熵
+凭据被离线猜测。环境变量参考 Provider 仅供迁移与测试；生产实现应使用 Credential Manager、Vault、云
+Secret Manager/KMS 或 workload identity。缺失、版本不符、越权引用、Provider 身份变化或任一固定制品漂移
+都会在 Backend 子进程启动前失败。Provider schema v1 与 Backend schema v1/v2/v3 保持兼容。
+
+Provider schema v2 返回 `issuedAt/expiresAt/selectedVersion` 租约，并协商
+`leased-secret/rotation-fallback/revocation-aware`。轮换引用显式保存有序新旧版本和 `fallbackUntil`；新版本
+可用时立即优先，新版本尚未投放或已撤销时只能在窗口内使用旧版本，窗口结束后失败关闭。Backend schema v4
+再要求 `minimumCredentialLeaseSeconds >= timeoutSeconds + 1`，每次启动子进程前确认租约覆盖完整操作窗口。
+Provider 的必需运行环境与可选秘密来源 allowlist 分离，允许版本分阶段投放，同时拒绝继承无关宿主变量。
+
+Backend、Secret Provider、Artifact Store 和 Backend Config Resolver 的外部进程执行已统一使用
+[`team_contract_adapter_runtime.py`](team-contract-adapter-runtime.md)。新增 Adapter 不应复制 `Popen`、超时轮询、
+环境构造或 stdout/stderr 读取逻辑；协议模块只保留身份、scope 和业务响应校验。公共层变更必须同时通过四类
+协议集成测试、安装 SDK 和 PDR-REC-0037。
+
+跨团队部署不再要求把每种新 Adapter 写入核心注册表。Adapter 团队生成摘要固定的 Manifest，部署 Owner 把
+Manifest 摘要写入 Host 本地 Catalog；`pdr.py contract-package adapter-catalog-list/check` 随后完成声明式发现和
+只读 Capability 健康检查。Catalog 仅统一发现与能力观察，不提供通用业务调用：各协议宿主仍独立执行完整的
+request/response、身份、scope 和一致性校验。安装 SDK 的 `examples/team-contract-adapter-catalog/` 提供生成器，
+PDR-REC-0038 验证未知类型无需核心代码注册、传递 pin 和失败关闭边界。
+
+Host 部署通过 `adapter-catalog-activate` 把固定 Catalog 写入内容寻址状态库，再原子切换唯一 pointer。
+写者使用跨进程 lease/fencing epoch、expected generation CAS 和唯一 operation ID；精确重试幂等，冲突重放、
+并发旧写及 Catalog generation 降级均拒绝。`adapter-catalog-current/current-check` 为消费者提供经过完整 state 链
+与传递 pin 验证的当前快照，探测期间 pointer 改变会丢弃结果。`adapter-catalog-rollback` 只选择历史已验证
+Catalog，并以前进的新 activation generation 留下审计记录。PDR-REC-0039 覆盖该生命周期边界。
+
+长运行消费者更新由 `adapter-catalog-reconcile/recover/status` 管理。Reconciler 固定并协商外部 lifecycle Hook，按
+prepare、零 pending drain、Catalog CAS switch、activate、有限 health gate、commit 顺序推进。每次副作用前写入
+自摘要 journal；中断恢复依赖稳定 transaction operation ID，不重复创建 Catalog generation。切换前失败 abort，
+切换后失败自动创建精确源 Catalog 的前进式 rollback generation；rollback Hook 失败可再次恢复。PDR-REC-0040
+覆盖进程中断、持续不健康、首次 rollback 失败、重放冲突、pin 漂移、journal 篡改和 stderr 脱敏。
+已 committed 事务不能由 Fleet 或操作者直接覆盖 Catalog pointer；必须调用
+`adapter-catalog-reconcile-revert`，由原 journal、源摘要和同一 lifecycle Hook 完成前进式、幂等撤销。
+
+多 Host 发布由 `adapter-catalog-fleet-run/recover/status` 管理。摘要固定的 Fleet Plan 把第一波零失败 Canary、
+后续 wave、每波失败预算、节点故障域、源 activation generation 和最大并发绑定为一次 rollout；Node Executor
+SPI 隔离 SSH/WinRM/Kubernetes/代理等传输实现。协调器只接受能力协商后的幂等节点 deploy/status/revert，节点
+实际变更仍由各自 Reconciler 完成。任一 wave 超预算立即停止后续准入，并按 wave/节点逆序撤销已经 committed
+的节点；pending 节点不变。自摘要 Fleet journal 支持节点完成但协调器未收到响应的恢复，PDR-REC-0041 覆盖。
+
+Fleet Plan v2 在 Node Executor 之外固定独立 Wave Gate SPI。每个 wave 的 `gatePolicy` 声明最短观察时间、最大
+判定次数和拒绝动作；观察期只持久化 `waiting` 后返回，不占用长运行进程。Gate 只看到脱敏节点计数并返回
+`pass/pause/fail` 与证据 SHA。暂停后普通 recover 不会绕过，`fleet-resume/fleet-abort` 使用 control generation
+CAS、唯一 operation ID、actor 和 reason 记录人工决定；abort 继续复用节点 Reconciler 的逆序撤销。Plan v1
+保持兼容，PDR-REC-0042 覆盖 Gate 响应歧义、SLO 暂停、观察窗口、人工控制、篡改、pin 和脱敏。
+
+Fleet Plan v3 再固定独立 Control Authorizer SPI，解决 v2 actor 仅由调用方自报的问题。Authorizer 只接收
+operation/action、claimed actor、control generation、Gate/Catalog 摘要和 reason SHA，返回 allow/deny、
+认证 Principal、证据 SHA 与稳定诊断码。Principal 不匹配、适配器异常和无明确决定均失败关闭；deny 会进入
+自摘要授权历史，但不改变 rollout 或 control generation。稳定 authorization ID 使响应丢失可安全重试，已经
+拒绝的 operation ID 不受后续环境策略变化影响。允许控制继续复用 v2 CAS、幂等 resume/abort 与 Reconciler
+逆序回滚。Plan v1/v2 保持兼容，PDR-REC-0043 覆盖授权故障注入和安装 SDK。
+
+Fleet Plan v4 使用既有 Registry Leader Backend 的线性 CAS 保存一个小型 State Pointer，并把每版完整 journal
+作为不可变内容写入既有 Artifact Store。Plan 仅固定两个适配器的 ID 和配置 SHA；各协调 Host 可用不同本地
+配置路径及空 scratch 目录接管同一 rollout。每次写入增加 `stateVersion/fencingToken` 并连接前一 Pointer 与
+journal 摘要，旧协调器 CAS、缺失或篡改的 blob、scope/pin 漂移均失败关闭；提交响应丢失通过读回当前 Pointer
+消歧。Plan v1-v3 保持本地 journal 兼容，PDR-REC-0044 验证跨主机接管边界。
+
+Fleet Plan v5 进一步去除 Executor、Wave Gate、Control Authorizer、State Backend 和 Artifact Store 的全部
+本机配置路径及配置 SHA。Plan 为五类 Adapter 保存统一 `adapter-config-ref`，包含 Resolver/Config/Adapter ID、
+Adapter 类型和 revision；每个协调 Host 用自身固定摘要的 Adapter Config Resolver 将同一引用解析到本机配置。
+Resolver 请求绑定 `adapter-catalog-fleet -> rolloutId -> catalogId` scope，返回配置仍需通过对应 Adapter 的完整
+配置、制品 pin 和能力协商校验。远端 Pointer schema v2 与 journal v5 也只保存逻辑引用，因此 Host A 与 Host B
+的 Resolver 配置、映射路径以及五类 Adapter 配置摘要可以不同，同时不能改变逻辑 Adapter 身份。v1-v4 保持
+兼容；PDR-REC-0045 覆盖跨 Host 逻辑引用接管、类型/版本/scope/pin 漂移与失败关闭。
+
+## 统一 Adapter Conformance Kit
+
+`adapter-conformance` 为 Fleet Plan v5 使用的六类公共边界提供同一认证入口：Fleet Executor、Wave Gate、
+Control Authorizer、Registry Leader Backend、Artifact Store 和 Adapter Config Resolver。它复用各模块自己的
+严格 config loader 与 capability negotiation，不维护第二份协议解释。认证会重复协商以验证能力摘要稳定性，
+重新验证 executable/artifact/config pin，主动提交错误 config SHA 验证失败关闭，检查环境 allowlist 和进程
+timeout/response-size 策略，并生成自摘要 `PocoDDSRuntimeTeamContractAdapterConformanceEvidence`。
+
+证据的 `conformanceId` 只由逻辑 Adapter 身份、配置/能力摘要、scope、协议和 check-set 版本计算，因此同一
+固定配置的重复认证不受报告路径和时间影响；不同 Host 的本地配置 SHA 不同时应得到不同 ID。
+`certifiedAt/reportSha256` 提供本次运行的审计身份。报告明确不包含配置路径、配置
+内容、命令参数或环境值，适合由 Adapter 团队交付给集成团队。`integration-readiness` 只证明公共适配层边界，
+不能替代 etcd/对象存储/IAM/节点部署的真实环境 acceptance。PDR-REC-0046 覆盖 pin、replay、scope、漂移、
+脱敏、自摘要和安装 CLI。
+
+## Fleet v6 Adapter Conformance Admission
+
+Fleet Plan v6 通过 `adapterConformancePolicy` 声明认证等级、check-set、证据最大年龄、六类必需 Adapter 和
+九项必需检查。协调 Host 使用 `adapter-conformance-admission-create` 将六份 evidence 组成 Host 本地 bundle，
+执行 `run/recover/resume/abort/status` 时同时传入 bundle 路径及预期 SHA。准入在业务调用前复核 bundle/evidence
+摘要、认证时间、Adapter ID、配置 SHA、protocol、scope、required capabilities，并在真实能力协商后再次比对
+capability manifest SHA；任一项不一致均失败关闭。
+
+Plan、远程 Pointer 和 journal 都不保存 evidence/config 的本地路径。journal v6 仅追加 policy、bundle、
+conformance、config、capability 和 evidence 的摘要身份，所以另一个 Host 可以使用不同路径和不同固定 bundle
+接管同一 rollout，同时保留可追溯的两次 admission。integration-readiness 仍不能替代生产环境 acceptance。
+
+## Fleet v7 Signed Adapter Conformance Trust
+
+Fleet Plan v7 进一步要求 `adapterConformanceTrustPolicy`。集成团队固定 trust policy 的 ID、最低 generation 和
+文件 SHA；Adapter 认证方用 Ed25519 私钥对精确 evidence SHA、conformance ID、Adapter kind/ID、配置 SHA 与
+scope 签名。policy 为每把公钥限制允许的 Adapter kind/ID 和有效期，并定义最大 attestation lifetime；
+`revokedKeys` 可立即拒绝旧密钥，提升 generation 后可并行加入新密钥完成轮换。
+
+```powershell
+$evidenceSha = (Get-FileHash C:\pdr\fleet-executor-conformance.json -Algorithm SHA256).Hash.ToLower()
+python pdr.py contract-package adapter-conformance-attest `
+  --evidence C:\pdr\fleet-executor-conformance.json `
+  --expected-evidence-sha256 $evidenceSha `
+  --certifier-id runtime-adapter-team --key-id adapter-certifier-2026-b `
+  --private-key-environment PDR_ADAPTER_CERTIFIER_PRIVATE_KEY `
+  --report C:\pdr\fleet-executor-attestation.json
+
+python pdr.py contract-package adapter-conformance-admission-create `
+  --bundle-id host-b-admission --rollout-id oslo-adapters-v7 `
+  --catalog-id production-adapters `
+  --evidence fleet-executor C:\pdr\fleet-executor-conformance.json `
+  --attestation fleet-executor C:\pdr\fleet-executor-attestation.json `
+  --output C:\pdr\host-b-admission.json
+```
+
+实际 bundle 必须同时包含六类 evidence/attestation。执行 Fleet 命令时除 bundle 及其 SHA 外，还必须传入
+`--adapter-conformance-trust-policy` 和 `--expected-adapter-conformance-trust-policy-sha256`。journal v7 只保留
+trust policy、attestation、certifier 和 key 的摘要身份，不保存公私钥路径或 evidence 路径。示例中的
+`create_conformance_trust_demo.py` 只用于本地 SDK 验收；生产私钥必须由团队自己的 KMS/HSM 和发布流程管理。

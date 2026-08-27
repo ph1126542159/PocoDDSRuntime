@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-state.schema.json",
+  "title": "Immutable Adapter Catalog activation state", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "catalogId", "generation", "previousStateSha256", "catalogGeneration", "catalogSha256", "action", "operationId", "actor", "reason", "rollbackFromGeneration", "rollbackToGeneration", "occurredAt"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCatalogState"},
+    "catalogId": {"$ref": "#/$defs/id"}, "generation": {"type": "integer", "minimum": 1, "maximum": 100000},
+    "previousStateSha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "catalogGeneration": {"type": "integer", "minimum": 1}, "catalogSha256": {"$ref": "#/$defs/sha256"},
+    "action": {"enum": ["activate", "rollback"]}, "operationId": {"$ref": "#/$defs/id"}, "actor": {"$ref": "#/$defs/id"},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\r\\n]+$"},
+    "rollbackFromGeneration": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
+    "rollbackToGeneration": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
+    "occurredAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

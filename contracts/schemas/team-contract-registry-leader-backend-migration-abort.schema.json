@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-backend-migration-abort.schema.json",
+  "title": "Registry leader backend pre-fence abort evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "migrationId", "authorityId", "registryId", "transactionStore", "transactionSha256", "sourceBackend", "targetBackend", "sourceCurrent", "targetCurrent", "bindingGrantSha256", "retainedTargetHistory", "operator", "reason", "abortedAt"],
+  "properties": {
+    "schemaVersion": {"enum": [2, 3]}, "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendMigrationAbort"}, "passed": {"const": true},
+    "migrationId": {"$ref": "#/$defs/id"}, "authorityId": {"$ref": "#/$defs/id"}, "registryId": {"$ref": "#/$defs/id"},
+    "transactionStore": {"$ref": "#/$defs/store"}, "transactionSha256": {"$ref": "#/$defs/sha256"},
+    "sourceBackend": {"$ref": "#/$defs/backend"}, "targetBackend": {"$ref": "#/$defs/backend"},
+    "sourceCurrent": {"$ref": "#/$defs/current"}, "targetCurrent": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/current"}]},
+    "bindingGrantSha256": {"$ref": "#/$defs/sha256"}, "retainedTargetHistory": {"const": true},
+    "operator": {"$ref": "#/$defs/id"}, "reason": {"type": "string", "minLength": 1, "maxLength": 1024}, "abortedAt": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"properties": {"sourceBackend": {"$ref": "#/$defs/localBackend"}, "targetBackend": {"$ref": "#/$defs/localBackend"}}}, "else": {"properties": {"sourceBackend": {"$ref": "#/$defs/backendRef"}, "targetBackend": {"$ref": "#/$defs/backendRef"}}}}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "backend": {"oneOf": [{"$ref": "#/$defs/localBackend"}, {"$ref": "#/$defs/backendRef"}]},
+    "localBackend": {"type": "object", "additionalProperties": false, "required": ["kind", "backendId", "configPath", "configSha256"], "properties": {"kind": {"const": "external-command"}, "backendId": {"$ref": "#/$defs/id"}, "configPath": {"type": "string", "minLength": 1}, "configSha256": {"$ref": "#/$defs/sha256"}}},
+    "backendRef": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "backendId", "revision"], "properties": {"kind": {"const": "backend-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "backendId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}},
+    "store": {"oneOf": [{"type": "object", "additionalProperties": false, "required": ["kind", "path"], "properties": {"kind": {"const": "file"}, "path": {"type": "string", "minLength": 1}}}, {"$ref": "#/$defs/localBackend"}]},
+    "current": {"type": "object", "additionalProperties": false, "required": ["fencingToken", "grantSha256", "purpose", "leaderId"], "properties": {"fencingToken": {"type": "integer", "minimum": 1}, "grantSha256": {"$ref": "#/$defs/sha256"}, "purpose": {"enum": ["leadership", "fence"]}, "leaderId": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]}}}
+  }
+}

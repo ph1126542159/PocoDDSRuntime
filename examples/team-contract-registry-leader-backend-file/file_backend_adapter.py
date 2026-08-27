@@ -8,6 +8,7 @@ consensus backend.
 
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import json
@@ -22,6 +23,19 @@ from typing import Any
 
 REQUEST_PRODUCT = "PocoDDSRuntimeTeamContractRegistryLeaderBackendRequest"
 RESPONSE_PRODUCT = "PocoDDSRuntimeTeamContractRegistryLeaderBackendResponse"
+CAPABILITY_REQUEST_PRODUCT = (
+    "PocoDDSRuntimeTeamContractRegistryLeaderBackendCapabilityRequest"
+)
+CAPABILITY_MANIFEST_PRODUCT = (
+    "PocoDDSRuntimeTeamContractRegistryLeaderBackendCapabilityManifest"
+)
+CAPABILITIES = [
+    "atomic-compare-and-swap",
+    "commit-outcome-reconciliation",
+    "immutable-history",
+    "linearizable-read-current",
+    "scope-confinement",
+]
 ZERO_SHA256 = "0" * 64
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -116,21 +130,48 @@ def validate_request(document: Any) -> dict[str, Any]:
     return document
 
 
+def validate_capability_request(document: Any) -> dict[str, Any]:
+    if (not isinstance(document, dict)
+            or set(document) != {
+                "schemaVersion", "product", "requestId", "backendId"
+            }
+            or document.get("schemaVersion") != 1
+            or document.get("product") != CAPABILITY_REQUEST_PRODUCT
+            or any(not IDENTIFIER.fullmatch(str(document.get(name, "")))
+                   for name in ("requestId", "backendId"))):
+        raise ValueError("capability request is malformed")
+    return document
+
+
+def capability_manifest(request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schemaVersion": 1, "product": CAPABILITY_MANIFEST_PRODUCT,
+        "requestId": request["requestId"], "backendId": request["backendId"],
+        "implementationId": "pdr-file-backend-reference-v1",
+        "protocolMajor": 1, "protocolMinor": 0,
+        "capabilities": CAPABILITIES,
+    }
+
+
 def read_request() -> dict[str, Any]:
     content = sys.stdin.buffer.read(MAX_REQUEST_BYTES + 1)
     if not content or len(content) > MAX_REQUEST_BYTES:
         raise ValueError("request size is outside policy")
     try:
-        return validate_request(json.loads(content))
+        document = json.loads(content)
+        if (isinstance(document, dict)
+                and document.get("product") == CAPABILITY_REQUEST_PRODUCT):
+            return validate_capability_request(document)
+        return validate_request(document)
     except (UnicodeError, json.JSONDecodeError) as error:
         raise ValueError("request is invalid JSON") from error
 
 
-def checked_scope(request: dict[str, Any]) -> Path:
-    root_value = os.environ.get("PDR_LEADER_BACKEND_SAMPLE_ROOT", "")
+def checked_scope(request: dict[str, Any], root_environment: str) -> Path:
+    root_value = os.environ.get(root_environment, "")
     root_input = Path(root_value)
     if not root_value or not root_input.is_absolute():
-        raise ValueError("PDR_LEADER_BACKEND_SAMPLE_ROOT must be absolute")
+        raise ValueError(f"{root_environment} must be absolute")
     root_input.mkdir(parents=True, exist_ok=True)
     root = root_input.resolve()
     if root_input.is_symlink() or not root.is_dir():
@@ -250,8 +291,8 @@ def compare_and_swap(request: dict[str, Any], scope: Path) -> dict[str, Any]:
         )
 
 
-def execute(request: dict[str, Any]) -> dict[str, Any]:
-    scope = checked_scope(request)
+def execute(request: dict[str, Any], root_environment: str) -> dict[str, Any]:
+    scope = checked_scope(request, root_environment)
     operation = request["operation"]
     if operation == "read-current":
         grant = load_grant(scope / "current.json")
@@ -269,10 +310,26 @@ def execute(request: dict[str, Any]) -> dict[str, Any]:
     return compare_and_swap(request, scope)
 
 
+def parser() -> argparse.ArgumentParser:
+    result = argparse.ArgumentParser(description=__doc__)
+    result.add_argument(
+        "--root-environment", default="PDR_LEADER_BACKEND_SAMPLE_ROOT"
+    )
+    result.add_argument("--required-environment")
+    return result
+
+
 def main() -> int:
     try:
+        args = parser().parse_args()
         request = read_request()
-        result = execute(request)
+        if (request["product"] != CAPABILITY_REQUEST_PRODUCT
+                and args.required_environment
+                and not os.environ.get(args.required_environment)):
+            raise ValueError("required credential environment is unavailable")
+        result = capability_manifest(request) \
+            if request["product"] == CAPABILITY_REQUEST_PRODUCT \
+            else execute(request, args.root_environment)
         sys.stdout.write(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
     except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as error:

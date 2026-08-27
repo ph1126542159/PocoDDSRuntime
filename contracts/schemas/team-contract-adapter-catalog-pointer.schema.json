@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-pointer.schema.json",
+  "title": "Atomic Adapter Catalog state pointer", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "catalogId", "generation", "stateSha256", "updatedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCatalogPointer"},
+    "catalogId": {"$ref": "#/$defs/id"}, "generation": {"type": "integer", "minimum": 1},
+    "stateSha256": {"$ref": "#/$defs/sha256"}, "updatedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

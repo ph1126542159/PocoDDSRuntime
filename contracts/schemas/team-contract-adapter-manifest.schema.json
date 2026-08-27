@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-manifest.schema.json",
+  "title": "Discoverable pinned Team Contract Adapter manifest", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "manifestId", "adapterId", "adapterType", "owner", "revision", "protocolId", "configPath", "configSha256", "identityField", "capabilityRequestProduct", "capabilityManifestProduct"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterManifest"},
+    "manifestId": {"$ref": "#/$defs/id"}, "adapterId": {"$ref": "#/$defs/id"}, "adapterType": {"$ref": "#/$defs/type"},
+    "owner": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"},
+    "revision": {"$ref": "#/$defs/id"}, "protocolId": {"$ref": "#/$defs/id"}, "configPath": {"type": "string", "minLength": 1},
+    "configSha256": {"$ref": "#/$defs/sha256"}, "identityField": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{0,63}$", "not": {"enum": ["schemaVersion", "product", "requestId", "implementationId", "protocolMajor", "protocolMinor", "capabilities"]}},
+    "capabilityRequestProduct": {"$ref": "#/$defs/id"}, "capabilityManifestProduct": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "type": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

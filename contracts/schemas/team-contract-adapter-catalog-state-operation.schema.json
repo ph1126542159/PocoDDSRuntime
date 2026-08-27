@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-state-operation.schema.json",
+  "title": "Adapter Catalog activation or rollback report", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "action", "catalogId", "generation", "currentGeneration", "catalogGeneration", "catalogSha256", "stateSha256", "previousStateSha256", "operationId", "actor", "reason", "rollbackFromGeneration", "rollbackToGeneration", "occurredAt", "idempotentReplay"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCatalogStateOperation"}, "passed": {"const": true},
+    "action": {"enum": ["activate", "rollback"]}, "catalogId": {"$ref": "#/$defs/id"},
+    "generation": {"type": "integer", "minimum": 1}, "currentGeneration": {"type": "integer", "minimum": 1},
+    "catalogGeneration": {"type": "integer", "minimum": 1}, "catalogSha256": {"$ref": "#/$defs/sha256"}, "stateSha256": {"$ref": "#/$defs/sha256"},
+    "previousStateSha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "operationId": {"$ref": "#/$defs/id"}, "actor": {"$ref": "#/$defs/id"}, "reason": {"type": "string", "minLength": 1, "maxLength": 512},
+    "rollbackFromGeneration": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]}, "rollbackToGeneration": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
+    "occurredAt": {"type": "string", "format": "date-time"}, "idempotentReplay": {"type": "boolean"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

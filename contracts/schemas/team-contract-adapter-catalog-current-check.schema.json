@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-current-check.schema.json",
+  "title": "Snapshot-consistent current Adapter Catalog capability check", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "catalogId", "generation", "catalogGeneration", "catalogSha256", "stateSha256", "adapters", "checkedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCatalogCurrentCheck"}, "passed": {"const": true},
+    "catalogId": {"$ref": "#/$defs/id"}, "generation": {"type": "integer", "minimum": 1}, "catalogGeneration": {"type": "integer", "minimum": 1},
+    "catalogSha256": {"$ref": "#/$defs/sha256"}, "stateSha256": {"$ref": "#/$defs/sha256"}, "checkedAt": {"type": "string", "format": "date-time"},
+    "adapters": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/$defs/adapter"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "type": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"}, "capability": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "adapter": {"type": "object", "additionalProperties": false, "required": ["adapterId", "adapterType", "manifestId", "revision", "owner", "protocolId", "protocolMajor", "protocolMinor", "capabilities", "capabilityManifestSha256", "configSha256", "healthy"], "properties": {"adapterId": {"$ref": "#/$defs/id"}, "adapterType": {"$ref": "#/$defs/type"}, "manifestId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}, "owner": {"type": "string", "minLength": 3}, "protocolId": {"$ref": "#/$defs/id"}, "protocolMajor": {"type": "integer", "minimum": 1}, "protocolMinor": {"type": "integer", "minimum": 0}, "capabilities": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/capability"}}, "capabilityManifestSha256": {"$ref": "#/$defs/sha256"}, "configSha256": {"$ref": "#/$defs/sha256"}, "healthy": {"const": true}}}
+  }
+}

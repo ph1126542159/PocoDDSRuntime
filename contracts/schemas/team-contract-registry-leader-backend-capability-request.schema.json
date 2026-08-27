@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-backend-capability-request.schema.json",
+  "title": "Registry leader backend capability request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "backendId"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendCapabilityRequest"},
+    "requestId": {"$ref": "#/$defs/id"},
+    "backendId": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}
+  }
+}

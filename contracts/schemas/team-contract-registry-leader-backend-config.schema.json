@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "product", "backendId", "kind", "authorityIds", "registryIds", "executable", "executableSha256", "arguments", "artifactPins", "environmentVariables", "timeoutSeconds", "maxResponseBytes"],
   "properties": {
-    "schemaVersion": {"const": 1},
+    "schemaVersion": {"enum": [1, 2, 3, 4]},
     "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendConfig"},
     "backendId": {"$ref": "#/$defs/id"},
     "kind": {"const": "external-command"},
@@ -18,7 +18,19 @@
     "artifactPins": {"type": "array", "maxItems": 32, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}}}},
     "environmentVariables": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"}},
     "timeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 30},
-    "maxResponseBytes": {"type": "integer", "minimum": 1024, "maximum": 1048576}
+    "maxResponseBytes": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+    "protocolMajor": {"type": "integer", "minimum": 1, "maximum": 65535},
+    "minimumProtocolMinor": {"type": "integer", "minimum": 0, "maximum": 65535},
+    "requiredCapabilities": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"}},
+    "secretProvider": {"type": "object", "additionalProperties": false, "required": ["kind", "providerId", "configPath", "configSha256"], "properties": {"kind": {"const": "external-command"}, "providerId": {"$ref": "#/$defs/id"}, "configPath": {"type": "string", "minLength": 1}, "configSha256": {"$ref": "#/$defs/sha256"}}},
+    "credentialBindings": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"type": "object", "additionalProperties": false, "required": ["environmentVariable", "secretRef"], "properties": {"environmentVariable": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"}, "secretRef": {"$ref": "team-contract-secret-reference.schema.json"}}}},
+    "minimumCredentialLeaseSeconds": {"type": "integer", "minimum": 2, "maximum": 3600}
   },
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"not": {"anyOf": [{"required": ["protocolMajor"]}, {"required": ["minimumProtocolMinor"]}, {"required": ["requiredCapabilities"]}, {"required": ["secretProvider"]}, {"required": ["credentialBindings"]}]}}, "else": {"required": ["protocolMajor", "minimumProtocolMinor", "requiredCapabilities"]}},
+    {"if": {"properties": {"schemaVersion": {"minimum": 3}}}, "then": {"required": ["secretProvider", "credentialBindings"]}, "else": {"not": {"anyOf": [{"required": ["secretProvider"]}, {"required": ["credentialBindings"]}]} }},
+    {"if": {"properties": {"schemaVersion": {"const": 3}}}, "then": {"properties": {"credentialBindings": {"items": {"properties": {"secretRef": {"properties": {"kind": {"const": "secret-ref"}}}}}}}}},
+    {"if": {"properties": {"schemaVersion": {"const": 4}}}, "then": {"required": ["minimumCredentialLeaseSeconds"]}, "else": {"not": {"required": ["minimumCredentialLeaseSeconds"]}}}
+  ],
   "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
 }

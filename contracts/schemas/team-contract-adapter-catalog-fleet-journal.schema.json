@@ -1,0 +1,804 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-fleet-journal.schema.json",
+    "title": "Recoverable Adapter Catalog Fleet rollout journal",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schemaVersion",
+        "product",
+        "rolloutId",
+        "planSha256",
+        "catalogId",
+        "candidateCatalogGeneration",
+        "candidateCatalogSha256",
+        "status",
+        "currentWave",
+        "failedWave",
+        "nodes",
+        "createdAt",
+        "updatedAt",
+        "journalSha256"
+    ],
+    "properties": {
+        "schemaVersion": {
+            "enum": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        "product": {
+            "const": "PocoDDSRuntimeTeamContractAdapterCatalogFleetJournal"
+        },
+        "rolloutId": {
+            "$ref": "#/$defs/pathId"
+        },
+        "planSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "executorConfigSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "gateConfigSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "controlAuthorizerConfigSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "stateBackendConfigSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "artifactStoreConfigSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "adapterConfigResolverId": {
+            "$ref": "#/$defs/id"
+        },
+        "executorConfigRef": {
+            "$ref": "#/$defs/adapterConfigRef"
+        },
+        "gateConfigRef": {
+            "$ref": "#/$defs/adapterConfigRef"
+        },
+        "controlAuthorizerConfigRef": {
+            "$ref": "#/$defs/adapterConfigRef"
+        },
+        "stateBackendConfigRef": {
+            "$ref": "#/$defs/adapterConfigRef"
+        },
+        "artifactStoreConfigRef": {
+            "$ref": "#/$defs/adapterConfigRef"
+        },
+        "stateVersion": {
+            "type": "integer",
+            "minimum": 1
+        },
+        "previousJournalSha256": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/sha256"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "lastCoordinatorId": {
+            "$ref": "#/$defs/id"
+        },
+        "adapterConformancePolicy": {"type": "object"},
+        "adapterConformanceTrustPolicy": {"type": "object"},
+        "admissions": {"type": "array", "minItems": 1, "maxItems": 200, "items": {"type": "object", "additionalProperties": false, "required": ["admissionId", "policyId", "coordinatorId", "bundleSha256", "entries", "admittedAt"], "properties": {"admissionId": {"$ref": "#/$defs/sha256"}, "policyId": {"$ref": "#/$defs/id"}, "coordinatorId": {"$ref": "#/$defs/id"}, "bundleSha256": {"$ref": "#/$defs/sha256"}, "entries": {"type": "array", "minItems": 6, "maxItems": 6}, "admittedAt": {"type": "string", "format": "date-time"}}}},
+        "catalogId": {
+            "$ref": "#/$defs/id"
+        },
+        "candidateCatalogGeneration": {
+            "type": "integer",
+            "minimum": 2
+        },
+        "candidateCatalogSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "status": {
+            "enum": [
+                "running",
+                "paused",
+                "rolling-back",
+                "rollback-failed",
+                "committed",
+                "rolled-back"
+            ]
+        },
+        "currentWave": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32
+        },
+        "failedWave": {
+            "oneOf": [
+                {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "nodes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1024,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "nodeId",
+                    "waveIndex",
+                    "status",
+                    "attempts",
+                    "errorCode",
+                    "reconcileReportSha256",
+                    "currentActivationGeneration",
+                    "updatedAt"
+                ],
+                "properties": {
+                    "nodeId": {
+                        "$ref": "#/$defs/pathId"
+                    },
+                    "waveIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 31
+                    },
+                    "status": {
+                        "enum": [
+                            "pending",
+                            "deploying",
+                            "committed",
+                            "failed",
+                            "rolling-back",
+                            "rolled-back",
+                            "rollback-failed"
+                        ]
+                    },
+                    "attempts": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                    },
+                    "errorCode": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/$defs/id"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "reconcileReportSha256": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/$defs/sha256"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "currentActivationGeneration": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            }
+        },
+        "gates": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+                "$ref": "#/$defs/gate"
+            }
+        },
+        "controlGeneration": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+        },
+        "controls": {
+            "type": "array",
+            "maxItems": 100
+        },
+        "authorizationAttempts": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+                "$ref": "#/$defs/authorization"
+            }
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "journalSha256": {
+            "$ref": "#/$defs/sha256"
+        }
+    },
+    "allOf": [
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 1
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "executorConfigSha256"
+                ],
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "running",
+                            "rolling-back",
+                            "rollback-failed",
+                            "committed",
+                            "rolled-back"
+                        ]
+                    }
+                },
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "gateConfigSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "gates"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "controlGeneration"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "controls"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "controlAuthorizerConfigSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "authorizationAttempts"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 2
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "executorConfigSha256",
+                    "gateConfigSha256",
+                    "gates",
+                    "controlGeneration",
+                    "controls"
+                ],
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "controlAuthorizerConfigSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "authorizationAttempts"
+                            ]
+                        }
+                    ]
+                },
+                "properties": {
+                    "controls": {
+                        "items": {
+                            "$ref": "#/$defs/controlV2"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 3
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "executorConfigSha256",
+                    "gateConfigSha256",
+                    "gates",
+                    "controlGeneration",
+                    "controls",
+                    "controlAuthorizerConfigSha256",
+                    "authorizationAttempts"
+                ],
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "stateBackendConfigSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "artifactStoreConfigSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "stateVersion"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "previousJournalSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "lastCoordinatorId"
+                            ]
+                        }
+                    ]
+                },
+                "properties": {
+                    "controls": {
+                        "items": {
+                            "$ref": "#/$defs/controlV3"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 4
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "executorConfigSha256",
+                    "gateConfigSha256",
+                    "gates",
+                    "controlGeneration",
+                    "controls",
+                    "controlAuthorizerConfigSha256",
+                    "authorizationAttempts",
+                    "stateBackendConfigSha256",
+                    "artifactStoreConfigSha256",
+                    "stateVersion",
+                    "previousJournalSha256",
+                    "lastCoordinatorId"
+                ],
+                "properties": {
+                    "controls": {
+                        "items": {
+                            "$ref": "#/$defs/controlV3"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 5
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "adapterConfigResolverId",
+                    "executorConfigRef",
+                    "gateConfigRef",
+                    "controlAuthorizerConfigRef",
+                    "stateBackendConfigRef",
+                    "artifactStoreConfigRef",
+                    "gates",
+                    "controlGeneration",
+                    "controls",
+                    "authorizationAttempts",
+                    "stateVersion",
+                    "previousJournalSha256",
+                    "lastCoordinatorId"
+                ],
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "executorConfigSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "gateConfigSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "controlAuthorizerConfigSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "stateBackendConfigSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "artifactStoreConfigSha256"
+                            ]
+                        }
+                    ]
+                },
+                "properties": {
+                    "controls": {
+                        "items": {
+                            "$ref": "#/$defs/controlV3"
+                        }
+                    }
+                }
+            }
+        },
+        {"if": {"properties": {"schemaVersion": {"const": 6}}}, "then": {"required": ["adapterConfigResolverId", "executorConfigRef", "gateConfigRef", "controlAuthorizerConfigRef", "stateBackendConfigRef", "artifactStoreConfigRef", "gates", "controlGeneration", "controls", "authorizationAttempts", "stateVersion", "previousJournalSha256", "lastCoordinatorId", "adapterConformancePolicy", "admissions"]}},
+        {"if": {"properties": {"schemaVersion": {"const": 7}}}, "then": {"required": ["adapterConfigResolverId", "executorConfigRef", "gateConfigRef", "controlAuthorizerConfigRef", "stateBackendConfigRef", "artifactStoreConfigRef", "gates", "controlGeneration", "controls", "authorizationAttempts", "stateVersion", "previousJournalSha256", "lastCoordinatorId", "adapterConformancePolicy", "adapterConformanceTrustPolicy", "admissions"]}}
+    ],
+    "$defs": {
+        "pathId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,60}$"
+        },
+        "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+        },
+        "adapterConfigRef": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "kind",
+                "resolverId",
+                "configId",
+                "adapterKind",
+                "adapterId",
+                "revision"
+            ],
+            "properties": {
+                "kind": {
+                    "const": "adapter-config-ref"
+                },
+                "resolverId": {
+                    "$ref": "#/$defs/id"
+                },
+                "configId": {
+                    "$ref": "#/$defs/id"
+                },
+                "adapterKind": {
+                    "enum": [
+                        "artifact-store",
+                        "control-authorizer",
+                        "fleet-executor",
+                        "registry-leader-backend",
+                        "wave-gate"
+                    ]
+                },
+                "adapterId": {
+                    "$ref": "#/$defs/id"
+                },
+                "revision": {
+                    "$ref": "#/$defs/id"
+                }
+            }
+        },
+        "gate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "waveId",
+                "waveIndex",
+                "status",
+                "attempts",
+                "observationStartedAt",
+                "evidenceSha256",
+                "diagnosticCode",
+                "updatedAt"
+            ],
+            "properties": {
+                "waveId": {
+                    "$ref": "#/$defs/pathId"
+                },
+                "waveIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31
+                },
+                "status": {
+                    "enum": [
+                        "pending",
+                        "waiting",
+                        "evaluating",
+                        "passed",
+                        "paused",
+                        "failed"
+                    ]
+                },
+                "attempts": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                },
+                "observationStartedAt": {
+                    "oneOf": [
+                        {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "evidenceSha256": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/sha256"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "diagnosticCode": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/id"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        },
+        "controlV2": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "generation",
+                "operationId",
+                "action",
+                "actor",
+                "reason",
+                "waveIndex",
+                "at"
+            ],
+            "properties": {
+                "generation": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                },
+                "operationId": {
+                    "$ref": "#/$defs/id"
+                },
+                "action": {
+                    "enum": [
+                        "resume",
+                        "abort"
+                    ]
+                },
+                "actor": {
+                    "$ref": "#/$defs/id"
+                },
+                "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512,
+                    "pattern": "^[^\\r\\n]+$"
+                },
+                "waveIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31
+                },
+                "at": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        },
+        "controlV3": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "generation",
+                "operationId",
+                "action",
+                "actor",
+                "reason",
+                "waveIndex",
+                "at",
+                "authorizationId",
+                "authorizationEvidenceSha256"
+            ],
+            "properties": {
+                "generation": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                },
+                "operationId": {
+                    "$ref": "#/$defs/id"
+                },
+                "action": {
+                    "enum": [
+                        "resume",
+                        "abort"
+                    ]
+                },
+                "actor": {
+                    "$ref": "#/$defs/id"
+                },
+                "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512,
+                    "pattern": "^[^\\r\\n]+$"
+                },
+                "waveIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31
+                },
+                "at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "authorizationId": {
+                    "$ref": "#/$defs/id"
+                },
+                "authorizationEvidenceSha256": {
+                    "$ref": "#/$defs/sha256"
+                }
+            }
+        },
+        "authorization": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "authorizationId",
+                "operationId",
+                "action",
+                "claimedActor",
+                "reasonSha256",
+                "decision",
+                "principalId",
+                "evidenceSha256",
+                "diagnosticCode",
+                "controlGeneration",
+                "waveIndex",
+                "at"
+            ],
+            "properties": {
+                "authorizationId": {
+                    "$ref": "#/$defs/id"
+                },
+                "operationId": {
+                    "$ref": "#/$defs/id"
+                },
+                "action": {
+                    "enum": [
+                        "resume",
+                        "abort"
+                    ]
+                },
+                "claimedActor": {
+                    "$ref": "#/$defs/id"
+                },
+                "reasonSha256": {
+                    "$ref": "#/$defs/sha256"
+                },
+                "decision": {
+                    "enum": [
+                        "allow",
+                        "deny"
+                    ]
+                },
+                "principalId": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/id"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "evidenceSha256": {
+                    "$ref": "#/$defs/sha256"
+                },
+                "diagnosticCode": {
+                    "oneOf": [
+                        {
+                            "$ref": "#/$defs/id"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "controlGeneration": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                },
+                "waveIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31
+                },
+                "at": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-artifact-store-response.schema.json",
+  "title": "Artifact Store response", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "storeId", "operation", "passed", "found", "stored", "sha256", "sizeBytes", "mediaType", "contentBase64", "error"],
+  "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractArtifactStoreResponse"}, "requestId": {"$ref": "#/$defs/id"}, "storeId": {"$ref": "#/$defs/id"}, "operation": {"enum": ["put", "get"]}, "passed": {"type": "boolean"}, "found": {"type": "boolean"}, "stored": {"type": ["boolean", "null"]}, "sha256": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}, "sizeBytes": {"type": ["integer", "null"], "minimum": 1}, "mediaType": {"type": ["string", "null"]}, "contentBase64": {"type": ["string", "null"]}, "error": {"type": ["string", "null"], "maxLength": 1024}},
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-backend-config-reference.schema.json",
+  "title": "Portable backend configuration reference",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "resolverId", "configId", "backendId", "revision"],
+  "properties": {
+    "kind": {"const": "backend-config-ref"},
+    "resolverId": {"$ref": "#/$defs/id"},
+    "configId": {"$ref": "#/$defs/id"},
+    "backendId": {"$ref": "#/$defs/id"},
+    "revision": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}}
+}

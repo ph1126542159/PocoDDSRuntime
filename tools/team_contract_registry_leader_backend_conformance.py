@@ -181,6 +181,11 @@ def execute_command(args: argparse.Namespace) -> int:
             "backendId": backend.backend_id, "authorityId": args.authority_id,
             "registryId": args.registry_id,
             "backendConfigSha256": backend.config_sha256,
+            "backendProtocol": {
+                "major": backend.capability_manifest["protocolMajor"],
+                "minor": backend.capability_manifest["protocolMinor"],
+            } if backend.capability_manifest is not None else None,
+            "capabilityManifestSha256": backend.capability_manifest_sha256,
             "startedAt": started, "completedAt": registry_tool.utc_time(None),
             "finalFencingToken": 2, "finalGrantSha256": winner[2],
             "checks": checks,

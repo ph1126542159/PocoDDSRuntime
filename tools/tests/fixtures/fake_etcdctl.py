@@ -132,9 +132,23 @@ def main() -> int:
         endpoints = endpoint_flag.split("=", 1)[1].split(",")
         mode = os.environ.get("PDR_TEST_ETCDCTL_MODE", "normal")
         if "health" in arguments:
-            for item in endpoints:
+            healthy_endpoints = endpoints[:-1] \
+                if mode == "health-failure" else endpoints
+            for item in healthy_endpoints:
                 print(f"{item} is healthy: successfully committed proposal")
+            if mode == "health-failure":
+                print(f"{endpoints[-1]} is unhealthy", file=sys.stderr)
+                return 2
             return 0
+        postflight_failure = False
+        if mode == "postflight-leader-mismatch":
+            counter_path = root / ".postflight-status-count"
+            with Lock(root / ".postflight-status-lock"):
+                count = int(counter_path.read_text(encoding="utf-8")) \
+                    if counter_path.is_file() else 0
+                count += 1
+                counter_path.write_text(str(count), encoding="utf-8")
+            postflight_failure = count >= 2
         statuses = []
         for offset, item in enumerate(endpoints, start=1):
             statuses.append({
@@ -147,9 +161,17 @@ def main() -> int:
                         "revision": 42,
                         "raft_term": 7,
                     },
-                    "version": "3.6.0", "leader": 1002,
+                    "version": "3.6.0",
+                    "leader": 1003
+                        if (mode == "leader-mismatch" or postflight_failure)
+                        and offset == len(endpoints)
+                        else 1002,
                     "raftTerm": 7, "raftIndex": 50,
-                    "raftAppliedIndex": 50, "isLearner": False,
+                    "raftAppliedIndex": 51
+                        if mode == "raft-lag" and offset == len(endpoints)
+                        else 50,
+                    "isLearner": mode == "learner"
+                        and offset == len(endpoints),
                     "errors": [],
                 },
             })

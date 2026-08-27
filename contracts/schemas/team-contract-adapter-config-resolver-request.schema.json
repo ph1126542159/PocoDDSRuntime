@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-config-resolver-request.schema.json",
+  "title": "Adapter configuration resolver request", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "resolverId", "operation", "reference", "scope"],
+  "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterConfigResolverRequest"}, "requestId": {"$ref": "#/$defs/id"}, "resolverId": {"$ref": "#/$defs/id"}, "operation": {"const": "resolve"}, "reference": {"$ref": "#/$defs/reference"}, "scope": {"$ref": "#/$defs/scope"}},
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "reference": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "adapterKind", "adapterId", "revision"], "properties": {"kind": {"const": "adapter-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "adapterKind": {"enum": ["artifact-store", "control-authorizer", "fleet-executor", "registry-leader-backend", "wave-gate"]}, "adapterId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}},
+    "scope": {"type": "object", "additionalProperties": false, "required": ["consumerType", "consumerId", "resourceId"], "properties": {"consumerType": {"$ref": "#/$defs/id"}, "consumerId": {"$ref": "#/$defs/id"}, "resourceId": {"$ref": "#/$defs/id"}}}
+  }
+}

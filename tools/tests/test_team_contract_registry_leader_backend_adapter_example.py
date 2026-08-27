@@ -58,7 +58,15 @@ class LeaderBackendAdapterExampleTests(unittest.TestCase):
             )
             self.assertIn("PDR_LEADER_BACKEND_SAMPLE_CONFIG_PASS", generated.stdout)
             document = json.loads(config.read_bytes())
-            self.assertEqual(document["arguments"], [str(adapter.resolve())])
+            self.assertEqual(document["schemaVersion"], 2)
+            self.assertEqual(document["protocolMajor"], 1)
+            self.assertIn(
+                "atomic-compare-and-swap", document["requiredCapabilities"]
+            )
+            self.assertEqual(document["arguments"], [
+                str(adapter.resolve()), "--root-environment",
+                "PDR_LEADER_BACKEND_SAMPLE_ROOT",
+            ])
             self.assertEqual(
                 document["artifactPins"][0]["sha256"],
                 hashlib.sha256(adapter.read_bytes()).hexdigest(),
@@ -127,6 +135,10 @@ class LeaderBackendAdapterExampleTests(unittest.TestCase):
             evidence = json.loads(report.read_bytes())
             self.assertEqual(evidence["finalFencingToken"], 2)
             self.assertEqual(len(evidence["checks"]), 6)
+            self.assertEqual(evidence["backendProtocol"], {"major": 1, "minor": 0})
+            self.assertRegex(
+                evidence["capabilityManifestSha256"], r"^[0-9a-f]{64}$"
+            )
             scope = store / authority1 / registry1
             current = json.loads((scope / "current.json").read_bytes())
             self.assertEqual(current["fencingToken"], 2)
@@ -154,7 +166,7 @@ class LeaderBackendAdapterExampleTests(unittest.TestCase):
             self.assertFalse((store / authority2 / registry2).exists())
             print(
                 "PDR_REGISTRY_LEADER_BACKEND_ADAPTER_EXAMPLE_PASS "
-                "generated=1 pins=1 overwrite=1 conformance=1 cas=1 "
+                "generated=1 pins=1 overwrite=1 capability=1 conformance=1 cas=1 "
                 "history=1 retained=1 empty-stale=1 tamper=1"
             )
 

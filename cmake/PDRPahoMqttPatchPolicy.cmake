@@ -1,0 +1,36 @@
+include_guard(GLOBAL)
+
+function(pdr_paho_mqtt_has_callback_teardown_fix output_variable)
+    set(_candidate_targets
+        eclipse-paho-mqtt-c::paho-mqtt3cs-static
+        paho-mqtt3cs-static
+        eclipse-paho-mqtt-c::paho-mqtt3c-static
+        paho-mqtt3c-static)
+    set(_patched FALSE)
+    foreach(_candidate IN LISTS _candidate_targets)
+        if(NOT TARGET "${_candidate}")
+            continue()
+        endif()
+        get_target_property(_include_dirs "${_candidate}" INTERFACE_INCLUDE_DIRECTORIES)
+        foreach(_include_dir IN LISTS _include_dirs)
+            if(_include_dir MATCHES "^\\$<BUILD_INTERFACE:(.*)>$")
+                set(_include_dir "${CMAKE_MATCH_1}")
+            elseif(_include_dir MATCHES "^\\$<INSTALL_INTERFACE:")
+                continue()
+            endif()
+            set(_header "${_include_dir}/MQTTClient.h")
+            if(EXISTS "${_header}")
+                file(READ "${_header}" _header_content)
+                if(_header_content MATCHES
+                   "PDR_PAHO_MQTTCLIENT_CALLBACK_TEARDOWN_SAFE[ \\t]+1")
+                    set(_patched TRUE)
+                    break()
+                endif()
+            endif()
+        endforeach()
+        if(_patched)
+            break()
+        endif()
+    endforeach()
+    set("${output_variable}" "${_patched}" PARENT_SCOPE)
+endfunction()

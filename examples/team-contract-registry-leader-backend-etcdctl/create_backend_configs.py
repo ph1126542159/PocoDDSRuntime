@@ -16,6 +16,13 @@ from urllib.parse import urlsplit
 
 ADAPTER_PRODUCT = "PocoDDSRuntimeTeamContractRegistryLeaderEtcdAdapterConfig"
 BACKEND_PRODUCT = "PocoDDSRuntimeTeamContractRegistryLeaderBackendConfig"
+REQUIRED_CAPABILITIES = [
+    "atomic-compare-and-swap",
+    "commit-outcome-reconciliation",
+    "immutable-history",
+    "linearizable-read-current",
+    "scope-confinement",
+]
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 ENVIRONMENT_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 VERSION_LINE = re.compile(r"^etcdctl version:\s*(\S+)\s*$", re.MULTILINE)
@@ -142,8 +149,10 @@ def execute(args: argparse.Namespace) -> int:
             if item not in unique_pins:
                 unique_pins.append(item)
         backend_document = {
-            "schemaVersion": 1, "product": BACKEND_PRODUCT,
+            "schemaVersion": 2, "product": BACKEND_PRODUCT,
             "backendId": args.backend_id, "kind": "external-command",
+            "protocolMajor": 1, "minimumProtocolMinor": 0,
+            "requiredCapabilities": REQUIRED_CAPABILITIES,
             "authorityIds": args.authority_id, "registryIds": args.registry_id,
             "executable": str(python), "executableSha256": sha256(python),
             "arguments": [

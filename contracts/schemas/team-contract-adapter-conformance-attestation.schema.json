@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-conformance-attestation.schema.json",
+  "title": "Signed Adapter conformance evidence attestation",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "operation", "certifierId", "keyId", "evidenceSha256", "conformanceId", "adapterKind", "adapterId", "configSha256", "scope", "issuedAt", "expiresAt", "signature"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterConformanceAttestation"}, "operation": {"const": "adapter-conformance-attest"},
+    "certifierId": {"$ref": "#/$defs/id"}, "keyId": {"$ref": "#/$defs/id"}, "evidenceSha256": {"$ref": "#/$defs/sha256"}, "conformanceId": {"$ref": "#/$defs/sha256"},
+    "adapterKind": {"enum": ["adapter-config-resolver", "artifact-store", "control-authorizer", "fleet-executor", "registry-leader-backend", "wave-gate"]}, "adapterId": {"$ref": "#/$defs/id"}, "configSha256": {"$ref": "#/$defs/sha256"},
+    "scope": {"type": "object", "additionalProperties": false, "required": ["primaryId", "secondaryId"], "properties": {"primaryId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}, "secondaryId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}}},
+    "issuedAt": {"type": "string", "format": "date-time"}, "expiresAt": {"type": "string", "format": "date-time"}, "signature": {"type": "string", "minLength": 88, "maxLength": 88}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

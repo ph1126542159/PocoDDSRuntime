@@ -1,0 +1,67 @@
+diff --git a/src/MQTTClient.c b/src/MQTTClient.c
+--- a/src/MQTTClient.c
++++ b/src/MQTTClient.c
+@@ -914,5 +914,10 @@ static thread_return_type WINAPI MQTTClient_run(void* n)
+ 				Log(TRACE_MIN, -1, "Calling messageArrived for client %s, queue depth %d",
+ 					m->c->clientID, m->c->messageQueue->count);
++				/* Detach the queue entry before releasing mqttclient_mutex.  The callback owns
++				 * the nested topic/message allocations when it returns true.  Leaving the entry
++				 * visible lets a concurrent disconnect clean the session and free those same
++				 * allocations before this thread can remove the entry. */
++				ListDetach(m->c->messageQueue, qe);
+ 				Paho_thread_unlock_mutex(mqttclient_mutex);
+ 				rc = (*(m->ma))(m->context, qe->topicName, topicLen, qe->msg);
+ 				Paho_thread_lock_mutex(mqttclient_mutex);
+@@ -926,11 +931,36 @@ static thread_return_type WINAPI MQTTClient_run(void* n)
+ 					if (m->c->persistence)
+ 						MQTTPersistence_unpersistQueueEntry(m->c, (MQTTPersistence_qEntry*)qe);
+ 					#endif
+-					ListRemove(m->c->messageQueue, qe);
++					free(qe);
+ 				}
+-				else
++				else if (m->c->connected && !tostop)
++				{
++					/* A false callback result retains ownership in Paho and retries the
++					 * message at the head of the queue. */
++					if (ListInsert(m->c->messageQueue, qe,
++							sizeof(qe) + sizeof(qe->msg) + qe->msg->payloadlen +
++							strlen(qe->topicName) + 1,
++							m->c->messageQueue->first) == NULL)
++					{
++						free(qe->topicName);
++						MQTTProperties_free(&qe->msg->properties);
++						free(qe->msg->payload);
++						free(qe->msg);
++						free(qe);
++					}
+ 					Log(TRACE_MIN, -1, "False returned from messageArrived for client %s, message remains on queue",
+ 						m->c->clientID);
++				}
++				else
++				{
++					/* The session was closed while the callback ran.  Its false result means
++					 * the application did not free the nested allocations, so release them here. */
++					free(qe->topicName);
++					MQTTProperties_free(&qe->msg->properties);
++					free(qe->msg->payload);
++					free(qe->msg);
++					free(qe);
++				}
+ 			}
+ 			if (pack)
+ 			{
+diff --git a/src/MQTTClient.h b/src/MQTTClient.h
+--- a/src/MQTTClient.h
++++ b/src/MQTTClient.h
+@@ -109,6 +109,10 @@
+ */
+ #if !defined(MQTTCLIENT_H)
+ #define MQTTCLIENT_H
++
++/* PocoDDSRuntime dependency contract: MQTTClient_run detaches an in-flight
++ * callback queue entry before releasing mqttclient_mutex. */
++#define PDR_PAHO_MQTTCLIENT_CALLBACK_TEARDOWN_SAFE 1
+ 
+ #if defined(__cplusplus)
+  extern "C" {

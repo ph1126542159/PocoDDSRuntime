@@ -187,9 +187,15 @@ int main()
     auto subscription = transport.subscribe(
         topic, [&](const TopicSpec&, const Message& message)
         {
-            std::lock_guard<std::mutex> lock(mutex);
-            received.push_back(message.context.messageId);
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                received.push_back(message.context.messageId);
+            }
             changed.notify_all();
+            // Keep the callback active after delivery becomes observable. This
+            // deterministically exercises stop() while Paho is between callback
+            // dispatch and its internal queue cleanup.
+            std::this_thread::sleep_for(std::chrono::milliseconds(25));
         });
 
     const auto started = transport.start();
@@ -241,6 +247,6 @@ int main()
         return 2;
     }
     std::cout << "PDR_MQTT_TRANSPORT_RECOVERY_PASS unexpectedDrop=1 reconnect=1 "
-                 "subscriptionRestored=1 delivery=2\n";
+                 "subscriptionRestored=1 delivery=2 callbackTeardown=1\n";
     return 0;
 }

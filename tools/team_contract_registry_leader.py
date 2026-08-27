@@ -623,8 +623,14 @@ def validate_binding(document: Any, registry_id: str | None = None) -> None:
     if not isinstance(document, dict):
         raise ValueError("Registry leader binding is malformed")
     version = document.get("schemaVersion")
-    expected_fields = base_fields if version == 1 else base_fields | {"authorityBackend"}
-    if (version not in {1, 2} or set(document) != expected_fields
+    backend_fields = {"authorityBackend"}
+    migration_fields = {
+        "backendMigrationEvidencePath", "backendMigrationEvidenceSha256",
+    }
+    expected_fields = base_fields if version == 1 else base_fields | backend_fields
+    if version == 3:
+        expected_fields |= migration_fields
+    if (version not in {1, 2, 3} or set(document) != expected_fields
             or document.get("product") != BINDING_PRODUCT
             or any(not package_tool.IDENTIFIER.fullmatch(str(document.get(name, "")))
                    for name in ("authorityId", "registryId", "leaderId",
@@ -658,6 +664,12 @@ def validate_binding(document: Any, registry_id: str | None = None) -> None:
                 or not package_tool.SHA256.fullmatch(
                     str(backend.get("configSha256", "")))):
             raise ValueError("Registry leader backend binding is malformed")
+        if version == 3 and (
+                not isinstance(document.get("backendMigrationEvidencePath"), str)
+                or not document["backendMigrationEvidencePath"]
+                or not package_tool.SHA256.fullmatch(
+                    str(document.get("backendMigrationEvidenceSha256", "")))):
+            raise ValueError("Registry leader backend migration binding is malformed")
     package_tool.parse_time(document.get("boundAt"), "leader binding boundAt")
 
 
@@ -819,8 +831,85 @@ def _activation_report(operation: str, root: Path, binding: dict[str, Any],
         "registryId": binding["registryId"], "leaderId": binding["leaderId"],
         "purpose": "leadership", "fencingToken": binding["fencingToken"],
         "grantSha256": grant_sha, "registry": str(root),
+        "backendMigrationEvidenceSha256":
+            binding.get("backendMigrationEvidenceSha256"),
         "completedAt": registry_tool.utc_time(None), "operator": operator,
     }
+
+
+def _verify_backend_migration(
+        root: Path, evidence_path_value: str, expected_evidence_sha: str,
+        old_binding: dict[str, Any], target_descriptor: dict[str, Any],
+        target_grant: dict[str, Any], target_grant_sha: str,
+        pointer: dict[str, Any], state: dict[str, Any], at: Any,
+        args: argparse.Namespace) \
+        -> tuple[Path, str]:
+    import team_contract_registry_leader_backend_migration as migration_tool
+
+    evidence, evidence_path, evidence_sha = migration_tool.load_migration(
+        evidence_path_value, expected_evidence_sha
+    )
+    _outside(evidence_path, root, "Registry leader backend migration evidence")
+    source = migration_tool._backend_from_descriptor(
+        evidence["sourceBackend"], evidence["authorityId"],
+        evidence["registryId"], args, "migration source backend",
+    )
+    target = migration_tool._backend_from_descriptor(
+        evidence["targetBackend"], evidence["authorityId"],
+        evidence["registryId"], args, "migration target backend",
+    )
+    if (old_binding.get("authorityBackend") != source.descriptor()
+            or target_descriptor != target.descriptor()
+            or evidence["authorityId"] != old_binding["authorityId"]
+            or evidence["registryId"] != state["registryId"]
+            or evidence["targetLeadershipGrantSha256"] != target_grant_sha
+            or evidence["targetLeadershipToken"]
+                != target_grant["fencingToken"]
+            or evidence["leaderId"] != target_grant["leaderId"]
+            or evidence["baselineRevision"] != pointer["revision"]
+            or evidence["baselineStateSha256"] != pointer["stateSha256"]):
+        raise ValueError("Registry leader backend migration evidence does not bind activation")
+    if evidence["schemaVersion"] == 1:
+        sync, _, _ = migration_tool.load_sync(
+            evidence["syncEvidencePath"], evidence["syncEvidenceSha256"]
+        )
+    else:
+        reference = evidence["syncEvidenceRef"]
+        artifact_store = migration_tool._artifact_store(
+            args, evidence["migrationId"], reference["storeId"]
+        )
+        if artifact_store is None:
+            raise ValueError("Registry leader migration Artifact Store is unavailable")
+        sync, _ = migration_tool._sync_bytes(
+            artifact_store.get(reference), reference["sha256"]
+        )
+    if (sync["migrationId"] != evidence["migrationId"]
+            or sync["sourceBackend"] != evidence["sourceBackend"]
+            or sync["targetBackend"] != evidence["targetBackend"]
+            or sync["synchronizedThroughToken"]
+                != evidence["sourceFenceToken"]
+            or sync["synchronizedGrantSha256"]
+                != evidence["sourceFenceGrantSha256"]
+            or sync["grantChainSha256"] != evidence["grantChainSha256"]):
+        raise ValueError("Registry leader backend migration sync evidence changed")
+    source_current = source.current()
+    if source_current is None:
+        raise ValueError("Registry leader migration source fence disappeared")
+    source_fence, _, source_sha = source_current
+    trust_path = Path(old_binding["trustPolicyPath"]).resolve()
+    trust, _, pinned_trust = load_trust_policy(
+        trust_path, old_binding["trustPolicyId"],
+        old_binding["trustPolicySha256"],
+    )
+    verify_grant(source_fence, trust, pinned_trust, at, True)
+    if (source_sha != evidence["sourceFenceGrantSha256"]
+            or source_fence["fencingToken"] != evidence["sourceFenceToken"]
+            or source_fence["purpose"] != "fence"
+            or source_fence["leaderId"] is not None
+            or target_grant["previousGrantSha256"] != source_sha
+            or target_grant["fencingToken"] != source_fence["fencingToken"] + 1):
+        raise ValueError("Registry leader migration source fence or target chain changed")
+    return evidence_path, evidence_sha
 
 
 def activate_command(args: argparse.Namespace) -> int:
@@ -892,6 +981,18 @@ def activate_command(args: argparse.Namespace) -> int:
         existing = read_binding(root, state["registryId"])
         operation: str
         promoted_sha: str | None = None
+        migration_evidence_path: Path | None = None
+        migration_evidence_sha: str | None = None
+        migration_evidence_value = getattr(
+            args, "backend_migration_evidence", None
+        )
+        expected_migration_sha = getattr(
+            args, "expected_backend_migration_evidence_sha256", None
+        )
+        if bool(migration_evidence_value) != bool(expected_migration_sha):
+            raise ValueError(
+                "backend migration activation requires evidence and pinned SHA"
+            )
         if standby is not None:
             if standby[0]["standbyId"] != args.node_id:
                 raise ValueError("Registry standby identity does not match leader grant")
@@ -905,10 +1006,32 @@ def activate_command(args: argparse.Namespace) -> int:
                 raise ValueError("Registry leader renewal is not a newer same-node grant")
             old_backend = old.get("authorityBackend")
             if old_backend != backend_descriptor:
-                raise ValueError(
-                    "Registry leader renewal cannot change the authority backend"
-                )
-            operation = "renew"
+                if (not migration_evidence_value or backend_descriptor is None
+                        or old_backend is None):
+                    raise ValueError(
+                        "Registry leader renewal cannot change the authority backend"
+                    )
+                migration_evidence_path, migration_evidence_sha = \
+                    _verify_backend_migration(
+                        root, migration_evidence_value, expected_migration_sha,
+                        old, backend_descriptor, grant, grant_sha,
+                        pointer, state, args.leader_verification_time,
+                        args,
+                    )
+                operation = "migrate"
+            else:
+                if migration_evidence_value:
+                    raise ValueError(
+                        "backend migration evidence cannot authorize a renewal"
+                    )
+                operation = "renew"
+            if old["schemaVersion"] == 3 and operation == "renew":
+                migration_evidence_path = Path(
+                    old["backendMigrationEvidencePath"]
+                ).resolve()
+                migration_evidence_sha = old[
+                    "backendMigrationEvidenceSha256"
+                ]
             promoted_sha = old["promotedFromStandbyMarkerSha256"]
         else:
             if (not args.confirm_enroll_primary or grant["fencingToken"] != 1
@@ -918,8 +1041,15 @@ def activate_command(args: argparse.Namespace) -> int:
                     "--confirm-enroll-primary"
                 )
             operation = "enroll"
+        if migration_evidence_value and operation != "migrate":
+            raise ValueError(
+                "backend migration evidence is only valid for backend cutover"
+            )
+        binding_version = 1
+        if backend_descriptor is not None:
+            binding_version = 3 if migration_evidence_path is not None else 2
         binding = {
-            "schemaVersion": 2 if backend_descriptor is not None else 1,
+            "schemaVersion": binding_version,
             "product": BINDING_PRODUCT,
             "authorityId": grant["authorityId"], "registryId": grant["registryId"],
             "leaderId": grant["leaderId"], "fencingToken": grant["fencingToken"],
@@ -932,12 +1062,31 @@ def activate_command(args: argparse.Namespace) -> int:
         }
         if backend_descriptor is not None:
             binding["authorityBackend"] = backend_descriptor
+        if migration_evidence_path is not None:
+            binding["backendMigrationEvidencePath"] = str(
+                migration_evidence_path
+            )
+            binding["backendMigrationEvidenceSha256"] = migration_evidence_sha
         validate_binding(binding, state["registryId"])
         with registry_tool.RegistryLease(root, f"leader-{operation}", args.operator) as lease:
             lease.assert_current()
             final_pointer, final_state = registry_tool.verified_current(root, args)
             if (final_pointer != pointer or final_state != state):
                 raise ValueError("Registry state changed during leader activation")
+            if operation == "migrate":
+                final_existing = read_binding(root, state["registryId"])
+                if final_existing != existing:
+                    raise ValueError(
+                        "Registry leader binding changed during backend migration"
+                    )
+                _verify_backend_migration(
+                    root, str(migration_evidence_path),
+                    str(migration_evidence_sha), existing[0],
+                    backend_descriptor, grant, grant_sha,
+                    final_pointer, final_state,
+                    args.leader_verification_time,
+                    args,
+                )
             if authority_backend is None:
                 if grant_path is None:
                     raise ValueError("Registry current leader grant path disappeared")
@@ -1055,6 +1204,14 @@ def parser() -> argparse.ArgumentParser:
     activate.add_argument("--operator", required=True)
     activate.add_argument("--operation-audit", required=True)
     activate.add_argument("--confirm-enroll-primary", action="store_true")
+    activate.add_argument("--backend-migration-evidence")
+    activate.add_argument("--expected-backend-migration-evidence-sha256")
+    activate.add_argument("--artifact-store-config")
+    activate.add_argument("--expected-artifact-store-config-sha256")
+    activate.add_argument("--backend-config-resolver-config")
+    activate.add_argument(
+        "--expected-backend-config-resolver-config-sha256"
+    )
     activate.add_argument("--bound-at")
     activate.add_argument("--report")
     activate.add_argument("--trust-policy", required=True)

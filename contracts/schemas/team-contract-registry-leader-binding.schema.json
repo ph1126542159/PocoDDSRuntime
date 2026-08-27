@@ -4,7 +4,8 @@
   "title": "Local Registry binding to a file or external-command leader authority",
   "oneOf": [
     {"$ref": "#/$defs/fileBinding"},
-    {"$ref": "#/$defs/backendBinding"}
+    {"$ref": "#/$defs/backendBinding"},
+    {"$ref": "#/$defs/migrationBackendBinding"}
   ],
   "$defs": {
     "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
@@ -58,6 +59,39 @@
             "configSha256": {"$ref": "#/$defs/sha256"}
           }
         }
+      }
+    },
+    "migrationBackendBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "product", "authorityId", "registryId", "leaderId", "fencingToken", "grantPath", "grantSha256", "trustPolicyPath", "trustPolicyId", "trustPolicySha256", "promotedFromStandbyMarkerSha256", "boundAt", "authorityBackend", "backendMigrationEvidencePath", "backendMigrationEvidenceSha256"],
+      "properties": {
+        "schemaVersion": {"const": 3},
+        "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBinding"},
+        "authorityId": {"$ref": "#/$defs/id"},
+        "registryId": {"$ref": "#/$defs/id"},
+        "leaderId": {"$ref": "#/$defs/id"},
+        "fencingToken": {"type": "integer", "minimum": 1},
+        "grantPath": {"type": "null"},
+        "grantSha256": {"$ref": "#/$defs/sha256"},
+        "trustPolicyPath": {"type": "string", "minLength": 1},
+        "trustPolicyId": {"$ref": "#/$defs/id"},
+        "trustPolicySha256": {"$ref": "#/$defs/sha256"},
+        "promotedFromStandbyMarkerSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "boundAt": {"type": "string", "format": "date-time"},
+        "authorityBackend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "backendId", "configPath", "configSha256"],
+          "properties": {
+            "kind": {"const": "external-command"},
+            "backendId": {"$ref": "#/$defs/id"},
+            "configPath": {"type": "string", "minLength": 1},
+            "configSha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "backendMigrationEvidencePath": {"type": "string", "minLength": 1},
+        "backendMigrationEvidenceSha256": {"$ref": "#/$defs/sha256"}
       }
     }
   }

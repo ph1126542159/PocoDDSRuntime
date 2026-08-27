@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-reconciler-request.schema.json",
+  "title": "Adapter Catalog lifecycle operation request", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "transactionId", "reconcilerId", "operation", "catalogId", "sourceActivationGeneration", "sourceCatalogGeneration", "sourceCatalogSha256", "candidateCatalogGeneration", "candidateCatalogSha256", "currentActivationGeneration", "attempt"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCatalogReconcilerRequest"}, "requestId": {"type": "string", "format": "uuid"},
+    "transactionId": {"$ref": "#/$defs/id"}, "reconcilerId": {"$ref": "#/$defs/id"}, "operation": {"enum": ["prepare", "drain", "activate", "health", "commit", "abort", "rollback"]}, "catalogId": {"$ref": "#/$defs/id"},
+    "sourceActivationGeneration": {"type": "integer", "minimum": 1}, "sourceCatalogGeneration": {"type": "integer", "minimum": 1}, "sourceCatalogSha256": {"$ref": "#/$defs/sha256"},
+    "candidateCatalogGeneration": {"type": "integer", "minimum": 2}, "candidateCatalogSha256": {"$ref": "#/$defs/sha256"}, "currentActivationGeneration": {"type": "integer", "minimum": 1}, "attempt": {"type": "integer", "minimum": 0, "maximum": 100}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

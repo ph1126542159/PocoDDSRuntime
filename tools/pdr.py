@@ -791,6 +791,240 @@ def manage_team_contract_registry_leader(args: argparse.Namespace) -> int:
     return getattr(leader, f"{args.leader_operation}_command")(args)
 
 
+def load_team_contract_registry_leader_backend_capabilities():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_registry_leader_backend_capabilities.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_leader_backend_capabilities_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Registry leader backend capability tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def inspect_team_contract_registry_leader_backend_capabilities(
+        args: argparse.Namespace) -> int:
+    return load_team_contract_registry_leader_backend_capabilities() \
+        .execute_command(args)
+
+
+def load_team_contract_registry_leader_backend_migration():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_registry_leader_backend_migration.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_leader_backend_migration_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Registry leader backend migration tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_registry_leader_backend_migration(
+        args: argparse.Namespace) -> int:
+    tool = load_team_contract_registry_leader_backend_migration()
+    return getattr(tool, f"{args.migration_operation}_command")(args)
+
+
+def load_team_contract_artifact_store():
+    path = Path(__file__).resolve().with_name("team_contract_artifact_store.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_artifact_store_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Artifact Store tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_artifact_store(args: argparse.Namespace) -> int:
+    tool = load_team_contract_artifact_store()
+    return getattr(tool, f"{args.artifact_operation}_command")(args)
+
+
+def load_team_contract_backend_config_resolver():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_backend_config_resolver.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_backend_config_resolver_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Backend Config Resolver tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_backend_config_resolver(
+        args: argparse.Namespace) -> int:
+    return load_team_contract_backend_config_resolver().resolve_command(args)
+
+
+def load_team_contract_secret_provider():
+    path = Path(__file__).resolve().with_name("team_contract_secret_provider.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_secret_provider_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Secret Provider tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_secret_provider(args: argparse.Namespace) -> int:
+    return load_team_contract_secret_provider().check_command(args)
+
+
+def load_team_contract_adapter_catalog():
+    path = Path(__file__).resolve().with_name("team_contract_adapter_catalog.py")
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_adapter_catalog_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Adapter Catalog tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_adapter_catalog(args: argparse.Namespace) -> int:
+    tool = load_team_contract_adapter_catalog()
+    return getattr(tool, f"{args.adapter_catalog_operation}_command")(args)
+
+
+def load_team_contract_adapter_catalog_state():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_adapter_catalog_state.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_adapter_catalog_state_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Adapter Catalog state tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_adapter_catalog_state(args: argparse.Namespace) -> int:
+    tool = load_team_contract_adapter_catalog_state()
+    return getattr(tool, f"{args.adapter_catalog_state_operation}_command")(args)
+
+
+def load_team_contract_adapter_catalog_reconciler():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_adapter_catalog_reconciler.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_adapter_catalog_reconciler_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Adapter Catalog Reconciler tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_adapter_catalog_reconciler(
+        args: argparse.Namespace) -> int:
+    tool = load_team_contract_adapter_catalog_reconciler()
+    return getattr(
+        tool, f"{args.adapter_catalog_reconcile_operation}_command"
+    )(args)
+
+
+def load_team_contract_adapter_catalog_fleet():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_adapter_catalog_fleet.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_adapter_catalog_fleet_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Adapter Catalog Fleet tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def manage_team_contract_adapter_catalog_fleet(
+        args: argparse.Namespace) -> int:
+    tool = load_team_contract_adapter_catalog_fleet()
+    return getattr(tool, f"{args.adapter_catalog_fleet_operation}_command")(args)
+
+
+def load_team_contract_adapter_conformance():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_adapter_conformance.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_adapter_conformance_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load Adapter conformance tooling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def qualify_team_contract_adapter(args: argparse.Namespace) -> int:
+    return load_team_contract_adapter_conformance().execute_command(args)
+
+
+def load_team_contract_adapter_conformance_admission():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_adapter_conformance_admission.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_adapter_conformance_admission_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Adapter conformance admission tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def create_team_contract_adapter_admission(args: argparse.Namespace) -> int:
+    return load_team_contract_adapter_conformance_admission().create_command(args)
+
+
+def load_team_contract_adapter_conformance_trust():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_adapter_conformance_trust.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_adapter_conformance_trust_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Adapter conformance trust tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def attest_team_contract_adapter(args: argparse.Namespace) -> int:
+    return load_team_contract_adapter_conformance_trust().attest_command(args)
+
+
 def load_team_contract_registry_leader_backend_conformance():
     path = Path(__file__).resolve().with_name(
         "team_contract_registry_leader_backend_conformance.py"
@@ -843,6 +1077,27 @@ def load_team_contract_registry_leader_etcd_preflight():
 def preflight_team_contract_registry_leader_etcd(
         args: argparse.Namespace) -> int:
     return load_team_contract_registry_leader_etcd_preflight().execute(args)
+
+
+def load_team_contract_registry_leader_etcd_acceptance():
+    path = Path(__file__).resolve().with_name(
+        "team_contract_registry_leader_etcd_acceptance.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "pdr_team_contract_registry_leader_etcd_acceptance_cli", path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"cannot load Registry leader etcd acceptance tooling: {path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def accept_team_contract_registry_leader_etcd(
+        args: argparse.Namespace) -> int:
+    return load_team_contract_registry_leader_etcd_acceptance().execute_command(args)
 
 
 def manage_team_contract_registry_handoff(args: argparse.Namespace) -> int:
@@ -5193,6 +5448,20 @@ def parser() -> argparse.ArgumentParser:
     registry_leader_activate.add_argument(
         "--confirm-enroll-primary", action="store_true"
     )
+    registry_leader_activate.add_argument("--backend-migration-evidence")
+    registry_leader_activate.add_argument(
+        "--expected-backend-migration-evidence-sha256"
+    )
+    registry_leader_activate.add_argument("--artifact-store-config")
+    registry_leader_activate.add_argument(
+        "--expected-artifact-store-config-sha256"
+    )
+    registry_leader_activate.add_argument(
+        "--backend-config-resolver-config"
+    )
+    registry_leader_activate.add_argument(
+        "--expected-backend-config-resolver-config-sha256"
+    )
     registry_leader_activate.add_argument("--bound-at")
     registry_leader_activate.add_argument("--report")
     registry_leader_activate.add_argument("--trust-policy", required=True)
@@ -5248,6 +5517,662 @@ def parser() -> argparse.ArgumentParser:
         handler=qualify_team_contract_registry_leader_backend
     )
 
+    registry_leader_backend_capabilities = team_contract_commands.add_parser(
+        "registry-leader-backend-capabilities",
+        help="negotiate and record a pinned backend capability manifest",
+    )
+    registry_leader_backend_capabilities.add_argument(
+        "--backend-config", required=True
+    )
+    registry_leader_backend_capabilities.add_argument(
+        "--expected-backend-config-sha256", required=True
+    )
+    registry_leader_backend_capabilities.add_argument(
+        "--authority-id", required=True
+    )
+    registry_leader_backend_capabilities.add_argument(
+        "--registry-id", required=True
+    )
+    registry_leader_backend_capabilities.add_argument("--report")
+    registry_leader_backend_capabilities.set_defaults(
+        handler=inspect_team_contract_registry_leader_backend_capabilities
+    )
+
+    artifact_store_put = team_contract_commands.add_parser(
+        "artifact-store-put",
+        help="publish immutable evidence and return a content-addressed reference",
+    )
+    artifact_store_get = team_contract_commands.add_parser(
+        "artifact-store-get",
+        help="materialize pinned content-addressed evidence",
+    )
+    for command, operation in (
+            (artifact_store_put, "put"), (artifact_store_get, "get")):
+        command.add_argument("--config", required=True)
+        command.add_argument("--expected-config-sha256", required=True)
+        command.add_argument("--namespace-id", required=True)
+        command.set_defaults(
+            handler=manage_team_contract_artifact_store,
+            artifact_operation=operation,
+        )
+    artifact_store_put.add_argument("--input", required=True)
+    artifact_store_put.add_argument(
+        "--media-type", default="application/octet-stream"
+    )
+    artifact_store_put.add_argument("--reference-output", required=True)
+    artifact_store_get.add_argument("--reference", required=True)
+    artifact_store_get.add_argument("--output", required=True)
+
+    secret_provider_check = team_contract_commands.add_parser(
+        "secret-provider-check",
+        help="resolve a version-pinned secret and emit only redacted availability",
+    )
+    secret_provider_check.add_argument("--config", required=True)
+    secret_provider_check.add_argument(
+        "--expected-config-sha256", required=True
+    )
+    secret_provider_check.add_argument("--reference", required=True)
+    secret_provider_check.add_argument(
+        "--expected-reference-sha256", required=True
+    )
+    secret_provider_check.add_argument("--report")
+    secret_provider_check.set_defaults(
+        handler=manage_team_contract_secret_provider
+    )
+
+    for operation in ("list", "check"):
+        adapter_catalog = team_contract_commands.add_parser(
+            f"adapter-catalog-{operation}",
+            help=("list pinned discoverable adapters" if operation == "list"
+                  else "negotiate capabilities for discoverable adapters"),
+        )
+        adapter_catalog.add_argument("--catalog", required=True)
+        adapter_catalog.add_argument(
+            "--expected-catalog-sha256", required=True
+        )
+        adapter_catalog.add_argument("--adapter-type")
+        adapter_catalog.add_argument("--report")
+        adapter_catalog.set_defaults(
+            handler=manage_team_contract_adapter_catalog,
+            adapter_catalog_operation=operation,
+        )
+
+    adapter_catalog_activate = team_contract_commands.add_parser(
+        "adapter-catalog-activate",
+        help="atomically activate a pinned host-local Adapter Catalog",
+    )
+    adapter_catalog_activate.add_argument("--catalog", required=True)
+    adapter_catalog_activate.add_argument(
+        "--expected-catalog-sha256", required=True
+    )
+    adapter_catalog_rollback = team_contract_commands.add_parser(
+        "adapter-catalog-rollback",
+        help="restore an earlier verified Adapter Catalog generation",
+    )
+    adapter_catalog_rollback.add_argument(
+        "--to-generation", type=int, required=True
+    )
+    for command, operation in (
+            (adapter_catalog_activate, "activate"),
+            (adapter_catalog_rollback, "rollback")):
+        command.add_argument("--state-dir", required=True)
+        command.add_argument("--expected-generation", type=int, required=True)
+        command.add_argument("--operation-id", required=True)
+        command.add_argument("--actor", required=True)
+        command.add_argument("--reason", required=True)
+        command.add_argument("--report")
+        command.set_defaults(
+            handler=manage_team_contract_adapter_catalog_state,
+            adapter_catalog_state_operation=operation,
+        )
+    for command_name, operation, help_text in (
+            ("adapter-catalog-current", "current",
+             "resolve the current verified Adapter Catalog"),
+            ("adapter-catalog-current-check", "current_check",
+             "probe the current Catalog and reject a concurrent switch"),
+            ("adapter-catalog-state-verify", "verify",
+             "verify the immutable Catalog activation history")):
+        command = team_contract_commands.add_parser(
+            command_name, help=help_text
+        )
+        command.add_argument("--state-dir", required=True)
+        command.add_argument("--report")
+        command.set_defaults(
+            handler=manage_team_contract_adapter_catalog_state,
+            adapter_catalog_state_operation=operation,
+        )
+
+    adapter_catalog_reconcile = team_contract_commands.add_parser(
+        "adapter-catalog-reconcile",
+        help="health-gate a Catalog rollout and automatically roll back",
+    )
+    adapter_catalog_reconcile.add_argument("--catalog", required=True)
+    adapter_catalog_reconcile.add_argument(
+        "--expected-catalog-sha256", required=True
+    )
+    adapter_catalog_reconcile.add_argument(
+        "--expected-generation", type=int, required=True
+    )
+    adapter_catalog_reconcile.add_argument("--actor", required=True)
+    adapter_catalog_reconcile.add_argument("--reason", required=True)
+    adapter_catalog_reconcile.set_defaults(
+        adapter_catalog_reconcile_operation="run"
+    )
+    adapter_catalog_reconcile_recover = team_contract_commands.add_parser(
+        "adapter-catalog-reconcile-recover",
+        help="resume an interrupted Catalog rollout or rollback",
+    )
+    adapter_catalog_reconcile_recover.set_defaults(
+        adapter_catalog_reconcile_operation="recover"
+    )
+    adapter_catalog_reconcile_revert = team_contract_commands.add_parser(
+        "adapter-catalog-reconcile-revert",
+        help="reverse a committed Catalog rollout through its lifecycle Hook",
+    )
+    adapter_catalog_reconcile_revert.set_defaults(
+        adapter_catalog_reconcile_operation="revert"
+    )
+    for command in (
+            adapter_catalog_reconcile,
+            adapter_catalog_reconcile_recover,
+            adapter_catalog_reconcile_revert):
+        command.add_argument("--config", required=True)
+        command.add_argument("--expected-config-sha256", required=True)
+        command.add_argument("--state-dir", required=True)
+        command.add_argument("--transaction-dir", required=True)
+        command.add_argument("--transaction-id", required=True)
+        command.add_argument("--report")
+        command.set_defaults(handler=manage_team_contract_adapter_catalog_reconciler)
+    adapter_catalog_reconcile_status = team_contract_commands.add_parser(
+        "adapter-catalog-reconcile-status",
+        help="inspect one persistent Catalog rollout journal",
+    )
+    adapter_catalog_reconcile_status.add_argument(
+        "--transaction-dir", required=True
+    )
+    adapter_catalog_reconcile_status.add_argument(
+        "--transaction-id", required=True
+    )
+    adapter_catalog_reconcile_status.add_argument("--report")
+    adapter_catalog_reconcile_status.set_defaults(
+        handler=manage_team_contract_adapter_catalog_reconciler,
+        adapter_catalog_reconcile_operation="status",
+    )
+
+    for command_name, operation, help_text in (
+            ("adapter-catalog-fleet-run", "run",
+             "run a persistent canary/wave Catalog rollout"),
+            ("adapter-catalog-fleet-recover", "recover",
+             "resume an interrupted canary/wave Catalog rollout"),
+            ("adapter-catalog-fleet-resume", "resume",
+             "approve and continue a Wave Gate paused rollout"),
+            ("adapter-catalog-fleet-abort", "abort",
+             "abort a Wave Gate paused rollout and reverse committed nodes")):
+        command = team_contract_commands.add_parser(
+            command_name, help=help_text
+        )
+        command.add_argument("--plan", required=True)
+        command.add_argument("--expected-plan-sha256", required=True)
+        command.add_argument("--executor-config")
+        command.add_argument(
+            "--expected-executor-config-sha256"
+        )
+        command.add_argument("--adapter-config-resolver-config")
+        command.add_argument(
+            "--expected-adapter-config-resolver-config-sha256"
+        )
+        command.add_argument("--adapter-conformance-bundle")
+        command.add_argument(
+            "--expected-adapter-conformance-bundle-sha256"
+        )
+        command.add_argument("--adapter-conformance-trust-policy")
+        command.add_argument(
+            "--expected-adapter-conformance-trust-policy-sha256"
+        )
+        command.add_argument("--state-dir", required=True)
+        command.add_argument("--state-backend-config")
+        command.add_argument("--artifact-store-config")
+        command.add_argument("--coordinator-id")
+        command.add_argument("--report")
+        if operation in {"resume", "abort"}:
+            command.add_argument(
+                "--expected-control-generation", type=int, required=True
+            )
+            command.add_argument("--operation-id", required=True)
+            command.add_argument("--actor", required=True)
+            command.add_argument("--reason", required=True)
+        command.set_defaults(
+            handler=manage_team_contract_adapter_catalog_fleet,
+            adapter_catalog_fleet_operation=operation,
+        )
+    adapter_catalog_fleet_status = team_contract_commands.add_parser(
+        "adapter-catalog-fleet-status",
+        help="inspect one persistent canary/wave Fleet journal",
+    )
+    adapter_catalog_fleet_status.add_argument("--plan", required=True)
+    adapter_catalog_fleet_status.add_argument(
+        "--expected-plan-sha256", required=True
+    )
+    adapter_catalog_fleet_status.add_argument("--state-dir", required=True)
+    adapter_catalog_fleet_status.add_argument("--state-backend-config")
+    adapter_catalog_fleet_status.add_argument("--artifact-store-config")
+    adapter_catalog_fleet_status.add_argument("--coordinator-id")
+    adapter_catalog_fleet_status.add_argument(
+        "--adapter-config-resolver-config"
+    )
+    adapter_catalog_fleet_status.add_argument(
+        "--expected-adapter-config-resolver-config-sha256"
+    )
+    adapter_catalog_fleet_status.add_argument("--adapter-conformance-bundle")
+    adapter_catalog_fleet_status.add_argument(
+        "--expected-adapter-conformance-bundle-sha256"
+    )
+    adapter_catalog_fleet_status.add_argument(
+        "--adapter-conformance-trust-policy"
+    )
+    adapter_catalog_fleet_status.add_argument(
+        "--expected-adapter-conformance-trust-policy-sha256"
+    )
+    adapter_catalog_fleet_status.add_argument("--report")
+    adapter_catalog_fleet_status.set_defaults(
+        handler=manage_team_contract_adapter_catalog_fleet,
+        adapter_catalog_fleet_operation="status",
+    )
+
+    adapter_conformance = team_contract_commands.add_parser(
+        "adapter-conformance",
+        help="certify one pinned Adapter for integration readiness",
+    )
+    adapter_conformance.add_argument(
+        "--adapter-kind", required=True, choices=(
+            "adapter-config-resolver", "artifact-store",
+            "control-authorizer", "fleet-executor",
+            "registry-leader-backend", "wave-gate",
+        ),
+    )
+    adapter_conformance.add_argument("--config", required=True)
+    adapter_conformance.add_argument(
+        "--expected-config-sha256", required=True
+    )
+    adapter_conformance.add_argument("--scope-primary")
+    adapter_conformance.add_argument("--scope-secondary")
+    adapter_conformance.add_argument("--report", required=True)
+    adapter_conformance.set_defaults(
+        handler=qualify_team_contract_adapter
+    )
+    adapter_admission = team_contract_commands.add_parser(
+        "adapter-conformance-admission-create",
+        help="create a host-local pinned six-Adapter admission bundle",
+    )
+    adapter_admission.add_argument("--bundle-id", required=True)
+    adapter_admission.add_argument("--rollout-id", required=True)
+    adapter_admission.add_argument("--catalog-id", required=True)
+    adapter_admission.add_argument(
+        "--evidence", action="append", nargs=2,
+        metavar=("ADAPTER_KIND", "EVIDENCE_PATH"), required=True,
+    )
+    adapter_admission.add_argument(
+        "--attestation", action="append", nargs=2,
+        metavar=("ADAPTER_KIND", "ATTESTATION_PATH"),
+    )
+    adapter_admission.add_argument("--output", required=True)
+    adapter_admission.set_defaults(
+        handler=create_team_contract_adapter_admission
+    )
+    adapter_attestation = team_contract_commands.add_parser(
+        "adapter-conformance-attest",
+        help="sign exact Adapter conformance evidence with Ed25519",
+    )
+    adapter_attestation.add_argument("--evidence", required=True)
+    adapter_attestation.add_argument(
+        "--expected-evidence-sha256", required=True
+    )
+    adapter_attestation.add_argument("--certifier-id", required=True)
+    adapter_attestation.add_argument("--key-id", required=True)
+    adapter_attestation.add_argument(
+        "--private-key-environment", required=True
+    )
+    adapter_attestation.add_argument(
+        "--private-key-passphrase-environment"
+    )
+    adapter_attestation.add_argument("--issued-at")
+    adapter_attestation.add_argument(
+        "--lifetime-seconds", type=int, default=3600
+    )
+    adapter_attestation.add_argument("--report", required=True)
+    adapter_attestation.set_defaults(handler=attest_team_contract_adapter)
+
+    backend_config_resolve = team_contract_commands.add_parser(
+        "backend-config-resolve",
+        help="resolve a portable backend config reference on this host",
+    )
+    backend_config_resolve.add_argument("--config", required=True)
+    backend_config_resolve.add_argument(
+        "--expected-config-sha256", required=True
+    )
+    backend_config_resolve.add_argument("--reference", required=True)
+    backend_config_resolve.add_argument("--authority-id", required=True)
+    backend_config_resolve.add_argument("--registry-id", required=True)
+    backend_config_resolve.add_argument("--report")
+    backend_config_resolve.set_defaults(
+        handler=manage_team_contract_backend_config_resolver
+    )
+
+    registry_leader_backend_migration_sync = team_contract_commands.add_parser(
+        "registry-leader-backend-migration-sync",
+        help="synchronize an immutable grant chain into a target backend",
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--migration-id", required=True
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--authority-id", required=True
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--registry-id", required=True
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--source-backend-config"
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--expected-source-backend-config-sha256"
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--target-backend-config"
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--expected-target-backend-config-sha256"
+    )
+    registry_leader_backend_migration_sync.add_argument("--source-backend-ref")
+    registry_leader_backend_migration_sync.add_argument(
+        "--expected-source-backend-ref-sha256"
+    )
+    registry_leader_backend_migration_sync.add_argument("--target-backend-ref")
+    registry_leader_backend_migration_sync.add_argument(
+        "--expected-target-backend-ref-sha256"
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--confirm-target-migration-scope", action="store_true"
+    )
+    registry_leader_backend_migration_sync.add_argument("--transaction")
+    registry_leader_backend_migration_sync.add_argument(
+        "--transaction-backend-config"
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--expected-transaction-backend-config-sha256"
+    )
+    registry_leader_backend_migration_sync.add_argument("--artifact-store-config")
+    registry_leader_backend_migration_sync.add_argument(
+        "--expected-artifact-store-config-sha256"
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--backend-config-resolver-config"
+    )
+    registry_leader_backend_migration_sync.add_argument(
+        "--expected-backend-config-resolver-config-sha256"
+    )
+    registry_leader_backend_migration_sync.add_argument("--actor")
+    registry_leader_backend_migration_sync.add_argument(
+        "--output", required=True
+    )
+    registry_leader_backend_migration_sync.set_defaults(
+        handler=manage_team_contract_registry_leader_backend_migration,
+        migration_operation="sync",
+    )
+
+    registry_leader_backend_migration_finalize = \
+        team_contract_commands.add_parser(
+            "registry-leader-backend-migration-finalize",
+            help="verify a fenced source and target leadership cutover",
+        )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--migration-id", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--registry", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--authority-id", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--registry-id", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--sync-evidence", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--expected-sync-evidence-sha256", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--expected-target-grant-sha256", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--leader-verification-time"
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--trust-policy", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--expected-trust-policy-id", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--expected-trust-policy-sha256", required=True
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--verification-time"
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--maximum-files", type=int, default=64
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--maximum-expanded-bytes", type=int, default=16 * 1024 * 1024
+    )
+    registry_leader_backend_migration_finalize.add_argument("--transaction")
+    registry_leader_backend_migration_finalize.add_argument(
+        "--transaction-backend-config"
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--expected-transaction-backend-config-sha256"
+    )
+    registry_leader_backend_migration_finalize.add_argument("--artifact-store-config")
+    registry_leader_backend_migration_finalize.add_argument(
+        "--expected-artifact-store-config-sha256"
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--backend-config-resolver-config"
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--expected-backend-config-resolver-config-sha256"
+    )
+    registry_leader_backend_migration_finalize.add_argument(
+        "--expected-transaction-sha256"
+    )
+    registry_leader_backend_migration_finalize.add_argument("--actor")
+    registry_leader_backend_migration_finalize.add_argument(
+        "--output", required=True
+    )
+    registry_leader_backend_migration_finalize.set_defaults(
+        handler=manage_team_contract_registry_leader_backend_migration,
+        migration_operation="finalize",
+    )
+
+    registry_leader_backend_migration_status = \
+        team_contract_commands.add_parser(
+            "registry-leader-backend-migration-status",
+            help="classify live migration phase from a shared transaction",
+        )
+    registry_leader_backend_migration_status.add_argument(
+        "--transaction"
+    )
+    registry_leader_backend_migration_status.add_argument(
+        "--transaction-backend-config"
+    )
+    registry_leader_backend_migration_status.add_argument(
+        "--expected-transaction-backend-config-sha256"
+    )
+    registry_leader_backend_migration_status.add_argument("--artifact-store-config")
+    registry_leader_backend_migration_status.add_argument(
+        "--expected-artifact-store-config-sha256"
+    )
+    registry_leader_backend_migration_status.add_argument(
+        "--backend-config-resolver-config"
+    )
+    registry_leader_backend_migration_status.add_argument(
+        "--expected-backend-config-resolver-config-sha256"
+    )
+    registry_leader_backend_migration_status.add_argument("--migration-id")
+    registry_leader_backend_migration_status.add_argument("--registry-id")
+    registry_leader_backend_migration_status.add_argument(
+        "--registry", required=True
+    )
+    registry_leader_backend_migration_status.add_argument("--report")
+    registry_leader_backend_migration_status.set_defaults(
+        handler=manage_team_contract_registry_leader_backend_migration,
+        migration_operation="status",
+    )
+
+    registry_leader_backend_migration_resume = \
+        team_contract_commands.add_parser(
+            "registry-leader-backend-migration-resume",
+            help="resume exact-prefix synchronization from pinned state",
+        )
+    registry_leader_backend_migration_resume.add_argument(
+        "--transaction"
+    )
+    registry_leader_backend_migration_resume.add_argument(
+        "--transaction-backend-config"
+    )
+    registry_leader_backend_migration_resume.add_argument(
+        "--expected-transaction-backend-config-sha256"
+    )
+    registry_leader_backend_migration_resume.add_argument("--artifact-store-config")
+    registry_leader_backend_migration_resume.add_argument(
+        "--expected-artifact-store-config-sha256"
+    )
+    registry_leader_backend_migration_resume.add_argument(
+        "--backend-config-resolver-config"
+    )
+    registry_leader_backend_migration_resume.add_argument(
+        "--expected-backend-config-resolver-config-sha256"
+    )
+    registry_leader_backend_migration_resume.add_argument("--migration-id")
+    registry_leader_backend_migration_resume.add_argument("--registry-id")
+    registry_leader_backend_migration_resume.add_argument(
+        "--expected-transaction-sha256", required=True
+    )
+    registry_leader_backend_migration_resume.add_argument(
+        "--actor", required=True
+    )
+    registry_leader_backend_migration_resume.add_argument(
+        "--confirm-target-migration-scope", action="store_true"
+    )
+    registry_leader_backend_migration_resume.add_argument(
+        "--output", required=True
+    )
+    registry_leader_backend_migration_resume.set_defaults(
+        handler=manage_team_contract_registry_leader_backend_migration,
+        migration_operation="resume",
+    )
+
+    registry_leader_backend_migration_reconcile = \
+        team_contract_commands.add_parser(
+            "registry-leader-backend-migration-reconcile",
+            help="adopt a pinned checkpoint or confirm completed cutover",
+        )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--transaction"
+    )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--transaction-backend-config"
+    )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--expected-transaction-backend-config-sha256"
+    )
+    registry_leader_backend_migration_reconcile.add_argument("--artifact-store-config")
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--expected-artifact-store-config-sha256"
+    )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--backend-config-resolver-config"
+    )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--expected-backend-config-resolver-config-sha256"
+    )
+    registry_leader_backend_migration_reconcile.add_argument("--migration-id")
+    registry_leader_backend_migration_reconcile.add_argument("--registry-id")
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--expected-transaction-sha256"
+    )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--actor", required=True
+    )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--sync-evidence"
+    )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--expected-sync-evidence-sha256"
+    )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--migration-evidence"
+    )
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--expected-migration-evidence-sha256"
+    )
+    registry_leader_backend_migration_reconcile.add_argument("--registry")
+    registry_leader_backend_migration_reconcile.add_argument(
+        "--confirm-adopt-orphaned-sync", action="store_true"
+    )
+    registry_leader_backend_migration_reconcile.set_defaults(
+        handler=manage_team_contract_registry_leader_backend_migration,
+        migration_operation="reconcile",
+    )
+
+    registry_leader_backend_migration_abort = \
+        team_contract_commands.add_parser(
+            "registry-leader-backend-migration-abort",
+            help="terminally abort a pre-fence shared migration transaction",
+        )
+    registry_leader_backend_migration_abort.add_argument(
+        "--transaction"
+    )
+    registry_leader_backend_migration_abort.add_argument(
+        "--transaction-backend-config"
+    )
+    registry_leader_backend_migration_abort.add_argument(
+        "--expected-transaction-backend-config-sha256"
+    )
+    registry_leader_backend_migration_abort.add_argument("--artifact-store-config")
+    registry_leader_backend_migration_abort.add_argument(
+        "--expected-artifact-store-config-sha256"
+    )
+    registry_leader_backend_migration_abort.add_argument(
+        "--backend-config-resolver-config"
+    )
+    registry_leader_backend_migration_abort.add_argument(
+        "--expected-backend-config-resolver-config-sha256"
+    )
+    registry_leader_backend_migration_abort.add_argument("--migration-id")
+    registry_leader_backend_migration_abort.add_argument("--registry-id")
+    registry_leader_backend_migration_abort.add_argument(
+        "--expected-transaction-sha256", required=True
+    )
+    registry_leader_backend_migration_abort.add_argument(
+        "--registry", required=True
+    )
+    registry_leader_backend_migration_abort.add_argument(
+        "--operator", required=True
+    )
+    registry_leader_backend_migration_abort.add_argument(
+        "--reason", required=True
+    )
+    registry_leader_backend_migration_abort.add_argument(
+        "--output", required=True
+    )
+    registry_leader_backend_migration_abort.set_defaults(
+        handler=manage_team_contract_registry_leader_backend_migration,
+        migration_operation="abort",
+    )
+
     registry_leader_etcd_preflight = team_contract_commands.add_parser(
         "registry-leader-etcd-preflight",
         help="verify pinned etcd cluster topology before authority writes",
@@ -5259,6 +6184,38 @@ def parser() -> argparse.ArgumentParser:
     registry_leader_etcd_preflight.add_argument("--report")
     registry_leader_etcd_preflight.set_defaults(
         handler=preflight_team_contract_registry_leader_etcd
+    )
+
+    registry_leader_etcd_acceptance = team_contract_commands.add_parser(
+        "registry-leader-etcd-acceptance",
+        help="run pinned etcd preflight, conformance and postflight evidence",
+    )
+    registry_leader_etcd_acceptance.add_argument(
+        "--adapter-config", required=True
+    )
+    registry_leader_etcd_acceptance.add_argument(
+        "--expected-adapter-config-sha256", required=True
+    )
+    registry_leader_etcd_acceptance.add_argument(
+        "--backend-config", required=True
+    )
+    registry_leader_etcd_acceptance.add_argument(
+        "--expected-backend-config-sha256", required=True
+    )
+    registry_leader_etcd_acceptance.add_argument(
+        "--authority-id", required=True
+    )
+    registry_leader_etcd_acceptance.add_argument(
+        "--registry-id", required=True
+    )
+    registry_leader_etcd_acceptance.add_argument(
+        "--confirm-dedicated-empty-scope", action="store_true"
+    )
+    registry_leader_etcd_acceptance.add_argument(
+        "--output-directory", required=True
+    )
+    registry_leader_etcd_acceptance.set_defaults(
+        handler=accept_team_contract_registry_leader_etcd
     )
 
     def add_registry_handoff_common(

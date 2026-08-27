@@ -1,0 +1,419 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-fleet-report.schema.json",
+    "title": "Adapter Catalog Fleet rollout report",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schemaVersion",
+        "product",
+        "passed",
+        "rolloutId",
+        "status",
+        "catalogId",
+        "candidateCatalogGeneration",
+        "candidateCatalogSha256",
+        "waveCount",
+        "failedWave",
+        "committedNodes",
+        "failedNodes",
+        "pendingNodes",
+        "rolledBackNodes",
+        "rollbackFailedNodes",
+        "journalSha256",
+        "reportedAt"
+    ],
+    "properties": {
+        "schemaVersion": {
+            "enum": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ]
+        },
+        "product": {
+            "const": "PocoDDSRuntimeTeamContractAdapterCatalogFleetReport"
+        },
+        "passed": {
+            "type": "boolean"
+        },
+        "rolloutId": {
+            "$ref": "#/$defs/pathId"
+        },
+        "status": {
+            "enum": [
+                "running",
+                "paused",
+                "rolling-back",
+                "rollback-failed",
+                "committed",
+                "rolled-back"
+            ]
+        },
+        "catalogId": {
+            "$ref": "#/$defs/id"
+        },
+        "candidateCatalogGeneration": {
+            "type": "integer",
+            "minimum": 2
+        },
+        "candidateCatalogSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "waveCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 32
+        },
+        "failedWave": {
+            "oneOf": [
+                {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        },
+        "committedNodes": {
+            "type": "integer",
+            "minimum": 0
+        },
+        "failedNodes": {
+            "type": "integer",
+            "minimum": 0
+        },
+        "pendingNodes": {
+            "type": "integer",
+            "minimum": 0
+        },
+        "rolledBackNodes": {
+            "type": "integer",
+            "minimum": 0
+        },
+        "rollbackFailedNodes": {
+            "type": "integer",
+            "minimum": 0
+        },
+        "capabilityManifestSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "nodeExecutorCapabilityManifestSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "waveGateCapabilityManifestSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "controlAuthorizerCapabilityManifestSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "stateBackendCapabilityManifestSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "artifactStoreCapabilityManifestSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "adapterConfigResolverCapabilityManifestSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "adapterConformanceAdmissionId": {"$ref": "#/$defs/sha256"},
+        "adapterConformanceAdmissionCount": {"type": "integer", "minimum": 1, "maximum": 200},
+        "adapterConformanceTrustPolicyId": {"$ref": "#/$defs/id"},
+        "adapterConformanceTrustPolicyGeneration": {"type": "integer", "minimum": 1},
+        "adapterConformanceTrustPolicySha256": {"$ref": "#/$defs/sha256"},
+        "stateVersion": {
+            "type": "integer",
+            "minimum": 1
+        },
+        "lastCoordinatorId": {
+            "$ref": "#/$defs/id"
+        },
+        "gateCounts": {
+            "$ref": "#/$defs/gateCounts"
+        },
+        "authorizationCounts": {
+            "$ref": "#/$defs/authorizationCounts"
+        },
+        "controlGeneration": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+        },
+        "journalSha256": {
+            "$ref": "#/$defs/sha256"
+        },
+        "reportedAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "allOf": [
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 1
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "capabilityManifestSha256"
+                ],
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "nodeExecutorCapabilityManifestSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "waveGateCapabilityManifestSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "controlAuthorizerCapabilityManifestSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "gateCounts"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "authorizationCounts"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "controlGeneration"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 2
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "nodeExecutorCapabilityManifestSha256",
+                    "waveGateCapabilityManifestSha256",
+                    "gateCounts",
+                    "controlGeneration"
+                ],
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "capabilityManifestSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "controlAuthorizerCapabilityManifestSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "authorizationCounts"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 3
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "nodeExecutorCapabilityManifestSha256",
+                    "waveGateCapabilityManifestSha256",
+                    "controlAuthorizerCapabilityManifestSha256",
+                    "gateCounts",
+                    "authorizationCounts",
+                    "controlGeneration"
+                ],
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "capabilityManifestSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "stateBackendCapabilityManifestSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "artifactStoreCapabilityManifestSha256"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "stateVersion"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "lastCoordinatorId"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 4
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "nodeExecutorCapabilityManifestSha256",
+                    "waveGateCapabilityManifestSha256",
+                    "controlAuthorizerCapabilityManifestSha256",
+                    "stateBackendCapabilityManifestSha256",
+                    "artifactStoreCapabilityManifestSha256",
+                    "stateVersion",
+                    "lastCoordinatorId",
+                    "gateCounts",
+                    "authorizationCounts",
+                    "controlGeneration"
+                ],
+                "not": {
+                    "required": [
+                        "capabilityManifestSha256"
+                    ]
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "schemaVersion": {
+                        "const": 5
+                    }
+                }
+            },
+            "then": {
+                "required": [
+                    "nodeExecutorCapabilityManifestSha256",
+                    "waveGateCapabilityManifestSha256",
+                    "controlAuthorizerCapabilityManifestSha256",
+                    "stateBackendCapabilityManifestSha256",
+                    "artifactStoreCapabilityManifestSha256",
+                    "adapterConfigResolverCapabilityManifestSha256",
+                    "stateVersion",
+                    "lastCoordinatorId",
+                    "gateCounts",
+                    "authorizationCounts",
+                    "controlGeneration"
+                ],
+                "not": {
+                    "required": [
+                        "capabilityManifestSha256"
+                    ]
+                }
+            }
+        },
+        {"if": {"properties": {"schemaVersion": {"const": 6}}}, "then": {"required": ["nodeExecutorCapabilityManifestSha256", "waveGateCapabilityManifestSha256", "controlAuthorizerCapabilityManifestSha256", "stateBackendCapabilityManifestSha256", "artifactStoreCapabilityManifestSha256", "adapterConfigResolverCapabilityManifestSha256", "adapterConformanceAdmissionId", "adapterConformanceAdmissionCount", "stateVersion", "lastCoordinatorId", "gateCounts", "authorizationCounts", "controlGeneration"]}},
+        {"if": {"properties": {"schemaVersion": {"const": 7}}}, "then": {"required": ["nodeExecutorCapabilityManifestSha256", "waveGateCapabilityManifestSha256", "controlAuthorizerCapabilityManifestSha256", "stateBackendCapabilityManifestSha256", "artifactStoreCapabilityManifestSha256", "adapterConfigResolverCapabilityManifestSha256", "adapterConformanceAdmissionId", "adapterConformanceAdmissionCount", "adapterConformanceTrustPolicyId", "adapterConformanceTrustPolicyGeneration", "adapterConformanceTrustPolicySha256", "stateVersion", "lastCoordinatorId", "gateCounts", "authorizationCounts", "controlGeneration"]}}
+    ],
+    "$defs": {
+        "pathId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,60}$"
+        },
+        "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+        },
+        "gateCounts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "pending",
+                "waiting",
+                "evaluating",
+                "passed",
+                "paused",
+                "failed"
+            ],
+            "properties": {
+                "pending": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "waiting": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "evaluating": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "passed": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "paused": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "failed": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "authorizationCounts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "allow",
+                "deny"
+            ],
+            "properties": {
+                "allow": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "deny": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        }
+    }
+}

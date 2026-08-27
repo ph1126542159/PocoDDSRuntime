@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-backend-migration-sync.schema.json",
+  "title": "Registry leader backend synchronized history evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "migrationId", "authorityId", "registryId", "sourceBackend", "targetBackend", "sourceCapabilityManifestSha256", "targetCapabilityManifestSha256", "synchronizedThroughToken", "synchronizedGrantSha256", "grantCount", "grantChainSha256", "completedAt"],
+  "properties": {
+    "schemaVersion": {"enum": [1, 2]},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendMigrationSync"},
+    "passed": {"const": true},
+    "migrationId": {"$ref": "#/$defs/id"}, "authorityId": {"$ref": "#/$defs/id"}, "registryId": {"$ref": "#/$defs/id"},
+    "sourceBackend": {"$ref": "#/$defs/backend"}, "targetBackend": {"$ref": "#/$defs/backend"},
+    "sourceCapabilityManifestSha256": {"$ref": "#/$defs/sha256"}, "targetCapabilityManifestSha256": {"$ref": "#/$defs/sha256"},
+    "synchronizedThroughToken": {"type": "integer", "minimum": 1}, "synchronizedGrantSha256": {"$ref": "#/$defs/sha256"},
+    "grantCount": {"type": "integer", "minimum": 1}, "grantChainSha256": {"$ref": "#/$defs/sha256"},
+    "completedAt": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"properties": {"sourceBackend": {"$ref": "#/$defs/localBackend"}, "targetBackend": {"$ref": "#/$defs/localBackend"}}}, "else": {"properties": {"sourceBackend": {"$ref": "#/$defs/backendRef"}, "targetBackend": {"$ref": "#/$defs/backendRef"}}}}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "backend": {"oneOf": [{"$ref": "#/$defs/localBackend"}, {"$ref": "#/$defs/backendRef"}]},
+    "localBackend": {"type": "object", "additionalProperties": false, "required": ["kind", "backendId", "configPath", "configSha256"], "properties": {"kind": {"const": "external-command"}, "backendId": {"$ref": "#/$defs/id"}, "configPath": {"type": "string", "minLength": 1}, "configSha256": {"$ref": "#/$defs/sha256"}}},
+    "backendRef": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "backendId", "revision"], "properties": {"kind": {"const": "backend-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "backendId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}}
+  }
+}

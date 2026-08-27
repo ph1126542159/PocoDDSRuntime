@@ -6,6 +6,59 @@
 
 ## 本轮变化
 
+- Registry Leader Backend 新增 schema v3 Secret Provider SPI：配置仅保存版本化 secret 引用，固定 Provider
+  制品并在每次业务调用时解析、仅注入目标子进程；能力协商不读取凭据，公开检查报告不输出值、摘要或长度。
+  安装 SDK 包含环境变量迁移示例、公开 CLI、七份契约 schema 和 PDR-REC-0036 恢复场景；生产 Provider
+  应对接 Credential Manager、Vault、云 Secret Manager/KMS 或 workload identity。
+- Secret Provider v2 与 Backend schema v4 增加有时间边界的双版本轮换：有序首选/回退版本、显式回退截止、
+  撤销感知、租约剩余时间校验及可选秘密来源 allowlist。新旧值可分阶段投放；旧值不会在截止后被静默使用，
+  过短租约也不会启动 Backend 子进程。v1 精确引用继续兼容。
+- 新增公共 Team Contract Adapter Runtime SDK，Backend、Secret Provider、Artifact Store 和 Config Resolver
+  统一使用同一无 shell 子进程边界、最小环境、硬超时、响应上限、默认 stderr 脱敏及稳定能力摘要，减少多团队
+  重复实现和安全策略漂移；PDR-REC-0037 独立覆盖边界故障注入。
+- 新增摘要固定的 Adapter Manifest 与 Host 本地 Catalog：新 Adapter 类型通过数据声明即可被公开 CLI 列举和执行
+  只读 Capability 健康检查，无需修改核心注册表；配置、可执行程序和辅助制品仍逐层复核，协议业务调用继续由
+  专用宿主强校验。安装 SDK 包含生成器与真实调用验证，PDR-REC-0038 覆盖未知类型、漂移、重复和脱敏边界。
+- 新增 Host 本地 Adapter Catalog 原子激活控制面：跨进程 fenced writer lease、expected generation CAS、唯一
+  operation ID、不可变内容寻址状态链和原子 pointer 防止多人并发覆盖；回滚选择历史固定 Catalog 但创建新
+  activation generation，当前能力检查在探测中发生切换时拒绝旧快照。PDR-REC-0039 覆盖完整故障注入。
+- 新增可恢复 Adapter Catalog Reconciler：通过摘要固定的幂等 lifecycle Hook 执行 prepare、bounded drain、原子
+  switch、activate、有限 health gate 和 commit；切换前失败 abort，切换后失败自动创建源 Catalog rollback
+  generation。自摘要 journal 支持 health 阶段进程死亡及 rollback Hook 失败后的继续执行，PDR-REC-0040 覆盖。
+  已提交事务新增 `reconcile-revert`，使用原源身份和 lifecycle Hook 创建可重试的新 rollback generation，为后续
+  多 Host 反向波次回退提供不绕过单节点生命周期的原语。
+- 新增 Adapter Catalog Fleet 发布控制面：固定的 Plan 与 Node Executor SPI 支持第一波零失败 Canary、后续有序
+  wave、每波失败预算和有界节点并发；协调器在节点完成但响应未持久化时死亡可按稳定身份恢复。超预算立即停止
+  后续节点准入，并通过各节点真实 Reconciler 按 wave/节点逆序撤销 committed 事务；pending 节点保持不变。
+  PDR-REC-0041 覆盖并发、崩溃、歧义重试、逆序回退、计划冲突、pin、journal 篡改和秘密脱敏。
+- Adapter Catalog Fleet Plan v2 新增独立 Wave Gate SPI：每个 wave 可声明最短观察时间、最大判定次数和拒绝
+  动作，通过证据 SHA 接收 SLO/错误预算或人工审批结果。长观察窗口持久化后立即返回；Gate pause 不能被普通
+  recover 绕过，resume/abort 使用 generation CAS、唯一 operation ID、actor/reason 审计且幂等。Gate 响应丢失
+  可按稳定 evaluation ID 消歧，abort 复用节点 Reconciler 逆序回滚。PDR-REC-0042 覆盖完整故障注入。
+- Adapter Catalog Fleet Plan v3 新增独立 Control Authorizer SPI：resume/abort 不再仅信任自报 actor，而以
+  外部认证 Principal、默认拒绝策略和证据 SHA 准入。传入 Authorizer 的是 reason SHA 与脱敏控制意图；allow/deny
+  均进入自摘要 journal，deny 不改变 rollout/control generation，授权响应丢失可按稳定 authorization ID 恢复。
+  Plan v1/v2 保持兼容，PDR-REC-0043 覆盖 Principal 冒用、拒绝重放、崩溃恢复、pin、篡改与秘密脱敏。
+- Adapter Catalog Fleet Plan v4 新增跨协调 Host State Store：完整 journal 作为不可变内容写入 Artifact Store，
+  Leader Backend 只保存线性 CAS/fencing Pointer。Plan 固定 Backend/Store ID 与配置 SHA，但不固化主机本地
+  配置路径；新 Host 可使用空 scratch 接管，旧 writer、响应丢失、scope/pin 漂移和 blob 篡改均失败关闭或精确
+  读回消歧。Plan v1-v3 保持兼容，PDR-REC-0044 覆盖 15 项接管与安全断言。
+- Adapter Catalog Fleet Plan v5 新增统一、强类型的 Adapter Config Resolver 引用：Executor、Wave Gate、Control
+  Authorizer、Registry Leader Backend 和 Artifact Store 不再把主机本地配置路径或配置摘要写入 Plan、远程 journal
+  与 Pointer。不同 Host 可用各自固定的 Resolver/Mapping 解析同一逻辑引用，解析后仍由所属 Adapter 契约复核身份、
+  revision、scope、制品 pin 和配置内容；PDR-REC-0045 覆盖 Host 差异、漂移与跨协调恢复。
+- 新增统一 Adapter Conformance Kit，使用各 Adapter 的权威解析器和能力协商实现认证六类 Fleet Adapter 边界，
+  生成稳定 conformance ID、自摘要且脱敏的 integration-readiness 证据。安装 SDK 和公共 `pdr` CLI 均提供同一入口；
+  PDR-REC-0046 覆盖配置漂移、能力重放、scope 误用、环境逃逸、本地路径泄露与证据篡改。
+- Fleet Plan v6 将认证证据升级为执行前强制准入：Plan 固定认证等级、check-set、最大证据年龄和六类必需
+  Adapter；每个 Host 使用 SHA 固定的本地 admission bundle，运行时再绑定实际配置、scope 与能力摘要。
+  远程 journal 只保存 admission ID 和六项摘要，不保存本地路径；安装 SDK 已验证 Host A 暂停后 Host B
+  用不同 Resolver/准入包恢复。PDR-REC-0047 覆盖过期、篡改、配置/能力漂移和跨 Host 接管。
+- Fleet Plan v7 在 v6 准入之上增加 Ed25519 认证证明与 SHA 固定的 certifier trust policy。策略限制
+  Adapter kind/ID、密钥有效期、最大证明寿命和最低 generation，并支持显式吊销及密钥轮换；远程 journal
+  仅保存 policy/attestation/certifier/key 摘要身份。安装 SDK 验证 Host A 暂停后 Host B 使用独立签名 bundle
+  恢复；PDR-REC-0048 覆盖过期、越权、吊销、轮换和策略 generation。
+
 - 跨仓库团队契约交付新增确定性、内容寻址的 `.pdrcontracts` 包和无路径锁文件：Service、配置
   Participant、配置键生命周期及其已发布基线可按包 ID/版本/Owner/SHA 协作；安装 SDK 提供离线
   `pack/verify/lock/resolve` CLI 与 CTest。Ed25519 签名及 SHA 固定信任策略进一步校验发布 Owner、
@@ -57,7 +110,7 @@
   `pdr-fastdds-profile-check`，复用生产解析路径但不创建 Participant，供 Launcher、CI 与部署脚本
   在进程启动前执行确定性配置门禁。可选 `PDR_FASTDDS_PROFILE_SHA256` 进一步绑定最多 64 KiB 的
   Profile 原始字节，checker 与 Runtime 使用同一摘要，阻断预检后文件替换的 TOCTOU 漂移。
-- 框架恢复治理新增七层可执行故障矩阵：场景绑定组件 Owner、CTest 注册/标签、超时和逐断言 marker；v2 证据同时绑定选中测试命令/程序与 Profile 共享运行库集合。新增 MQTT Broker 非预期断线后的协调重连/订阅恢复，以及 Fast DDS Subscriber Participant/DataReader 重建、原逻辑订阅恢复和 Publisher 连续运行验证。本地故障注入与真实设备/HIL 验收保持明确边界。
+- 框架恢复治理新增七层可执行故障矩阵：场景绑定组件 Owner、CTest 注册/标签、超时和逐断言 marker；v2 证据同时绑定选中测试命令/程序与 Profile 共享运行库集合。新增 MQTT Broker 非预期断线后的协调重连/订阅恢复，以及 Fast DDS Subscriber Participant/DataReader 重建、原逻辑订阅恢复和 Publisher 连续运行验证。MQTT 受治理 Paho 构建还修复消息回调与 `disconnect/cleanSession` 并发时的队列双重释放，依赖能力标记和 `callbackTeardown` 故障注入阻止未修复库进入构建。本地故障注入与真实设备/HIL 验收保持明确边界。
 - SDK 公共表面新增弃用生命周期门禁：公共头文件标记、CMake target 和 ABI artifact 必须登记 Owner、替代入口、首次公告快照及最早移除主版本；破坏性变更不能再仅靠提升主版本放行。
 - 多模型框架：形成 `desktop-lite`、`desktop-distributed`、`embedded`、`edge-industrial`、`edge-test`、`server` 与 `robotics` Profile；构建清单明确 Host、Runtime、WebUI、能力和内置/外部 Transport，不再让普通桌面程序隐式依赖 ROS 2。
 - RuntimeCore：新增稳定的 Host/Component、消息契约、`PDRM/1` 编解码、同步/有界异步 Executor、依赖排序与失败回滚、Transport Registry 和一致性测试边界。

@@ -55,7 +55,14 @@ MqttClient::~MqttClient()
 {
     close();
     if (_client)
+    {
+        // MQTTClient_setCallbacks() requires a non-null message callback, so it
+        // cannot be used to unregister this context. close() stops Paho's worker
+        // before destroy releases the callback storage.
+        _closing = true;
+        waitForCallbacks();
         MQTTClient_destroy(&_client);
+    }
 }
 
 std::string MqttClient::name() const { return "mqtt:" + _options.serverUri; }
@@ -122,11 +129,10 @@ void MqttClient::open()
 
 void MqttClient::close() noexcept
 {
-    bool connected = false;
     {
         Poco::FastMutex::ScopedLock operationLock(_operationMutex);
         _closing = true;
-        connected = _connected.exchange(false);
+        _connected = false;
         _intentionalDisconnect = true;
         _ignoreLossUntilNanoseconds =
             std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -134,20 +140,14 @@ void MqttClient::close() noexcept
                 .count();
     }
 
-    const auto waitForCallbacks = [&]
-    {
-        std::unique_lock<std::mutex> lock(_callbackMutex);
-        _callbacksIdle.wait(lock, [&] { return _activeCallbacks == 0; });
-    };
-    waitForCallbacks();
-    if (connected)
+    if (_client)
     {
         Poco::FastMutex::ScopedLock operationLock(_operationMutex);
+        // Disconnect even after a broker-side loss. Paho uses this call to stop
+        // and join its callback worker; checking only our connected flag can
+        // otherwise leave post-callback queue cleanup racing with destroy().
         MQTTClient_disconnect(_client, 3000);
     }
-    // Paho can enter a callback between the first idle check and disconnect. Closing is still
-    // asserted, so that callback only releases its wire message and exits. Do not reopen or
-    // destroy the client until that final callback is complete.
     waitForCallbacks();
     _closing = false;
 }
@@ -258,26 +258,48 @@ void MqttClient::setMessageHandler(MessageHandler handler)
 void MqttClient::onConnectionLost(void* context, char* cause)
 {
     auto* self = static_cast<MqttClient*>(context);
-    const auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                         std::chrono::steady_clock::now().time_since_epoch())
-                         .count();
-    if (self->_intentionalDisconnect || now < self->_ignoreLossUntilNanoseconds)
+    if (!self)
         return;
-    self->_connected = false;
-    self->markFailure(std::string("MQTT connection lost") +
-                      (cause && *cause ? ": " + std::string(cause) : ""));
+    const bool admitted = self->beginCallback();
+    if (admitted)
+    {
+        try
+        {
+            const auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 std::chrono::steady_clock::now().time_since_epoch())
+                                 .count();
+            if (!self->_intentionalDisconnect &&
+                now >= self->_ignoreLossUntilNanoseconds)
+            {
+                self->_connected = false;
+                self->markFailure(std::string("MQTT connection lost") +
+                                  (cause && *cause ? ": " + std::string(cause) : ""));
+            }
+        }
+        catch (...)
+        {
+            // Never allow an exception to cross Paho's C callback boundary.
+            self->_connected = false;
+        }
+    }
+    self->endCallback();
 }
 
 int MqttClient::onMessageArrived(void* context, char* topicName, int topicLength,
                                  MQTTClient_message* message)
 {
     auto* self = static_cast<MqttClient*>(context);
+    if (!self)
     {
-        std::lock_guard<std::mutex> lock(self->_callbackMutex);
-        ++self->_activeCallbacks;
+        if (message)
+            MQTTClient_freeMessage(&message);
+        if (topicName)
+            MQTTClient_free(topicName);
+        return 1;
     }
+    const bool admitted = self->beginCallback();
     bool success = false;
-    const bool ignored = self->_closing.load();
+    const bool ignored = !admitted;
     std::size_t payloadSize = 0;
     if (!ignored)
     {
@@ -339,16 +361,38 @@ int MqttClient::onMessageArrived(void* context, char* topicName, int topicLength
     if (!ignored)
         PocoDDS::Protocols::ProtocolMetrics::emit(
             {"mqtt", "receive", success ? "success" : "error", 0, payloadSize});
-    {
-        std::lock_guard<std::mutex> lock(self->_callbackMutex);
-        --self->_activeCallbacks;
-        if (self->_activeCallbacks == 0)
-            self->_callbacksIdle.notify_all();
-    }
+    self->endCallback();
     return 1;
 }
 
-void MqttClient::onDeliveryComplete(void*, MQTTClient_deliveryToken) {}
+void MqttClient::onDeliveryComplete(void* context, MQTTClient_deliveryToken)
+{
+    auto* self = static_cast<MqttClient*>(context);
+    if (!self)
+        return;
+    (void)self->beginCallback();
+    self->endCallback();
+}
+
+bool MqttClient::beginCallback() noexcept
+{
+    std::lock_guard<std::mutex> lock(_callbackMutex);
+    ++_activeCallbacks;
+    return !_closing.load();
+}
+
+void MqttClient::endCallback() noexcept
+{
+    std::lock_guard<std::mutex> lock(_callbackMutex);
+    if (_activeCallbacks != 0 && --_activeCallbacks == 0)
+        _callbacksIdle.notify_all();
+}
+
+void MqttClient::waitForCallbacks() noexcept
+{
+    std::unique_lock<std::mutex> lock(_callbackMutex);
+    _callbacksIdle.wait(lock, [&] { return _activeCallbacks == 0; });
+}
 
 void MqttClient::requireSuccess(int result, const char* operation)
 {

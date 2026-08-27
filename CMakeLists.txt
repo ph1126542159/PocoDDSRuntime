@@ -697,6 +697,102 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_backend_conformance.py")
         set_tests_properties(team-contract-registry-leader-backend-conformance-cli PROPERTIES
             LABELS "sdk;team;contract;registry;leader;backend;conformance;cas;concurrency;fault-injection;persistence;recovery;security;unit")
+        add_test(NAME team-contract-registry-leader-backend-capabilities
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_backend_capabilities.py")
+        set_tests_properties(team-contract-registry-leader-backend-capabilities PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;backend;adapter;capability;compatibility;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-registry-leader-backend-migration
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_backend_migration.py")
+        set_tests_properties(team-contract-registry-leader-backend-migration PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;backend;migration;fencing;failover;persistence;fault-injection;recovery;security;unit"
+            TIMEOUT 90)
+        add_test(NAME team-contract-artifact-store
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_artifact_store.py")
+        set_tests_properties(team-contract-artifact-store PROPERTIES
+            LABELS "sdk;team;contract;artifact;adapter;content-addressed;persistence;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-backend-config-resolver
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_backend_config_resolver.py")
+        set_tests_properties(team-contract-backend-config-resolver PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;backend;resolver;adapter;portability;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-config-resolver
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_config_resolver.py")
+        set_tests_properties(team-contract-adapter-config-resolver PROPERTIES
+            LABELS "sdk;team;contract;adapter;catalog;fleet;resolver;portability;typed-reference;multi-host;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-conformance
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_conformance.py")
+        set_tests_properties(team-contract-adapter-conformance PROPERTIES
+            LABELS "sdk;team;contract;adapter;conformance;certification;capability;portability;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-conformance-admission
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_conformance_admission.py")
+        set_tests_properties(team-contract-adapter-conformance-admission PROPERTIES
+            LABELS "sdk;team;contract;adapter;conformance;admission;fleet;portability;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-secret-provider
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_secret_provider.py")
+        set_tests_properties(team-contract-secret-provider PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;backend;adapter;secret;credential;redaction;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-runtime
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_runtime.py")
+        set_tests_properties(team-contract-adapter-runtime PROPERTIES
+            LABELS "sdk;team;contract;adapter;runtime;process;isolation;timeout;redaction;fault-injection;recovery;security;unit"
+            TIMEOUT 15)
+        add_test(NAME team-contract-adapter-catalog
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_catalog.py")
+        set_tests_properties(team-contract-adapter-catalog PROPERTIES
+            LABELS "sdk;team;contract;adapter;catalog;manifest;discovery;capability;portability;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-catalog-state
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_catalog_state.py")
+        set_tests_properties(team-contract-adapter-catalog-state PROPERTIES
+            LABELS "sdk;team;contract;adapter;catalog;state;activation;cas;concurrency;rollback;atomicity;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-catalog-reconciler
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_catalog_reconciler.py")
+        set_tests_properties(team-contract-adapter-catalog-reconciler PROPERTIES
+            LABELS "sdk;team;contract;adapter;catalog;reconciler;lifecycle;transaction;drain;health;rollback;fault-injection;recovery;security;unit"
+            TIMEOUT 45)
+        add_test(NAME team-contract-adapter-catalog-fleet
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_catalog_fleet.py")
+        set_tests_properties(team-contract-adapter-catalog-fleet PROPERTIES
+            LABELS "sdk;team;contract;adapter;catalog;fleet;canary;wave;failure-budget;rollback;concurrency;fault-injection;recovery;security;unit"
+            TIMEOUT 90)
+        add_test(NAME team-contract-adapter-catalog-fleet-state-store
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_catalog_fleet_state_store.py")
+        set_tests_properties(team-contract-adapter-catalog-fleet-state-store PROPERTIES
+            LABELS "sdk;team;contract;adapter;catalog;fleet;state-store;multi-host;cas;fencing;takeover;artifact-store;fault-injection;recovery;security;unit"
+            TIMEOUT 30)
+        add_test(NAME team-contract-adapter-catalog-wave-gate
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_catalog_wave_gate.py")
+        set_tests_properties(team-contract-adapter-catalog-wave-gate PROPERTIES
+            LABELS "sdk;team;contract;adapter;catalog;fleet;wave;gate;slo;progressive-delivery;pause;resume;rollback;fault-injection;recovery;security;unit"
+            TIMEOUT 90)
+        add_test(NAME team-contract-adapter-catalog-control-authorizer
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_adapter_catalog_control_authorizer.py")
+        set_tests_properties(team-contract-adapter-catalog-control-authorizer PROPERTIES
+            LABELS "sdk;team;contract;adapter;catalog;fleet;authorization;rbac;principal;deny;resume;abort;rollback;fault-injection;recovery;security;unit"
+            TIMEOUT 90)
         add_test(NAME team-contract-registry-leader-backend-adapter-example
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_backend_adapter_example.py")
@@ -707,6 +803,12 @@ if(BUILD_TESTING)
             COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_etcd_adapter.py")
         set_tests_properties(team-contract-registry-leader-etcd-adapter PROPERTIES
+            LABELS "sdk;team;contract;registry;leader;backend;adapter;etcd;distributed;conformance;cas;concurrency;persistence;recovery;security;unit"
+            TIMEOUT 40)
+        add_test(NAME team-contract-registry-leader-etcd-acceptance
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/test_team_contract_registry_leader_etcd_adapter.py")
+        set_tests_properties(team-contract-registry-leader-etcd-acceptance PROPERTIES
             LABELS "sdk;team;contract;registry;leader;backend;adapter;etcd;distributed;conformance;cas;concurrency;persistence;recovery;security;unit"
             TIMEOUT 40)
         add_test(NAME team-contract-registry-handoff-cli
@@ -902,7 +1004,7 @@ if(BUILD_TESTING)
             set_tests_properties(framework-recovery-matrix-execution PROPERTIES
                 LABELS "architecture;recovery;fault-injection;contract;release"
                 RUN_SERIAL TRUE
-                TIMEOUT 180)
+                TIMEOUT 420)
         endif()
         add_test(NAME sdk-header-self-containment-policy
             COMMAND "${Python3_EXECUTABLE}"
@@ -1680,7 +1782,25 @@ install(PROGRAMS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_standby.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_leader.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_leader_backend.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_leader_backend_capabilities.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_leader_backend_conformance.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_leader_backend_migration.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_artifact_store.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_backend_config_resolver.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_config_resolver.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_conformance.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_conformance_admission.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_conformance_trust.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_secret_provider.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_runtime.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_catalog.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_catalog_state.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_catalog_reconciler.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_catalog_fleet.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_catalog_fleet_state_store.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_catalog_wave_gate.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_adapter_catalog_control_authorizer.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_leader_etcd_acceptance.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_handoff.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/team_contract_registry_access_policy.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/process_file_lease.py"
@@ -1726,6 +1846,42 @@ install(FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-registry-leader-backend-etcdctl/etcd_cluster_preflight.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-registry-leader-backend-etcdctl/README.md"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-registry-leader-backend-etcdctl")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-artifact-store-file/file_artifact_store_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-artifact-store-file/create_artifact_store_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-artifact-store-file/README.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-artifact-store-file")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-backend-config-resolver-file/file_backend_config_resolver_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-backend-config-resolver-file/create_resolver_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-backend-config-resolver-file/README.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-backend-config-resolver-file")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-config-resolver-file/file_adapter_config_resolver_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-config-resolver-file/create_resolver_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-config-resolver-file/README.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-adapter-config-resolver-file")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-secret-provider-environment/environment_secret_provider_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-secret-provider-environment/create_secret_provider_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-secret-provider-environment/README.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-secret-provider-environment")
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_adapter_manifest.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_adapter_catalog.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_reconciler_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/lifecycle_reconciler_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_fleet_node_map.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_fleet_executor_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_fleet_plan.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_conformance_trust_demo.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/fleet_node_executor_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_wave_gate_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/wave_gate_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/create_control_authorizer_config.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/control_authorizer_adapter.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/examples/team-contract-adapter-catalog/README.md"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/PocoDDSRuntime/examples/team-contract-adapter-catalog")
 if(NOT WIN32)
     install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/tools/pdr.py"
         DESTINATION "${CMAKE_INSTALL_BINDIR}" RENAME pdr)

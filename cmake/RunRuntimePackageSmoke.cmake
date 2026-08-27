@@ -111,12 +111,37 @@ if(NOT team_contract_help_result EQUAL 0 OR
         NOT team_contract_help_output MATCHES "registry-standby-sync" OR
         NOT team_contract_help_output MATCHES "registry-leader-issue" OR
         NOT team_contract_help_output MATCHES "registry-leader-activate" OR
+        NOT team_contract_help_output MATCHES "registry-leader-backend-capabilities" OR
         NOT team_contract_help_output MATCHES "registry-leader-backend-conformance" OR
+        NOT team_contract_help_output MATCHES "artifact-store-put" OR
+        NOT team_contract_help_output MATCHES "artifact-store-get" OR
+        NOT team_contract_help_output MATCHES "backend-config-resolve" OR
+        NOT team_contract_help_output MATCHES "adapter-conformance" OR
+        NOT team_contract_help_output MATCHES "registry-leader-backend-migration-sync" OR
+        NOT team_contract_help_output MATCHES "registry-leader-backend-migration-finalize" OR
+        NOT team_contract_help_output MATCHES "registry-leader-backend-migration-status" OR
+        NOT team_contract_help_output MATCHES "registry-leader-backend-migration-resume" OR
+        NOT team_contract_help_output MATCHES "registry-leader-backend-migration-reconcile" OR
+        NOT team_contract_help_output MATCHES "registry-leader-backend-migration-abort" OR
         NOT team_contract_help_output MATCHES "registry-leader-etcd-preflight" OR
+        NOT team_contract_help_output MATCHES "registry-leader-etcd-acceptance" OR
         NOT team_contract_help_output MATCHES "registry-drain-start" OR
         NOT team_contract_help_output MATCHES "registry-drain-finalize" OR
         NOT team_contract_help_output MATCHES "registry-remote-drain-start" OR
         NOT team_contract_help_output MATCHES "registry-remote-drain-finalize" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-activate" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-rollback" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-current-check" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-state-verify" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-reconcile" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-reconcile-recover" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-reconcile-revert" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-reconcile-status" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-fleet-run" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-fleet-recover" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-fleet-status" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-fleet-resume" OR
+        NOT team_contract_help_output MATCHES "adapter-catalog-fleet-abort" OR
         NOT team_contract_help_output MATCHES "registry-anchor-verify")
     message(FATAL_ERROR
         "Installed team contract impact gate CLI is incomplete "
@@ -144,6 +169,24 @@ set(installed_python_tools
     team_contract_registry_recovery.py
     team_contract_registry_standby.py
     team_contract_registry_leader.py
+    team_contract_registry_leader_backend_capabilities.py
+    team_contract_registry_leader_backend_migration.py
+    team_contract_artifact_store.py
+    team_contract_backend_config_resolver.py
+    team_contract_adapter_config_resolver.py
+    team_contract_adapter_conformance.py
+    team_contract_adapter_conformance_admission.py
+    team_contract_adapter_conformance_trust.py
+    team_contract_secret_provider.py
+    team_contract_adapter_runtime.py
+    team_contract_adapter_catalog.py
+    team_contract_adapter_catalog_state.py
+    team_contract_adapter_catalog_reconciler.py
+    team_contract_adapter_catalog_fleet.py
+    team_contract_adapter_catalog_fleet_state_store.py
+    team_contract_adapter_catalog_wave_gate.py
+    team_contract_adapter_catalog_control_authorizer.py
+    team_contract_registry_leader_etcd_acceptance.py
     team_contract_registry_handoff.py
     team_contract_registry_access_policy.py
     process_file_lease.py
@@ -170,6 +213,149 @@ foreach(installed_tool ${installed_python_tools} pdr.ps1 "${PDR_CONFIG_CHECK_FIL
         message(FATAL_ERROR "Installed Runtime package is missing CLI tool: ${installed_tool}")
     endif()
 endforeach()
+foreach(config_resolver_example_file
+        file_backend_config_resolver_adapter.py create_resolver_config.py README.md)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/examples/team-contract-backend-config-resolver-file/${config_resolver_example_file}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Backend Config Resolver SDK example: "
+            "${config_resolver_example_file}")
+    endif()
+endforeach()
+foreach(adapter_config_resolver_example_file
+        file_adapter_config_resolver_adapter.py create_resolver_config.py README.md)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/examples/team-contract-adapter-config-resolver-file/${adapter_config_resolver_example_file}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Adapter Config Resolver SDK example: "
+            "${adapter_config_resolver_example_file}")
+    endif()
+endforeach()
+foreach(config_resolver_schema
+        team-contract-backend-config-reference.schema.json
+        team-contract-backend-config-resolver-config.schema.json
+        team-contract-backend-config-resolver-capability-request.schema.json
+        team-contract-backend-config-resolver-capability-manifest.schema.json
+        team-contract-backend-config-resolver-request.schema.json
+        team-contract-backend-config-resolver-response.schema.json
+    team-contract-adapter-config-reference.schema.json
+    team-contract-adapter-config-resolver-config.schema.json
+    team-contract-adapter-config-resolver-capability-request.schema.json
+    team-contract-adapter-config-resolver-capability-manifest.schema.json
+    team-contract-adapter-config-resolver-request.schema.json
+    team-contract-adapter-config-resolver-response.schema.json
+    team-contract-adapter-conformance-evidence.schema.json
+    team-contract-adapter-conformance-admission-bundle.schema.json
+    team-contract-adapter-conformance-attestation.schema.json
+    team-contract-adapter-conformance-trust-policy.schema.json
+    team-contract-secret-reference.schema.json
+    team-contract-secret-provider-config.schema.json
+    team-contract-secret-provider-capability-request.schema.json
+    team-contract-secret-provider-capability-manifest.schema.json
+    team-contract-secret-provider-request.schema.json
+    team-contract-secret-provider-response.schema.json
+    team-contract-secret-provider-check.schema.json)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/contracts/schemas/${config_resolver_schema}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Backend Config Resolver schema: "
+            "${config_resolver_schema}")
+    endif()
+endforeach()
+foreach(secret_provider_example_file
+        environment_secret_provider_adapter.py create_secret_provider_config.py README.md)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/examples/team-contract-secret-provider-environment/${secret_provider_example_file}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Secret Provider SDK example: "
+            "${secret_provider_example_file}")
+    endif()
+endforeach()
+foreach(adapter_catalog_example_file
+        create_adapter_manifest.py create_adapter_catalog.py
+        create_reconciler_config.py lifecycle_reconciler_adapter.py
+        create_fleet_node_map.py create_fleet_executor_config.py
+        create_fleet_plan.py create_conformance_trust_demo.py
+        fleet_node_executor_adapter.py
+        create_wave_gate_config.py wave_gate_adapter.py
+        create_control_authorizer_config.py control_authorizer_adapter.py README.md)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/examples/team-contract-adapter-catalog/${adapter_catalog_example_file}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Adapter Catalog SDK example: "
+            "${adapter_catalog_example_file}")
+    endif()
+endforeach()
+foreach(adapter_catalog_schema
+        team-contract-adapter-manifest.schema.json
+        team-contract-adapter-catalog.schema.json
+        team-contract-adapter-catalog-listing.schema.json
+        team-contract-adapter-catalog-check.schema.json
+        team-contract-adapter-catalog-pointer.schema.json
+        team-contract-adapter-catalog-state.schema.json
+        team-contract-adapter-catalog-state-operation.schema.json
+        team-contract-adapter-catalog-current.schema.json
+        team-contract-adapter-catalog-current-check.schema.json
+        team-contract-adapter-catalog-state-verification.schema.json
+        team-contract-adapter-catalog-reconciler-config.schema.json
+        team-contract-adapter-catalog-reconciler-capability-request.schema.json
+        team-contract-adapter-catalog-reconciler-capability-manifest.schema.json
+        team-contract-adapter-catalog-reconciler-request.schema.json
+        team-contract-adapter-catalog-reconciler-response.schema.json
+        team-contract-adapter-catalog-reconcile-journal.schema.json
+        team-contract-adapter-catalog-reconcile-report.schema.json
+        team-contract-adapter-catalog-reconcile-status.schema.json
+        team-contract-adapter-catalog-fleet-plan.schema.json
+        team-contract-adapter-catalog-fleet-executor-config.schema.json
+        team-contract-adapter-catalog-fleet-executor-capability-request.schema.json
+        team-contract-adapter-catalog-fleet-executor-capability-manifest.schema.json
+        team-contract-adapter-catalog-fleet-executor-request.schema.json
+        team-contract-adapter-catalog-fleet-executor-response.schema.json
+        team-contract-adapter-catalog-fleet-node-map.schema.json
+        team-contract-adapter-catalog-fleet-journal.schema.json
+        team-contract-adapter-catalog-fleet-report.schema.json
+        team-contract-adapter-catalog-fleet-status.schema.json
+        team-contract-adapter-catalog-fleet-state-pointer.schema.json
+        team-contract-adapter-catalog-wave-gate-config.schema.json
+        team-contract-adapter-catalog-wave-gate-capability-request.schema.json
+        team-contract-adapter-catalog-wave-gate-capability-manifest.schema.json
+        team-contract-adapter-catalog-wave-gate-request.schema.json
+        team-contract-adapter-catalog-wave-gate-response.schema.json
+        team-contract-adapter-catalog-control-authorizer-config.schema.json
+        team-contract-adapter-catalog-control-authorizer-capability-request.schema.json
+        team-contract-adapter-catalog-control-authorizer-capability-manifest.schema.json
+        team-contract-adapter-catalog-control-authorizer-request.schema.json
+        team-contract-adapter-catalog-control-authorizer-response.schema.json)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/contracts/schemas/${adapter_catalog_schema}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Adapter Catalog schema: "
+            "${adapter_catalog_schema}")
+    endif()
+endforeach()
+foreach(artifact_store_example_file
+        file_artifact_store_adapter.py create_artifact_store_config.py README.md)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/examples/team-contract-artifact-store-file/${artifact_store_example_file}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Artifact Store SDK example: "
+            "${artifact_store_example_file}")
+    endif()
+endforeach()
+foreach(artifact_store_schema
+        team-contract-artifact-store-config.schema.json
+        team-contract-artifact-reference.schema.json
+        team-contract-artifact-store-capability-request.schema.json
+        team-contract-artifact-store-capability-manifest.schema.json
+        team-contract-artifact-store-request.schema.json
+        team-contract-artifact-store-response.schema.json)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/contracts/schemas/${artifact_store_schema}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing Artifact Store schema: "
+            "${artifact_store_schema}")
+    endif()
+endforeach()
 foreach(leader_backend_example_file
         file_backend_adapter.py create_backend_config.py README.md)
     if(NOT EXISTS
@@ -191,12 +377,37 @@ foreach(leader_etcd_example_file
 endforeach()
 foreach(leader_etcd_schema
         team-contract-registry-leader-etcd-adapter-config.schema.json
-        team-contract-registry-leader-etcd-preflight.schema.json)
+        team-contract-registry-leader-etcd-preflight.schema.json
+        team-contract-registry-leader-etcd-acceptance.schema.json)
     if(NOT EXISTS
             "${prefix}/share/PocoDDSRuntime/contracts/schemas/${leader_etcd_schema}")
         message(FATAL_ERROR
             "Installed Runtime package is missing leader etcd schema: "
             "${leader_etcd_schema}")
+    endif()
+endforeach()
+foreach(leader_backend_capability_schema
+        team-contract-registry-leader-backend-capability-request.schema.json
+        team-contract-registry-leader-backend-capability-manifest.schema.json
+        team-contract-registry-leader-backend-capability-report.schema.json)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/contracts/schemas/${leader_backend_capability_schema}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing leader backend capability schema: "
+            "${leader_backend_capability_schema}")
+    endif()
+endforeach()
+foreach(leader_backend_migration_schema
+        team-contract-registry-leader-backend-migration-sync.schema.json
+        team-contract-registry-leader-backend-migration.schema.json
+        team-contract-registry-leader-backend-migration-transaction.schema.json
+        team-contract-registry-leader-backend-migration-status.schema.json
+        team-contract-registry-leader-backend-migration-abort.schema.json)
+    if(NOT EXISTS
+            "${prefix}/share/PocoDDSRuntime/contracts/schemas/${leader_backend_migration_schema}")
+        message(FATAL_ERROR
+            "Installed Runtime package is missing leader backend migration schema: "
+            "${leader_backend_migration_schema}")
     endif()
 endforeach()
 if(NOT EXISTS "${prefix}/bin/project_config_transaction.py" OR

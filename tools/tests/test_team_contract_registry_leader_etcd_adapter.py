@@ -14,6 +14,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PDR = ROOT / "tools/pdr.py"
+sys.path.insert(0, str(ROOT / "tools"))
+import team_contract_registry_leader_backend as leader_backend_tool  # noqa: E402
+import team_contract_registry_leader_backend_migration as migration_tool  # noqa: E402
 EXAMPLE = ROOT / "examples/team-contract-registry-leader-backend-etcdctl"
 ADAPTER = EXAMPLE / "etcd_backend_adapter.py"
 CONFIG_TOOL = EXAMPLE / "create_backend_configs.py"
@@ -47,9 +50,13 @@ class LeaderEtcdAdapterTests(unittest.TestCase):
             authority1 = "etcd-adapter-authority-0001"
             authority2 = "etcd-adapter-authority-0002"
             authority3 = "etcd-adapter-authority-0003"
+            authority4 = "etcd-adapter-authority-0004"
+            authority5 = "etcd-migration-transaction-0005"
             registry1 = "etcd-adapter-registry-0001"
             registry2 = "etcd-adapter-registry-0002"
             registry3 = "etcd-adapter-registry-0003"
+            registry4 = "etcd-adapter-registry-0004"
+            registry5 = "etcd-adapter-registry-0005"
             common = [
                 sys.executable, str(CONFIG_TOOL),
                 "--python", str(Path(sys.executable).resolve()),
@@ -59,9 +66,13 @@ class LeaderEtcdAdapterTests(unittest.TestCase):
                 "--authority-id", authority1,
                 "--authority-id", authority2,
                 "--authority-id", authority3,
+                "--authority-id", authority4,
+                "--authority-id", authority5,
                 "--registry-id", registry1,
                 "--registry-id", registry2,
                 "--registry-id", registry3,
+                "--registry-id", registry4,
+                "--registry-id", registry5,
                 "--etcdctl", str(Path(sys.executable).resolve()),
                 "--etcdctl-argument", str(fake.resolve()),
                 "--etcdctl-artifact", str(fake.resolve()),
@@ -134,6 +145,21 @@ class LeaderEtcdAdapterTests(unittest.TestCase):
             )
             self.assertEqual(mismatch.returncode, 2)
             self.assertIn("disagree on cluster ID", mismatch.stderr)
+            for mode, diagnostic_text in (
+                ("health-failure", "etcdctl command failed"),
+                ("leader-mismatch", "disagree on an elected member leader"),
+                ("learner", "is a learner"),
+                ("raft-lag", "Raft status is inconsistent"),
+            ):
+                fault = self.invoke(
+                    sys.executable, str(PDR), "contract-package",
+                    "registry-leader-etcd-preflight",
+                    "--config", str(adapter_config.resolve()),
+                    "--expected-config-sha256", adapter_sha,
+                    environment=dict(environment, PDR_TEST_ETCDCTL_MODE=mode),
+                )
+                self.assertEqual(fault.returncode, 2, mode)
+                self.assertIn(diagnostic_text, fault.stderr)
             initial_request = {
                 "schemaVersion": 1,
                 "product": "PocoDDSRuntimeTeamContractRegistryLeaderBackendRequest",
@@ -181,24 +207,63 @@ class LeaderEtcdAdapterTests(unittest.TestCase):
                 + diagnostic.stderr.decode(errors="replace"),
             )
             self.assertTrue(json.loads(diagnostic.stdout)["committed"])
-            report = work / "conformance.json"
-            qualified = self.invoke(
+            acceptance_directory = work / "acceptance"
+            accepted = self.invoke(
                 sys.executable, str(PDR), "contract-package",
-                "registry-leader-backend-conformance",
+                "registry-leader-etcd-acceptance",
+                "--adapter-config", str(adapter_config.resolve()),
+                "--expected-adapter-config-sha256", adapter_sha,
                 "--backend-config", str(backend_config.resolve()),
                 "--expected-backend-config-sha256", backend_sha,
                 "--authority-id", authority1,
                 "--registry-id", registry1,
                 "--confirm-dedicated-empty-scope",
-                "--report", str(report.resolve()),
+                "--output-directory", str(acceptance_directory.resolve()),
                 environment=environment,
             )
             self.assertEqual(
-                qualified.returncode, 0, qualified.stdout + qualified.stderr
+                accepted.returncode, 0, accepted.stdout + accepted.stderr
             )
-            self.assertIn("checks=6 token=2", qualified.stdout)
-            evidence = json.loads(report.read_bytes())
+            self.assertIn("PDR_REGISTRY_LEADER_ETCD_ACCEPTANCE_PASS", accepted.stdout)
+            evidence = json.loads(
+                (acceptance_directory / "acceptance.json").read_bytes()
+            )
+            self.assertTrue(evidence["passed"])
+            self.assertEqual(evidence["backendProtocol"], {"major": 1, "minor": 0})
+            self.assertRegex(
+                evidence["capabilityManifestSha256"], r"^[0-9a-f]{64}$"
+            )
             self.assertEqual(evidence["finalFencingToken"], 2)
+            self.assertEqual(set(evidence["evidence"]), {
+                "preflightBefore", "conformance", "preflightAfter"
+            })
+            for item in evidence["evidence"].values():
+                stage_path = acceptance_directory / item["path"]
+                self.assertEqual(
+                    hashlib.sha256(stage_path.read_bytes()).hexdigest(),
+                    item["sha256"],
+                )
+            rerun_directory = work / "acceptance-rerun"
+            rerun = self.invoke(
+                sys.executable, str(PDR), "contract-package",
+                "registry-leader-etcd-acceptance",
+                "--adapter-config", str(adapter_config.resolve()),
+                "--expected-adapter-config-sha256", adapter_sha,
+                "--backend-config", str(backend_config.resolve()),
+                "--expected-backend-config-sha256", backend_sha,
+                "--authority-id", authority1,
+                "--registry-id", registry1,
+                "--confirm-dedicated-empty-scope",
+                "--output-directory", str(rerun_directory.resolve()),
+                environment=environment,
+            )
+            self.assertEqual(rerun.returncode, 2)
+            rerun_failure = json.loads(
+                (rerun_directory / "acceptance-failure.json").read_bytes()
+            )
+            self.assertFalse(rerun_failure["passed"])
+            self.assertFalse(rerun_failure["committed"])
+            self.assertEqual(rerun_failure["stage"], "conformance")
             state = json.loads((store / "state.json").read_bytes())
             scope_fragment = (
                 f"/authorities/{authority1}/registries/{registry1}/"
@@ -207,6 +272,115 @@ class LeaderEtcdAdapterTests(unittest.TestCase):
             self.assertEqual(len(scope_keys), 3)
             self.assertEqual(sum(item.endswith("/current") for item in scope_keys), 1)
             self.assertEqual(sum("/grants/" in item for item in scope_keys), 2)
+
+            checkpoint = work / "transaction-checkpoint.json"
+            checkpoint.write_text("{}\n", encoding="utf-8")
+            checkpoint_sha = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+            os.environ["PDR_TEST_ETCDCTL_ROOT"] = str(store.resolve())
+            os.environ["PDR_TEST_ETCDCTL_MODE"] = "normal"
+            transaction_store = migration_tool.BackendTransactionStore(
+                str(backend_config.resolve()), backend_sha,
+                authority5, registry5,
+            )
+            transaction = {
+                "schemaVersion": 2,
+                "product": migration_tool.TRANSACTION_PRODUCT,
+                "migrationId": authority5,
+                "authorityId": "registry-leader-authority",
+                "registryId": registry5,
+                "sourceBackend": {
+                    "kind": "external-command", "backendId": "source-store",
+                    "configPath": str(backend_config.resolve()),
+                    "configSha256": backend_sha,
+                },
+                "targetBackend": {
+                    "kind": "external-command", "backendId": "target-store",
+                    "configPath": str(backend_config.resolve()),
+                    "configSha256": backend_sha,
+                },
+                "status": "active", "stateVersion": 1,
+                "lastSyncEvidencePath": str(checkpoint.resolve()),
+                "lastSyncEvidenceSha256": checkpoint_sha,
+                "migrationEvidencePath": None,
+                "migrationEvidenceSha256": None,
+                "abortEvidencePath": None, "abortEvidenceSha256": None,
+                "actor": "etcd.operator", "updatedAt":
+                    "2026-08-26T12:00:00Z",
+                "fencingToken": 1, "previousGrantSha256": None,
+            }
+            transaction_sha1 = transaction_store.compare_and_swap(
+                leader_backend_tool.ZERO_SHA256, transaction,
+                "begin", "etcd.operator",
+            )
+            loaded_transaction = transaction_store.read(transaction_sha1)
+            self.assertIsNotNone(loaded_transaction)
+            self.assertEqual(loaded_transaction[0], transaction)
+            transaction2 = migration_tool._advance_transaction(
+                transaction, "handoff.operator", transaction_sha1
+            )
+            transaction_sha2 = transaction_store.compare_and_swap(
+                transaction_sha1, transaction2,
+                "resume", "handoff.operator",
+            )
+            self.assertEqual(
+                transaction_store.read(transaction_sha2)[0]["stateVersion"], 2
+            )
+            stale_transaction = migration_tool._advance_transaction(
+                transaction, "stale.operator", transaction_sha1
+            )
+            with self.assertRaisesRegex(ValueError, "identity changed"):
+                transaction_store.compare_and_swap(
+                    transaction_sha1, stale_transaction,
+                    "resume", "stale.operator",
+                )
+            transaction_state = json.loads((store / "state.json").read_bytes())
+            transaction_scope = (
+                f"/authorities/{authority5}/registries/{registry5}/"
+            )
+            transaction_keys = [
+                item for item in transaction_state if transaction_scope in item
+            ]
+            self.assertEqual(len(transaction_keys), 3)
+            self.assertEqual(
+                sum("/grants/" in item for item in transaction_keys), 2
+            )
+
+            committed_failure_directory = work / "acceptance-committed-failure"
+            committed_failure = self.invoke(
+                sys.executable, str(PDR), "contract-package",
+                "registry-leader-etcd-acceptance",
+                "--adapter-config", str(adapter_config.resolve()),
+                "--expected-adapter-config-sha256", adapter_sha,
+                "--backend-config", str(backend_config.resolve()),
+                "--expected-backend-config-sha256", backend_sha,
+                "--authority-id", authority4,
+                "--registry-id", registry4,
+                "--confirm-dedicated-empty-scope",
+                "--output-directory",
+                str(committed_failure_directory.resolve()),
+                environment=dict(
+                    environment,
+                    PDR_TEST_ETCDCTL_MODE="postflight-leader-mismatch",
+                ),
+            )
+            self.assertEqual(committed_failure.returncode, 3)
+            committed_failure_evidence = json.loads(
+                (committed_failure_directory / "acceptance-failure.json")
+                .read_bytes()
+            )
+            self.assertTrue(committed_failure_evidence["committed"])
+            self.assertEqual(
+                committed_failure_evidence["stage"], "preflight-after"
+            )
+            committed_scope_fragment = (
+                f"/authorities/{authority4}/registries/{registry4}/"
+            )
+            committed_state = json.loads((store / "state.json").read_bytes())
+            committed_scope_keys = [
+                item for item in committed_state
+                if committed_scope_fragment in item
+            ]
+            self.assertEqual(len(committed_scope_keys), 3)
 
             cert.write_text("tampered-client-cert\n", encoding="utf-8")
             rejected = self.invoke(
@@ -228,8 +402,11 @@ class LeaderEtcdAdapterTests(unittest.TestCase):
             ))
             print(
                 "PDR_REGISTRY_LEADER_ETCD_ADAPTER_PASS generated=1 https=1 "
-                "mtls=1 version=1 preflight=1 quorum=1 split=1 namespace=1 "
-                "txn=1 cas=1 concurrency=1 history=1 retained=1 pin=1"
+                "mtls=1 version=1 preflight=1 quorum=1 split=1 health=1 "
+                "leader=1 learner=1 lag=1 capability=1 acceptance=1 before=1 after=1 "
+                "evidence=1 rerun=1 committed=1 namespace=1 txn=1 cas=1 concurrency=1 "
+                "history=1 retained=1 pin=1"
+                " migrationStore=1 stateCas=1 stateHistory=1 staleState=1"
             )
 
     def test_generator_rejects_insecure_or_single_endpoint_config(self):

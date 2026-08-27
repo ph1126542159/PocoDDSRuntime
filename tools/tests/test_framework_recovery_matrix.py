@@ -29,7 +29,7 @@ class FrameworkRecoveryMatrixTests(unittest.TestCase):
 
     def test_repository_matrix_is_strict_and_covers_every_required_scope(self):
         scenarios = MODULE.validate_matrix(self.matrix, self.catalog)
-        self.assertEqual(len(scenarios), 30)
+        self.assertEqual(len(scenarios), 46)
         self.assertEqual(
             {item["scope"] for item in scenarios}, set(self.matrix["requiredScopes"])
         )
@@ -289,8 +289,8 @@ class FrameworkRecoveryMatrixTests(unittest.TestCase):
                 self.assertEqual(MODULE.execute_command(args), 0)
             evidence = json.loads(report_path.read_text(encoding="utf-8"))
             self.assertTrue(evidence["passed"])
-            self.assertEqual(evidence["scenarioCount"], 30)
-            self.assertEqual(len(evidence["results"]), 30)
+            self.assertEqual(evidence["scenarioCount"], 46)
+            self.assertEqual(len(evidence["results"]), 46)
             self.assertEqual(evidence["matrixSha256"], MODULE.document_digest(self.matrix))
             MODULE.validate_evidence(evidence)
 

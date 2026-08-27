@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-backend-migration-status.schema.json",
+  "title": "Registry leader backend live migration status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "migrationId", "authorityId", "registryId", "transactionStore", "transactionSha256", "transactionStatus", "stateVersion", "sourceBackend", "targetBackend", "sourceGrantCount", "targetGrantCount", "commonGrantCount", "sourceCurrent", "targetCurrent", "bindingRole", "phase", "recommendedAction", "safeToResume", "safeToAbort", "verifiedAt"],
+  "properties": {
+    "schemaVersion": {"enum": [2, 3, 4]}, "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendMigrationStatus"}, "passed": {"type": "boolean"},
+    "migrationId": {"$ref": "#/$defs/id"}, "authorityId": {"$ref": "#/$defs/id"}, "registryId": {"$ref": "#/$defs/id"},
+    "transactionStore": {"$ref": "#/$defs/store"}, "transactionSha256": {"$ref": "#/$defs/sha256"}, "transactionStatus": {"enum": ["active", "prepared", "completed", "aborted"]}, "stateVersion": {"type": "integer", "minimum": 1},
+    "sourceBackend": {"$ref": "#/$defs/backend"}, "targetBackend": {"$ref": "#/$defs/backend"},
+    "sourceGrantCount": {"type": "integer", "minimum": 0}, "targetGrantCount": {"type": "integer", "minimum": 0}, "commonGrantCount": {"type": "integer", "minimum": 0},
+    "sourceCurrent": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/current"}]}, "targetCurrent": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/current"}]},
+    "bindingRole": {"enum": ["source", "target", "other"]},
+    "phase": {"enum": ["ready", "synchronizing", "synchronized", "source-fenced-needs-resume", "source-fenced", "target-led", "cutover-complete", "aborted", "diverged", "inconsistent"]},
+    "recommendedAction": {"enum": ["resume", "fence-or-abort", "issue-target-leadership", "finalize-and-activate", "reconcile-completion", "start-new-migration", "manual-repair"]},
+    "artifactStore": {"$ref": "#/$defs/artifactStore"},
+    "backendConfigResolver": {"$ref": "#/$defs/configResolver"},
+    "lastSyncEvidenceRef": {"$ref": "#/$defs/artifactRef"},
+    "migrationEvidenceRef": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/artifactRef"}]},
+    "abortEvidenceRef": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/artifactRef"}]},
+    "safeToResume": {"type": "boolean"}, "safeToAbort": {"type": "boolean"}, "verifiedAt": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"enum": [3, 4]}}}, "then": {"required": ["artifactStore", "lastSyncEvidenceRef", "migrationEvidenceRef", "abortEvidenceRef"]}, "else": {"not": {"anyOf": [{"required": ["artifactStore"]}, {"required": ["lastSyncEvidenceRef"]}, {"required": ["migrationEvidenceRef"]}, {"required": ["abortEvidenceRef"]}]}}},
+    {"if": {"properties": {"schemaVersion": {"const": 4}}}, "then": {"required": ["backendConfigResolver"], "properties": {"sourceBackend": {"$ref": "#/$defs/backendRef"}, "targetBackend": {"$ref": "#/$defs/backendRef"}}}, "else": {"not": {"required": ["backendConfigResolver"]}, "properties": {"sourceBackend": {"$ref": "#/$defs/localBackend"}, "targetBackend": {"$ref": "#/$defs/localBackend"}}}}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "backend": {"oneOf": [{"$ref": "#/$defs/localBackend"}, {"$ref": "#/$defs/backendRef"}]},
+    "localBackend": {"type": "object", "additionalProperties": false, "required": ["kind", "backendId", "configPath", "configSha256"], "properties": {"kind": {"const": "external-command"}, "backendId": {"$ref": "#/$defs/id"}, "configPath": {"type": "string", "minLength": 1}, "configSha256": {"$ref": "#/$defs/sha256"}}},
+    "backendRef": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "backendId", "revision"], "properties": {"kind": {"const": "backend-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "backendId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}},
+    "store": {"oneOf": [{"type": "object", "additionalProperties": false, "required": ["kind", "path"], "properties": {"kind": {"const": "file"}, "path": {"type": "string", "minLength": 1}}}, {"$ref": "#/$defs/localBackend"}]},
+    "current": {"type": "object", "additionalProperties": false, "required": ["fencingToken", "grantSha256", "purpose", "leaderId"], "properties": {"fencingToken": {"type": "integer", "minimum": 1}, "grantSha256": {"$ref": "#/$defs/sha256"}, "purpose": {"enum": ["leadership", "fence"]}, "leaderId": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]}}},
+    "artifactStore": {"type": "object", "additionalProperties": false, "required": ["kind", "storeId", "configPath", "configSha256", "capabilityManifestSha256"], "properties": {"kind": {"const": "external-command"}, "storeId": {"$ref": "#/$defs/id"}, "configPath": {"type": "string", "minLength": 1}, "configSha256": {"$ref": "#/$defs/sha256"}, "capabilityManifestSha256": {"$ref": "#/$defs/sha256"}}},
+    "configResolver": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configPath", "configSha256", "capabilityManifestSha256"], "properties": {"kind": {"const": "external-command"}, "resolverId": {"$ref": "#/$defs/id"}, "configPath": {"type": "string", "minLength": 1}, "configSha256": {"$ref": "#/$defs/sha256"}, "capabilityManifestSha256": {"$ref": "#/$defs/sha256"}}},
+    "artifactRef": {"type": "object", "additionalProperties": false, "required": ["kind", "storeId", "namespaceId", "sha256", "sizeBytes", "mediaType"], "properties": {"kind": {"const": "content-addressed"}, "storeId": {"$ref": "#/$defs/id"}, "namespaceId": {"$ref": "#/$defs/id"}, "sha256": {"$ref": "#/$defs/sha256"}, "sizeBytes": {"type": "integer", "minimum": 1}, "mediaType": {"type": "string", "minLength": 3, "maxLength": 255}}}
+  }
+}

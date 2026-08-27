@@ -4,7 +4,7 @@
   "title": "Registry leader authority backend conformance evidence",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "product", "passed", "backendId", "authorityId", "registryId", "backendConfigSha256", "startedAt", "completedAt", "finalFencingToken", "finalGrantSha256", "checks"],
+  "required": ["schemaVersion", "product", "passed", "backendId", "authorityId", "registryId", "backendConfigSha256", "backendProtocol", "capabilityManifestSha256", "startedAt", "completedAt", "finalFencingToken", "finalGrantSha256", "checks"],
   "properties": {
     "schemaVersion": {"const": 1},
     "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendConformance"},
@@ -13,6 +13,8 @@
     "authorityId": {"$ref": "#/$defs/id"},
     "registryId": {"$ref": "#/$defs/id"},
     "backendConfigSha256": {"$ref": "#/$defs/sha256"},
+    "backendProtocol": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["major", "minor"], "properties": {"major": {"type": "integer", "minimum": 1, "maximum": 65535}, "minor": {"type": "integer", "minimum": 0, "maximum": 65535}}}]},
+    "capabilityManifestSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
     "startedAt": {"type": "string", "format": "date-time"},
     "completedAt": {"type": "string", "format": "date-time"},
     "finalFencingToken": {"const": 2},

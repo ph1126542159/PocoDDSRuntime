@@ -63,8 +63,22 @@ auto started = transport.start();
 - 当前 Adapter 负责连接和显式启停；生产项目还应在 Host 层增加退避重连、健康状态、凭据轮换与
   断线队列策略，不能把无限重试藏在业务调用内。
 
+## Paho 依赖安全契约
+
+MQTT Adapter 依赖受治理的 Eclipse Paho MQTT C 构建。Paho 1.3.15 的同步客户端在消息回调尚未
+完成内部队列清理时并发执行 `disconnect`，可能让 `cleanSession` 与回调重复释放同一消息。依赖
+Superbuild 会通过
+`cmake/patches/paho-mqtt-c-v1.3.15-message-callback-teardown.patch` 在回调前转移队列项所有权，
+并在安装头文件中写入 `PDR_PAHO_MQTTCLIENT_CALLBACK_TEARDOWN_SAFE` 能力标记。
+
+主工程配置会拒绝没有该能力标记的外部 Paho 包，避免开发机、CI 和发布机静默链接到行为不同的
+系统库。升级 Paho 时必须重新审查补丁、更新能力标记，并通过 `mqtt-transport-peer-recovery` 的
+`callbackTeardown=1` 断言及重复压力测试后，才能替换受治理版本。
+
 ## 验收
 
 `mqtt-transport-smoke` 会启动真实 TCP Mini Broker，验证 CONNECT、SUBSCRIBE、客户端发布、QoS 1
 PUBACK、Broker 主动下发 `PDRM/1`、UNSUBSCRIBE、DISCONNECT，并执行 7 项 Transport Conformance
-检查。TLS 证书校验由协议层 `mqtt-tls-integration` 单独覆盖。
+检查。`mqtt-transport-peer-recovery` 会在 Broker 异常断开后恢复订阅与完整消息，并主动让
+`stop()` 与仍在执行的消息回调重叠，验证回调销毁边界。TLS 证书校验由协议层
+`mqtt-tls-integration` 单独覆盖。

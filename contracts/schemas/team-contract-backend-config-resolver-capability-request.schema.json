@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-backend-config-resolver-capability-request.schema.json",
+  "title": "Backend configuration resolver capability request",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "resolverId"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractBackendConfigResolverCapabilityRequest"},
+    "requestId": {"$ref": "#/$defs/id"}, "resolverId": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}}
+}

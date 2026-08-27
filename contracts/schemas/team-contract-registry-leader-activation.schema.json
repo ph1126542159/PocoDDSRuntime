@@ -9,7 +9,7 @@
     "schemaVersion": {"const": 1},
     "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderActivation"},
     "passed": {"const": true},
-    "operation": {"enum": ["issue", "enroll", "promote", "renew"]},
+    "operation": {"enum": ["issue", "enroll", "promote", "renew", "migrate"]},
     "authorityId": {"$ref": "#/$defs/id"},
     "registryId": {"$ref": "#/$defs/id"},
     "leaderId": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
@@ -17,6 +17,7 @@
     "fencingToken": {"type": "integer", "minimum": 1},
     "grantSha256": {"$ref": "#/$defs/sha256"},
     "registry": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
+    "backendMigrationEvidenceSha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
     "completedAt": {"type": "string", "format": "date-time"},
     "operator": {"$ref": "#/$defs/id"}
   },

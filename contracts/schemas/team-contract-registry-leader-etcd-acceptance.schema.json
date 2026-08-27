@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-etcd-acceptance.schema.json",
+  "title": "Registry leader etcd external acceptance evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "passed", "adapterId", "backendId", "authorityId", "registryId", "adapterConfigSha256", "backendConfigSha256", "backendProtocol", "capabilityManifestSha256", "clusterId", "memberIds", "leaderBefore", "leaderAfter", "minimumRevisionBefore", "minimumRevisionAfter", "finalFencingToken", "finalGrantSha256", "evidence", "checks", "startedAt", "completedAt"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderEtcdAcceptance"},
+    "passed": {"const": true},
+    "adapterId": {"$ref": "#/$defs/id"}, "backendId": {"$ref": "#/$defs/id"},
+    "authorityId": {"$ref": "#/$defs/id"}, "registryId": {"$ref": "#/$defs/id"},
+    "adapterConfigSha256": {"$ref": "#/$defs/sha256"}, "backendConfigSha256": {"$ref": "#/$defs/sha256"},
+    "backendProtocol": {"type": "object", "additionalProperties": false, "required": ["major", "minor"], "properties": {"major": {"type": "integer", "minimum": 1, "maximum": 65535}, "minor": {"type": "integer", "minimum": 0, "maximum": 65535}}},
+    "capabilityManifestSha256": {"$ref": "#/$defs/sha256"},
+    "clusterId": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+    "memberIds": {"type": "array", "minItems": 3, "maxItems": 9, "uniqueItems": true, "items": {"type": "string", "pattern": "^[1-9][0-9]*$"}},
+    "leaderBefore": {"type": "string", "pattern": "^[1-9][0-9]*$"}, "leaderAfter": {"type": "string", "pattern": "^[1-9][0-9]*$"},
+    "minimumRevisionBefore": {"type": "integer", "minimum": 1}, "minimumRevisionAfter": {"type": "integer", "minimum": 1},
+    "finalFencingToken": {"const": 2}, "finalGrantSha256": {"$ref": "#/$defs/sha256"},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["preflightBefore", "conformance", "preflightAfter"], "properties": {"preflightBefore": {"$ref": "#/$defs/evidence"}, "conformance": {"$ref": "#/$defs/evidence"}, "preflightAfter": {"$ref": "#/$defs/evidence"}}},
+    "checks": {"type": "object", "additionalProperties": false, "required": ["configBinding", "preflightBefore", "conformance", "preflightAfter", "topologyStable", "evidenceDigestBound"], "properties": {"configBinding": {"const": true}, "preflightBefore": {"const": true}, "conformance": {"const": true}, "preflightAfter": {"const": true}, "topologyStable": {"const": true}, "evidenceDigestBound": {"const": true}}},
+    "startedAt": {"type": "string", "format": "date-time"}, "completedAt": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "pattern": "^[A-Za-z0-9._-]+\\.json$"}, "sha256": {"$ref": "#/$defs/sha256"}}}
+  }
+}

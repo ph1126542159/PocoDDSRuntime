@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-fleet-state-pointer.schema.json",
+  "title": "CAS-fenced Adapter Catalog Fleet remote state pointer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "rolloutId", "catalogId", "planSha256", "stateBackendId", "artifactStoreId", "stateVersion", "fencingToken", "previousGrantSha256", "journalRef", "journalSha256", "coordinatorId", "updatedAt"],
+  "properties": {
+    "schemaVersion": {"enum": [1, 2]},
+    "product": {"const": "PocoDDSRuntimeTeamContractAdapterCatalogFleetStatePointer"},
+    "rolloutId": {"$ref": "#/$defs/id"},
+    "catalogId": {"$ref": "#/$defs/id"},
+    "planSha256": {"$ref": "#/$defs/sha256"},
+    "stateBackendId": {"$ref": "#/$defs/id"},
+    "stateBackendConfigSha256": {"$ref": "#/$defs/sha256"},
+    "artifactStoreId": {"$ref": "#/$defs/id"},
+    "artifactStoreConfigSha256": {"$ref": "#/$defs/sha256"},
+    "adapterConfigResolverId": {"$ref": "#/$defs/id"},
+    "stateBackendConfigRef": {"$ref": "#/$defs/adapterConfigRef"},
+    "artifactStoreConfigRef": {"$ref": "#/$defs/adapterConfigRef"},
+    "stateVersion": {"type": "integer", "minimum": 1},
+    "fencingToken": {"type": "integer", "minimum": 1},
+    "previousGrantSha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+    "journalRef": {"$ref": "#/$defs/artifactReference"},
+    "journalSha256": {"$ref": "#/$defs/sha256"},
+    "coordinatorId": {"$ref": "#/$defs/id"},
+    "updatedAt": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"required": ["stateBackendConfigSha256", "artifactStoreConfigSha256"], "not": {"anyOf": [{"required": ["adapterConfigResolverId"]}, {"required": ["stateBackendConfigRef"]}, {"required": ["artifactStoreConfigRef"]}]}}},
+    {"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"required": ["adapterConfigResolverId", "stateBackendConfigRef", "artifactStoreConfigRef"], "not": {"anyOf": [{"required": ["stateBackendConfigSha256"]}, {"required": ["artifactStoreConfigSha256"]}]}, "properties": {"stateBackendConfigRef": {"properties": {"adapterKind": {"const": "registry-leader-backend"}}}, "artifactStoreConfigRef": {"properties": {"adapterKind": {"const": "artifact-store"}}}}}},
+    {"if": {"properties": {"stateVersion": {"const": 1}}}, "then": {"properties": {"previousGrantSha256": {"type": "null"}}}},
+    {"if": {"properties": {"stateVersion": {"minimum": 2}}}, "then": {"properties": {"previousGrantSha256": {"$ref": "#/$defs/sha256"}}}}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "adapterConfigRef": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "adapterKind", "adapterId", "revision"], "properties": {"kind": {"const": "adapter-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "adapterKind": {"enum": ["artifact-store", "control-authorizer", "fleet-executor", "registry-leader-backend", "wave-gate"]}, "adapterId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}},
+    "artifactReference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "storeId", "namespaceId", "sha256", "sizeBytes", "mediaType"],
+      "properties": {
+        "kind": {"const": "content-addressed"},
+        "storeId": {"$ref": "#/$defs/id"},
+        "namespaceId": {"$ref": "#/$defs/id"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "sizeBytes": {"type": "integer", "minimum": 1},
+        "mediaType": {"const": "application/json"}
+      }
+    }
+  }
+}

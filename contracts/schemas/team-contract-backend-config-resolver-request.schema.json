@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-backend-config-resolver-request.schema.json",
+  "title": "Backend configuration resolver request",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "resolverId", "operation", "reference", "authorityId", "registryId"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractBackendConfigResolverRequest"},
+    "requestId": {"$ref": "#/$defs/id"}, "resolverId": {"$ref": "#/$defs/id"}, "operation": {"const": "resolve"},
+    "reference": {"$ref": "#/$defs/reference"}, "authorityId": {"$ref": "#/$defs/id"}, "registryId": {"$ref": "#/$defs/id"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "reference": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "backendId", "revision"], "properties": {"kind": {"const": "backend-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "backendId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}}
+  }
+}

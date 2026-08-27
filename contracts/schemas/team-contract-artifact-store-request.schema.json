@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-artifact-store-request.schema.json",
+  "title": "Artifact Store request", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "storeId", "namespaceId", "operation", "sha256", "sizeBytes", "mediaType", "contentBase64"],
+  "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractArtifactStoreRequest"}, "requestId": {"$ref": "#/$defs/id"}, "storeId": {"$ref": "#/$defs/id"}, "namespaceId": {"$ref": "#/$defs/id"}, "operation": {"enum": ["put", "get"]}, "sha256": {"$ref": "#/$defs/sha256"}, "sizeBytes": {"type": ["integer", "null"], "minimum": 1}, "mediaType": {"type": "string", "minLength": 3, "maxLength": 255}, "contentBase64": {"type": ["string", "null"]}},
+  "allOf": [{"if": {"properties": {"operation": {"const": "put"}}}, "then": {"properties": {"sizeBytes": {"type": "integer", "minimum": 1}, "contentBase64": {"type": "string"}}}, "else": {"properties": {"sizeBytes": {"type": "null"}, "contentBase64": {"type": "null"}}}}],
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

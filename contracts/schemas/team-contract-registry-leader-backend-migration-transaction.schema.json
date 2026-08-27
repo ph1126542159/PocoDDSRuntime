@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-registry-leader-backend-migration-transaction.schema.json",
+  "title": "Registry leader backend shared migration transaction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "migrationId", "authorityId", "registryId", "sourceBackend", "targetBackend", "status", "stateVersion", "actor", "updatedAt"],
+  "properties": {
+    "schemaVersion": {"enum": [1, 2, 3, 4]},
+    "product": {"const": "PocoDDSRuntimeTeamContractRegistryLeaderBackendMigrationTransaction"},
+    "migrationId": {"$ref": "#/$defs/id"}, "authorityId": {"$ref": "#/$defs/id"}, "registryId": {"$ref": "#/$defs/id"},
+    "sourceBackend": {"$ref": "#/$defs/backend"}, "targetBackend": {"$ref": "#/$defs/backend"},
+    "status": {"enum": ["active", "prepared", "completed", "aborted"]},
+    "stateVersion": {"type": "integer", "minimum": 1},
+    "lastSyncEvidencePath": {"type": "string", "minLength": 1}, "lastSyncEvidenceSha256": {"$ref": "#/$defs/sha256"},
+    "migrationEvidencePath": {"anyOf": [{"type": "null"}, {"type": "string", "minLength": 1}]}, "migrationEvidenceSha256": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "abortEvidencePath": {"anyOf": [{"type": "null"}, {"type": "string", "minLength": 1}]}, "abortEvidenceSha256": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "artifactStoreId": {"$ref": "#/$defs/id"},
+    "backendConfigResolverId": {"$ref": "#/$defs/id"},
+    "lastSyncEvidenceRef": {"$ref": "#/$defs/artifactRef"},
+    "migrationEvidenceRef": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/artifactRef"}]},
+    "abortEvidenceRef": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/artifactRef"}]},
+    "actor": {"$ref": "#/$defs/id"}, "updatedAt": {"type": "string", "format": "date-time"},
+    "fencingToken": {"type": "integer", "minimum": 1}, "previousGrantSha256": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]}
+  },
+  "allOf": [
+    {"if": {"properties": {"schemaVersion": {"const": 1}}}, "then": {"required": ["lastSyncEvidencePath", "lastSyncEvidenceSha256", "migrationEvidencePath", "migrationEvidenceSha256", "abortEvidencePath", "abortEvidenceSha256"], "not": {"anyOf": [{"required": ["fencingToken"]}, {"required": ["previousGrantSha256"]}, {"required": ["artifactStoreId"]}, {"required": ["lastSyncEvidenceRef"]}, {"required": ["migrationEvidenceRef"]}, {"required": ["abortEvidenceRef"]}]}}},
+    {"if": {"properties": {"schemaVersion": {"const": 2}}}, "then": {"required": ["lastSyncEvidencePath", "lastSyncEvidenceSha256", "migrationEvidencePath", "migrationEvidenceSha256", "abortEvidencePath", "abortEvidenceSha256", "fencingToken", "previousGrantSha256"], "not": {"anyOf": [{"required": ["artifactStoreId"]}, {"required": ["lastSyncEvidenceRef"]}, {"required": ["migrationEvidenceRef"]}, {"required": ["abortEvidenceRef"]}]}}},
+    {"if": {"properties": {"schemaVersion": {"const": 3}}}, "then": {"required": ["artifactStoreId", "lastSyncEvidenceRef", "migrationEvidenceRef", "abortEvidenceRef", "fencingToken", "previousGrantSha256"], "not": {"anyOf": [{"required": ["lastSyncEvidencePath"]}, {"required": ["lastSyncEvidenceSha256"]}, {"required": ["migrationEvidencePath"]}, {"required": ["migrationEvidenceSha256"]}, {"required": ["abortEvidencePath"]}, {"required": ["abortEvidenceSha256"]}, {"required": ["backendConfigResolverId"]}]}}},
+    {"if": {"properties": {"schemaVersion": {"const": 4}}}, "then": {"required": ["artifactStoreId", "backendConfigResolverId", "lastSyncEvidenceRef", "migrationEvidenceRef", "abortEvidenceRef", "fencingToken", "previousGrantSha256"], "not": {"anyOf": [{"required": ["lastSyncEvidencePath"]}, {"required": ["lastSyncEvidenceSha256"]}, {"required": ["migrationEvidencePath"]}, {"required": ["migrationEvidenceSha256"]}, {"required": ["abortEvidencePath"]}, {"required": ["abortEvidenceSha256"]}]}}},
+    {"if": {"properties": {"schemaVersion": {"enum": [1, 2]}, "status": {"enum": ["active", "aborted"]}}}, "then": {"properties": {"migrationEvidencePath": {"type": "null"}, "migrationEvidenceSha256": {"type": "null"}}}},
+    {"if": {"properties": {"schemaVersion": {"enum": [1, 2]}, "status": {"enum": ["prepared", "completed"]}}}, "then": {"properties": {"migrationEvidencePath": {"type": "string", "minLength": 1}, "migrationEvidenceSha256": {"$ref": "#/$defs/sha256"}}}},
+    {"if": {"properties": {"schemaVersion": {"enum": [1, 2]}, "status": {"const": "aborted"}}}, "then": {"properties": {"abortEvidencePath": {"type": "string", "minLength": 1}, "abortEvidenceSha256": {"$ref": "#/$defs/sha256"}}}, "else": {"if": {"properties": {"schemaVersion": {"enum": [1, 2]}}}, "then": {"properties": {"abortEvidencePath": {"type": "null"}, "abortEvidenceSha256": {"type": "null"}}}}},
+    {"if": {"properties": {"schemaVersion": {"enum": [3, 4]}, "status": {"enum": ["active", "aborted"]}}}, "then": {"properties": {"migrationEvidenceRef": {"type": "null"}}}},
+    {"if": {"properties": {"schemaVersion": {"enum": [3, 4]}, "status": {"enum": ["prepared", "completed"]}}}, "then": {"properties": {"migrationEvidenceRef": {"$ref": "#/$defs/artifactRef"}}}},
+    {"if": {"properties": {"schemaVersion": {"enum": [3, 4]}, "status": {"const": "aborted"}}}, "then": {"properties": {"abortEvidenceRef": {"$ref": "#/$defs/artifactRef"}}}, "else": {"if": {"properties": {"schemaVersion": {"enum": [3, 4]}}}, "then": {"properties": {"abortEvidenceRef": {"type": "null"}}}}},
+    {"if": {"properties": {"schemaVersion": {"enum": [1, 2, 3]}}}, "then": {"not": {"required": ["backendConfigResolverId"]}, "properties": {"sourceBackend": {"$ref": "#/$defs/localBackend"}, "targetBackend": {"$ref": "#/$defs/localBackend"}}}, "else": {"properties": {"sourceBackend": {"$ref": "#/$defs/backendRef"}, "targetBackend": {"$ref": "#/$defs/backendRef"}}}}
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "backend": {"oneOf": [{"$ref": "#/$defs/localBackend"}, {"$ref": "#/$defs/backendRef"}]},
+    "localBackend": {"type": "object", "additionalProperties": false, "required": ["kind", "backendId", "configPath", "configSha256"], "properties": {"kind": {"const": "external-command"}, "backendId": {"$ref": "#/$defs/id"}, "configPath": {"type": "string", "minLength": 1}, "configSha256": {"$ref": "#/$defs/sha256"}}},
+    "backendRef": {"type": "object", "additionalProperties": false, "required": ["kind", "resolverId", "configId", "backendId", "revision"], "properties": {"kind": {"const": "backend-config-ref"}, "resolverId": {"$ref": "#/$defs/id"}, "configId": {"$ref": "#/$defs/id"}, "backendId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}}},
+    "artifactRef": {"type": "object", "additionalProperties": false, "required": ["kind", "storeId", "namespaceId", "sha256", "sizeBytes", "mediaType"], "properties": {"kind": {"const": "content-addressed"}, "storeId": {"$ref": "#/$defs/id"}, "namespaceId": {"$ref": "#/$defs/id"}, "sha256": {"$ref": "#/$defs/sha256"}, "sizeBytes": {"type": "integer", "minimum": 1}, "mediaType": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}$"}}}
+  }
+}

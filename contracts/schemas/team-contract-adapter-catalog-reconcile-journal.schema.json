@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-reconcile-journal.schema.json",
+  "title": "Recoverable Adapter Catalog rollout journal", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "transactionId", "reconcilerId", "configSha256", "catalogId", "sourceActivationGeneration", "sourceCatalogGeneration", "sourceCatalogSha256", "candidateCatalogGeneration", "candidateCatalogSha256", "actor", "reason", "status", "switchedGeneration", "rollbackGeneration", "healthAttempt", "lastOperation", "errorCode", "createdAt", "updatedAt", "journalSha256"],
+  "properties": {
+    "schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCatalogReconcileJournal"}, "transactionId": {"$ref": "#/$defs/id"}, "reconcilerId": {"$ref": "#/$defs/id"}, "configSha256": {"$ref": "#/$defs/sha256"}, "catalogId": {"$ref": "#/$defs/id"},
+    "sourceActivationGeneration": {"type": "integer", "minimum": 1}, "sourceCatalogGeneration": {"type": "integer", "minimum": 1}, "sourceCatalogSha256": {"$ref": "#/$defs/sha256"}, "candidateCatalogGeneration": {"type": "integer", "minimum": 2}, "candidateCatalogSha256": {"$ref": "#/$defs/sha256"},
+    "actor": {"$ref": "#/$defs/id"}, "reason": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\r\\n]+$"},
+    "status": {"enum": ["preparing", "prepared", "draining", "drained", "switching", "switched", "activating", "activated", "health-checking", "healthy", "committing", "committed", "aborting", "aborted", "abort-failed", "rolling-back", "catalog-rolled-back", "rollback-hook", "rolled-back", "rollback-failed"]},
+    "switchedGeneration": {"oneOf": [{"type": "integer", "minimum": 2}, {"type": "null"}]}, "rollbackGeneration": {"oneOf": [{"type": "integer", "minimum": 3}, {"type": "null"}]}, "healthAttempt": {"type": "integer", "minimum": 0, "maximum": 100},
+    "lastOperation": {"oneOf": [{"enum": ["prepare", "drain", "switch", "activate", "health", "commit", "abort", "rollback"]}, {"type": "null"}]}, "errorCode": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+    "createdAt": {"type": "string", "format": "date-time"}, "updatedAt": {"type": "string", "format": "date-time"}, "journalSha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

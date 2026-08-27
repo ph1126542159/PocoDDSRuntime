@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-listing.schema.json",
+  "title": "Team Contract Adapter catalog listing", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "catalogId", "catalogGeneration", "catalogSha256", "adapters"],
+  "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCatalogListing"}, "catalogId": {"$ref": "#/$defs/id"}, "catalogGeneration": {"type": "integer", "minimum": 1}, "catalogSha256": {"$ref": "#/$defs/sha256"}, "adapters": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"type": "object", "additionalProperties": false, "required": ["adapterId", "adapterType", "manifestId", "revision", "owner", "protocolId", "configSha256"], "properties": {"adapterId": {"$ref": "#/$defs/id"}, "adapterType": {"$ref": "#/$defs/type"}, "manifestId": {"$ref": "#/$defs/id"}, "revision": {"$ref": "#/$defs/id"}, "owner": {"type": "string", "minLength": 3}, "protocolId": {"$ref": "#/$defs/id"}, "configSha256": {"$ref": "#/$defs/sha256"}}}}},
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "type": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

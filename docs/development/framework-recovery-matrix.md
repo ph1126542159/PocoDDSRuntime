@@ -23,10 +23,10 @@
 | Process | 子进程永久崩溃 | 滚动重启预算耗尽后 fail-closed |
 | Bundle | 部署 Owner 崩溃 | 排他租约拒绝并发写，崩溃后释放租约 |
 | Service | 配置参与者部分提交 | 两阶段预检、逆序回滚、恢复和幂等重放 |
-| Transport | Modbus Peer 断线、MQTT Broker 非预期断线、Fast DDS Participant 重建 | 新会话重连、恢复订阅/Reader，并验证断线或重建前后的完整业务值 |
+| Transport | Modbus Peer 断线、MQTT Broker 非预期断线、MQTT 回调期间关闭、Fast DDS Participant 重建 | 新会话重连、恢复订阅/Reader，安全排空回调，并验证断线或重建前后的完整业务值 |
 | Persistence | 维护操作中断 | 重开、恢复意图、完整性、备份和只读检查 |
 
-当前矩阵包含七个必需层级和十二个场景，其中 Process 层分别验证外部 Launcher 的 Runtime 看护预算，以及 Runtime 内 `ProcessManagement` 对普通受管子进程的有限恢复、启动 Readiness、新鲜文件防伪、心跳丢失、显式依赖 DAG、依赖故障传播、循环检测、反向关闭及版本化依赖观察 API；两层不能互相替代。Transport 层同时验证 Modbus、MQTT 与 Fast DDS。MQTT 场景明确区分两层责任：Transport 观察连接丢失并保存订阅意图，上层协调器再次调用 `start()` 后建立新会话；它不宣称 Transport 内部存在隐藏的无限自动重连线程。Fast DDS 场景销毁并重建 Subscriber Participant/DataReader，保留原逻辑 Subscription 和持续运行的 Publisher；通过依赖 DDS discovery 恢复，不伪装成 Broker 式重连。
+当前矩阵包含七个必需层级和四十八个场景，其中 Process 层分别验证外部 Launcher 的 Runtime 看护预算，以及 Runtime 内 `ProcessManagement` 对普通受管子进程的有限恢复、启动 Readiness、新鲜文件防伪、心跳丢失、显式依赖 DAG、依赖故障传播、循环检测、反向关闭及版本化依赖观察 API；两层不能互相替代。Transport 层同时验证 Modbus、MQTT 与 Fast DDS。MQTT 场景明确区分两层责任：Transport 观察连接丢失并保存订阅意图，上层协调器再次调用 `start()` 后建立新会话；它不宣称 Transport 内部存在隐藏的无限自动重连线程。场景还让 `stop()` 与消息回调重叠，验证 Paho 队列所有权和回调销毁边界。Fast DDS 场景销毁并重建 Subscriber Participant/DataReader，保留原逻辑 Subscription 和持续运行的 Publisher；通过依赖 DDS discovery 恢复，不伪装成 Broker 式重连。PDR-REC-0036 验证 Secret Provider 的 v1 兼容、v2 租约、显式双版本轮换、撤销、回退截止、无持久化泄露以及 Backend v4 租约覆盖；PDR-REC-0037 验证四类 Adapter 共用的进程隔离、超时、输出上限、脱敏和稳定能力摘要；PDR-REC-0038 验证摘要固定的 Manifest/Catalog 能发现核心从未登记的 Adapter 类型，并对传递制品漂移、重复身份和泄密失败关闭；PDR-REC-0039 验证 Catalog 原子激活、fenced 单写者、generation CAS、幂等重试、快照一致性和前进式显式回滚；PDR-REC-0040 验证可恢复 Reconciler 的 prepare/drain/switch/health/commit、切换前 abort、切换后自动回退及 rollback Hook 二次恢复；PDR-REC-0041 验证多 Host Canary/Wave 的并发上限、失败预算、协调器崩溃恢复、未准入节点隔离和 committed 节点逆序撤销；PDR-REC-0042 验证独立 Wave Gate 的 SLO 证据、非阻塞观察窗口、持久暂停、CAS resume、人工 abort 和判定歧义恢复；PDR-REC-0043 验证 Control Authorizer 默认拒绝、Principal 绑定、脱敏意图、授权响应歧义、拒绝持久化和获权回滚；PDR-REC-0044 验证远程 Fleet journal、线性 CAS/fencing、跨协调 Host 接管、提交歧义消解及 Artifact 篡改失败关闭；PDR-REC-0045 验证 Fleet Plan v5 的强类型逻辑配置引用可跨 Host 解析且对 identity/revision/scope/pin 漂移失败关闭；PDR-REC-0046 验证六类 Adapter 共用的一致性认证、稳定 ID、能力重放、证据脱敏和自摘要防篡改；PDR-REC-0047 验证 Fleet v6 对六类认证证据的强制准入、时效、配置/能力/scope 绑定、零路径审计和跨 Host 接管；PDR-REC-0048 验证 Fleet v7 的 Ed25519 签名证明、certifier kind/ID 权限、有效期、吊销、密钥轮换和最低 trust policy generation。
 
 这些是本机构建中的故障注入/模拟协议/进程测试证据，不等同于真实机器人、真实现场总线、断电掉电、硬件看门狗或 24/72 小时长稳验收。真实设备与环境仍必须进入独立的 SIL/HIL/外部验收证据。
 

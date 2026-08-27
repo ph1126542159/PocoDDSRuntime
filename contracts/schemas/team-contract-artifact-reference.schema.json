@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pocoddsruntime.local/schemas/team-contract-artifact-reference.schema.json",
+  "title": "Portable content-addressed Artifact Store reference",
+  "type": "object", "additionalProperties": false,
+  "required": ["kind", "storeId", "namespaceId", "sha256", "sizeBytes", "mediaType"],
+  "properties": {"kind": {"const": "content-addressed"}, "storeId": {"$ref": "#/$defs/id"}, "namespaceId": {"$ref": "#/$defs/id"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "sizeBytes": {"type": "integer", "minimum": 1}, "mediaType": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}$"}},
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}}
+}

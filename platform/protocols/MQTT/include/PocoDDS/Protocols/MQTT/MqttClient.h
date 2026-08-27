@@ -81,6 +81,9 @@ class MqttClient final : public PocoDDS::Protocols::DiagnosticProtocol,
                                 MQTTClient_message* message);
     static void onDeliveryComplete(void* context, MQTTClient_deliveryToken token);
     static void requireSuccess(int result, const char* operation);
+    bool beginCallback() noexcept;
+    void endCallback() noexcept;
+    void waitForCallbacks() noexcept;
     void markSuccess();
     void markFailure(const std::string& message);
 

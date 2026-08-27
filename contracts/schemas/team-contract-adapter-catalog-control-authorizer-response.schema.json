@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://pocoddsruntime.local/schemas/team-contract-adapter-catalog-control-authorizer-response.schema.json",
+  "title": "Adapter Catalog Fleet control authorization response", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "product", "requestId", "authorizerId", "authorizationId", "rolloutId", "operationId", "action", "allowed", "decision", "principalId", "evidenceSha256", "diagnosticCode"],
+  "properties": {"schemaVersion": {"const": 1}, "product": {"const": "PocoDDSRuntimeTeamContractAdapterCatalogControlAuthorizerResponse"}, "requestId": {"type": "string", "format": "uuid"}, "authorizerId": {"$ref": "#/$defs/id"}, "authorizationId": {"$ref": "#/$defs/id"}, "rolloutId": {"$ref": "#/$defs/pathId"}, "operationId": {"$ref": "#/$defs/id"}, "action": {"enum": ["resume", "abort"]}, "allowed": {"type": "boolean"}, "decision": {"enum": ["allow", "deny"]}, "principalId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}, "evidenceSha256": {"$ref": "#/$defs/sha256"}, "diagnosticCode": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}},
+  "allOf": [{"if": {"properties": {"decision": {"const": "allow"}}}, "then": {"properties": {"allowed": {"const": true}, "principalId": {"$ref": "#/$defs/id"}, "diagnosticCode": {"type": "null"}}}}, {"if": {"properties": {"decision": {"const": "deny"}}}, "then": {"properties": {"allowed": {"const": false}, "diagnosticCode": {"$ref": "#/$defs/id"}}}}],
+  "$defs": {"pathId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,60}$"}, "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}
