@@ -8,7 +8,9 @@
 __pycache__/
 *.py[cod]
 /webui/node_modules/
+**/node_modules/
 deploy/observability/certificates/*.key
 deploy/observability/certificates/*.crt
 deploy/observability/certificates/*.csr
 deploy/observability/certificates/*.srl
+/webui/home/build/

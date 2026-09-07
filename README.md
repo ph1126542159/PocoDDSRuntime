@@ -1,5 +1,18 @@
 # PocoDDSRuntime
 
+## Project status and license
+
+Early-stage C++ runtime maintained by [Hui Peng](https://github.com/ph1126542159).
+Project-owned code is licensed under **GPL-3.0-only**; existing third-party
+licenses and copyrights are preserved. See [LICENSE](LICENSE),
+[NOTICE.md](NOTICE.md), and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+The v0.1.0 release is a source release. Broad adoption and full cross-platform
+acceptance are not established. Known CI limitations and the public-source
+preparation are recorded in
+[open-source readiness](docs/development/open-source-readiness.md).
+
+
 PocoDDSRuntime is a C++17 OSP service container derived from the macchina.io
 composition model. OSP owns local Bundle lifecycle and service registration;
 Fast DDS replaces the former RemotingNG cross-process proxy/skeleton layer.
